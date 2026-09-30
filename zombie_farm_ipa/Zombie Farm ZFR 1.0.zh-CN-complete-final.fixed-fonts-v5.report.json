@@ -1,0 +1,241 @@
+{
+  "generated": "2026-09-15T05:07:45+00:00",
+  "tool": "patch_zfr_fonts_v5.py",
+  "purpose": "extend title 24 / body 18 to the dedicated ZFAlertWindow subclass dialogs",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v4.ipa",
+    "size": 59564493,
+    "sha256": "1087C7006AC3C62DFBAA52507CB5E786B4DD5F67A14ED16DBA3D7EF57E0491AE",
+    "executable_sha256": "9B9251122C86E0CA5B1F1D98DB93BD49B787E33F837C07E3E7CA0BD2A5DC0EEF"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x16682c",
+      "file_offset": 1480748,
+      "old": "1a36a0e3",
+      "new": "1c36a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowFlurryOffer -initWithWindow: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16e7bc",
+      "file_offset": 1513404,
+      "old": "1a36a0e3",
+      "new": "1c36a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowQuest -initWithQuest: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16f240",
+      "file_offset": 1516096,
+      "old": "1ab6a0e3",
+      "new": "1cb6a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowQuestComplete -initWithQuest: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x1a3950",
+      "file_offset": 1730896,
+      "old": "1a36a0e3",
+      "new": "1c36a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowFriendsList -init title 20.0 -> 24.0 [1/2]"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x1a3c00",
+      "file_offset": 1731584,
+      "old": "1a36a0e3",
+      "new": "1c36a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowFriendsList -init title 20.0 -> 24.0 [2/2]"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x1a81d8",
+      "file_offset": 1749464,
+      "old": "1a36a0e3",
+      "new": "1c36a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowGiftReceive -initWithGifts: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x1a9654",
+      "file_offset": 1754708,
+      "old": "1a36a0e3",
+      "new": "1c36a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowGiftSelection -initWithLevel: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x1b2020",
+      "file_offset": 1789984,
+      "old": "1726a0e3",
+      "new": "1926a0e3",
+      "float": "18",
+      "note": "ZFAlertWindowPromo -initWithWindow:withDictionary: body 15.0 -> 18.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x1b3528",
+      "file_offset": 1795368,
+      "old": "1726a0e3",
+      "new": "1926a0e3",
+      "float": "18",
+      "note": "ZFAlertWindowPromo -display body 15.0 -> 18.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x252b60",
+      "file_offset": 2448224,
+      "old": "1a96a0e3",
+      "new": "1c96a0e3",
+      "float": "24",
+      "note": "ZFAlertWindowBrainSpinner -displayResult title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10776c",
+      "file_offset": 6023020,
+      "old": "c4f2a010",
+      "new": "c4f2c010",
+      "float": "24",
+      "note": "ZFAlertWindowFlurryOffer -initWithWindow: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10d090",
+      "file_offset": 6045840,
+      "old": "c4f2a016",
+      "new": "c4f2c016",
+      "float": "24",
+      "note": "ZFAlertWindowQuest -initWithQuest: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10da84",
+      "file_offset": 6048388,
+      "old": "c4f2a010",
+      "new": "c4f2c010",
+      "float": "24",
+      "note": "ZFAlertWindowQuestComplete -initWithQuest: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x134524",
+      "file_offset": 6206756,
+      "old": "c4f2a010",
+      "new": "c4f2c010",
+      "float": "24",
+      "note": "ZFAlertWindowFriendsList -init title 20.0 -> 24.0 [1/2]"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x13478a",
+      "file_offset": 6207370,
+      "old": "c4f2a010",
+      "new": "c4f2c010",
+      "float": "24",
+      "note": "ZFAlertWindowFriendsList -init title 20.0 -> 24.0 [2/2]"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x137b84",
+      "file_offset": 6220676,
+      "old": "c4f2a010",
+      "new": "c4f2c010",
+      "float": "24",
+      "note": "ZFAlertWindowGiftReceive -initWithGifts: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x138b84",
+      "file_offset": 6224772,
+      "old": "c4f2a010",
+      "new": "c4f2c010",
+      "float": "24",
+      "note": "ZFAlertWindowGiftSelection -initWithLevel: title 20.0 -> 24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x14007c",
+      "file_offset": 6254716,
+      "old": "c4f27012",
+      "new": "c4f29012",
+      "float": "18",
+      "note": "ZFAlertWindowPromo -display body 15.0 -> 18.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x1b35ac",
+      "file_offset": 6727084,
+      "old": "c4f2a016",
+      "new": "c4f2c016",
+      "float": "24",
+      "note": "ZFAlertWindowBrainSpinner -displayResult title 20.0 -> 24.0"
+    }
+  ],
+  "executable_checks": {
+    "sites_verified": 19,
+    "readback": [
+      "sub6 0x16682c 1c36a0e3 (24)",
+      "sub6 0x16e7bc 1c36a0e3 (24)",
+      "sub6 0x16f240 1cb6a0e3 (24)",
+      "sub6 0x1a3950 1c36a0e3 (24)",
+      "sub6 0x1a3c00 1c36a0e3 (24)",
+      "sub6 0x1a81d8 1c36a0e3 (24)",
+      "sub6 0x1a9654 1c36a0e3 (24)",
+      "sub6 0x1b2020 1926a0e3 (18)",
+      "sub6 0x1b3528 1926a0e3 (18)",
+      "sub6 0x252b60 1c96a0e3 (24)",
+      "sub9 0x10776c c4f2c010 (24)",
+      "sub9 0x10d090 c4f2c016 (24)",
+      "sub9 0x10da84 c4f2c010 (24)",
+      "sub9 0x134524 c4f2c010 (24)",
+      "sub9 0x13478a c4f2c010 (24)",
+      "sub9 0x137b84 c4f2c010 (24)",
+      "sub9 0x138b84 c4f2c010 (24)",
+      "sub9 0x14007c c4f29012 (18)",
+      "sub9 0x1b35ac c4f2c016 (24)"
+    ],
+    "v4_helper_region_intact": true
+  },
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191075,
+    "padding_bytes": 11982,
+    "compression_strategy": "default",
+    "crc32": "28ba83ed",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v5.ipa",
+    "size": 59564493,
+    "sha256": "622A2F88EB6D93C6810E1D8649929C3F23A08817E3332E2A75C7AB841275CE86",
+    "executable_sha256": "A5EE43C6772181CEF370329FC37D8E06270486260927898A1EB0028A3E7D5DF0"
+  }
+}

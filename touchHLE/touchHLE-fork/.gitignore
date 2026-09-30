@@ -1,0 +1,38 @@
+/target
+/vendor/boost
+/touchHLE_sandbox
+/touchHLE_apps
+touchHLE_log.txt
+touchHLE_wallpaper.*
+
+# Android
+
+*.iml
+.gradle
+/local.properties
+.idea/
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+android/app/src/main/jniLibs
+android/app/build
+android/build
+android/app/*.jks
+android/app/*.keystore
+*.jks
+*.keystore
+
+# Default developer dump file
+
+DUMP.txt
+
+# Local game/debug artifacts
+/zombie_farm/
+/_tmp*/
+/.tmp*/
+/touchhle_*.log
+/tools/__pycache__/
+/使用教程.txt
+/run_online.txt

@@ -1,0 +1,280 @@
+{
+  "generated": "2026-09-19T18:47:12+00:00",
+  "tool": "patch_zfr_questfix_v28.py",
+  "kind": "FIX",
+  "supersedes": "fixed-fonts-v27fix.ipa",
+  "root_cause": "v11fix replaced the whole body of -[ZFQuestNotification stopListening] with removeObserver:self, deleting the original per-ZFQuestRequirement removeObserver: loop. NSNotificationCenter holds observers as raw unretained pointers, so each released requirement left a dangling entry; posting that notification then sent incrementCount: to a recycled address (NSString / NSNotification) and touchHLE aborted with exit code -1073741819.",
+  "fix": "-stopListening now calls [[NSNotificationCenter defaultCenter] removeObserver:self] (the v11fix counting repair, unchanged) AND then unregisters every object in self.requirements, restoring the original binary's cleanup.",
+  "counting_fix_preserved": "removeObserver: matches by pointer and each ZFQuestNotification builds its own requirement objects from Quests.plist into its own ivar +0x128, so the throwaway's loop cannot unregister a live quest's counters.",
+  "loop_style": "count + objectAtIndex: instead of the original fast enumeration: equivalent here (the array is not mutated) and 0x8a bytes instead of ~0xcc, so no code cave is needed.",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v27fix.ipa",
+    "size": 59564493,
+    "sha256": "3D4CA38B66FAA55CA476FD4417443E814848BE44D978594E604EF81003AAC131",
+    "executable_sha256": "CE84E9C86A40500F7F96D40A7C22D73EE424A92C06CB6C18D5E4B1E2ABEE6E3A"
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x10a1dc",
+      "end": "0x10a29c",
+      "file_offset": 6033884,
+      "len": 192,
+      "v27_sha256": "3f27d334b6dd50f9861a9976b9f64397844d9411dd57392a4a42c85f24420080",
+      "new_sha256": "b33213a9fd439f054ef05fe0a87d26b49d942caebf927e80b6c7defc703b15eb",
+      "note": "stopListening body -> removeObserver:self + per-requirement removeObserver: loop"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16a5f8",
+      "end": "0x16a700",
+      "file_offset": 1496568,
+      "len": 264,
+      "v27_sha256": "824d7bda74a5cc5f1c13b58861bce85795a07373e275a1584d93a6ea19eee703",
+      "new_sha256": "670ed1bcce00579c2db5314272491eab04a22e8825b811972eccde38a4109b62",
+      "note": "stopListening body (ARM) -> same"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16a700",
+      "end": "0x16a718",
+      "file_offset": 1496832,
+      "len": 24,
+      "v27_sha256": "ede9e7ef1e636a1174fd62d28e41cbc686e080486047908fd60123d4bbfdb3d0",
+      "new_sha256": "96b0e0d7debdc49dde02eacc29e34e917c3b16fe95ff4879e495b33664f5ee2b",
+      "note": "stopListening literal pool -> 6 slot words"
+    }
+  ],
+  "site_count": 3,
+  "structure_checks": {
+    "sub9": {
+      "instructions": 76,
+      "calls": [
+        [
+          "0x10a1f6",
+          "blx",
+          "0x2d014c"
+        ],
+        [
+          "0x10a20a",
+          "blx",
+          "0x2d014c"
+        ],
+        [
+          "0x10a21a",
+          "blx",
+          "0x2d014c"
+        ],
+        [
+          "0x10a22c",
+          "blx",
+          "0x2d014c"
+        ],
+        [
+          "0x10a248",
+          "blx",
+          "0x2d014c"
+        ],
+        [
+          "0x10a25a",
+          "blx",
+          "0x2d014c"
+        ]
+      ],
+      "loop_head": "0x10a234",
+      "epilogue": "0x10a262"
+    },
+    "sub6": {
+      "instructions": 34,
+      "calls": [
+        [
+          "0x16a608",
+          "0x393fe0"
+        ],
+        [
+          "0x16a61c",
+          "0x393fe0"
+        ],
+        [
+          "0x16a628",
+          "0x393fe0"
+        ],
+        [
+          "0x16a638",
+          "0x393fe0"
+        ],
+        [
+          "0x16a658",
+          "0x393fe0"
+        ],
+        [
+          "0x16a668",
+          "0x393fe0"
+        ]
+      ],
+      "pool_loads": [
+        [
+          "0x16a5fc",
+          "0x16a700"
+        ],
+        [
+          "0x16a604",
+          "0x16a704"
+        ],
+        [
+          "0x16a610",
+          "0x16a708"
+        ],
+        [
+          "0x16a624",
+          "0x16a70c"
+        ],
+        [
+          "0x16a634",
+          "0x16a710"
+        ],
+        [
+          "0x16a650",
+          "0x16a714"
+        ],
+        [
+          "0x16a664",
+          "0x16a708"
+        ]
+      ],
+      "loop_head": "0x16a644",
+      "epilogue": "0x16a674"
+    },
+    "stack": {
+      "sub9": {
+        "push": "0x10a1dc",
+        "sub": "0x10a1de",
+        "add": "0x10a262",
+        "pop": "0x10a264",
+        "balanced": true
+      },
+      "sub6": {
+        "sp_writes": [
+          "sub sp, r7, #0x18"
+        ],
+        "balanced": true
+      }
+    }
+  },
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ],
+      [
+        "0x186d40",
+        "0x186d44"
+      ],
+      [
+        "0x186d44",
+        "0x186d48"
+      ],
+      [
+        "0x186d50",
+        "0x186d54"
+      ],
+      [
+        "0x187dcc",
+        "0x187dd0"
+      ],
+      [
+        "0x187dd0",
+        "0x187dd4"
+      ],
+      [
+        "0x187dd8",
+        "0x187ddc"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ],
+      [
+        "0x1138c8",
+        "0x1138f3"
+      ],
+      [
+        "0x1138f4",
+        "0x113909"
+      ],
+      [
+        "0x76d0e",
+        "0x76d12"
+      ],
+      [
+        "0x11f43a",
+        "0x11f43e"
+      ],
+      [
+        "0x11f43c",
+        "0x11f440"
+      ],
+      [
+        "0x11f440",
+        "0x11f444"
+      ],
+      [
+        "0x120030",
+        "0x120034"
+      ],
+      [
+        "0x120032",
+        "0x120036"
+      ],
+      [
+        "0x120038",
+        "0x12003c"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191226,
+    "padding_bytes": 11831,
+    "compression_strategy": "default",
+    "crc32": "de8c6119",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v28fix.ipa",
+    "size": 59564493,
+    "sha256": "7B37DC7CF874D478BA25D458871B2D19F1B58532E83223C52A5C9519B5BDA7F8",
+    "executable_sha256": "45D647787CC6256DBE83B041808E5845739A7B331B72DC030C7FD6E9CC04B05B"
+  }
+}

@@ -1,0 +1,157 @@
+{
+  "generated": "2026-09-17T04:49:02+00:00",
+  "tool": "patch_zfr_b2_v22.py",
+  "kind": "FIX",
+  "findings": {
+    "#7": "the zh-Hans fork in ZFZombieMenu builds \u6570\u503c/\u80fd\u529b/\u529b\u91cf/\u751f\u547d/\u901f\u5ea6 as CCLabelTTF with no setColor:, i.e. cocos2d default white; a shared Thumb stub performs the original factory call and then sends setColor:(0,0,0) to the new label",
+    "placement": "sub9 0x1138c8, inside the orphan function whose prologue the v17 stub already replaced; no branch or literal reference reaches it (see _analysis/_v21_refs.py)"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v21fix.ipa",
+    "size": 59564493,
+    "sha256": "358D2887D43F613748581EB29FAFC385976629ED791188FBF973D2C6922C2052",
+    "executable_sha256": "7DBAC66BB28DEBA9812C5F9D9ED81850E93E4B3381924EDEC9AF39494BE4394F"
+  },
+  "stub": {
+    "addr": "0x1138c8",
+    "len": 44,
+    "selector": "0x2d16e7",
+    "literal_at": "0x1138f0"
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x1138c8",
+      "file_offset": 6072520,
+      "len": 44,
+      "kind": "stub",
+      "old_prefix": "7944784409680068bcf13cec039041f6",
+      "new_prefix": "82b0cdf804e0ddf808c0cdf800c0bcf1",
+      "literal": "0x2d16e7",
+      "literal_at": "0x1138f0",
+      "old_literal_at_16": "84ec048b",
+      "new_literal": "e7162d00",
+      "note": "#7 setColor: wrapper stub"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0cf962",
+      "file_offset": 5794146,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "00f2f4eb",
+      "new_prefix": "43f0b1ff",
+      "branch_to": "0x1138c8",
+      "note": "#7 ZFZombieMenu -initRightMenu STATS (\u6570\u503c) label"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0cfaf0",
+      "file_offset": 5794544,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "00f22ceb",
+      "new_prefix": "43f0eafe",
+      "branch_to": "0x1138c8",
+      "note": "#7 ZFZombieMenu -initRightMenu ABILITY (\u80fd\u529b) label"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0d0582",
+      "file_offset": 5797250,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "fff1e4ed",
+      "new_prefix": "43f0a1f9",
+      "branch_to": "0x1138c8",
+      "note": "#7 ZFZombieMenu -initStatDisplay POWER (\u529b\u91cf) label"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0d05d2",
+      "file_offset": 5797330,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "fff1bced",
+      "new_prefix": "43f079f9",
+      "branch_to": "0x1138c8",
+      "note": "#7 ZFZombieMenu -initStatDisplay LIFE (\u751f\u547d) label"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0d061c",
+      "file_offset": 5797404,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "fff196ed",
+      "new_prefix": "43f054f9",
+      "branch_to": "0x1138c8",
+      "note": "#7 ZFZombieMenu -initStatDisplay SPEED (\u901f\u5ea6) label"
+    }
+  ],
+  "site_count": 6,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191089,
+    "padding_bytes": 11968,
+    "compression_strategy": "default",
+    "crc32": "31568f72",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v22fix.ipa",
+    "size": 59564493,
+    "sha256": "BD99FD793C23D0CEA2D92D4309E6DDE1F3772CF44B337C69425C307D542C2EA3",
+    "executable_sha256": "3666A9D34C5A97F22D75806B42D831FAC5BA8AD3A3AC6747E452924088527B7D"
+  }
+}

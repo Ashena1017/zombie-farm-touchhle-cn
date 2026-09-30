@@ -1,0 +1,139 @@
+{
+  "generated": "2026-09-16T17:11:58+00:00",
+  "tool": "patch_zfr_b2_v17.py",
+  "kind": "FIX",
+  "findings": {
+    "scanner_bug": "16-bit Thumb `add rd, pc` uses addr+4 as its base, NOT Align(addr+4,4). At addr%4==2 every previous scan (_dis.py, _b2_all.py) resolved 2 bytes early and silently dropped the site -- this is why the sub9 '%@ Used!' reference appeared not to exist.  _v17_pc.py proves it: 6629 unaligned hits vs 0 aligned hits over 56353 sites.",
+    "issue_1_site": "sub9 0x54272 in -[ZFMarketMenu alertWindow:dismissedPositive:] feeds the RAW item name into stringWithFormat:('\u5df2\u4f7f\u7528%@\uff01').  The template was already localised; only the argument was not.",
+    "issue_1_r4": "v16's stub cannot be reused: its return address lives in r4 and r4 is self here (read at 0x5441c).  The new stub uses a bx-r12 tail call and touches no callee-saved register.",
+    "exp_string": "the float reading ' +1Ee' is CFString 0x476190/0x3b2120 (' +%dxp' in the baseline), NOT the 0x468ef0/0x3a4e80 one v16 repaired.  The codex patch had moved its data pointer onto the corrupted 'ZFSaleEndDateDay +%d\u0118\u0119' cstring."
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v16fix.ipa",
+    "size": 59564493,
+    "sha256": "D51BE79A5886E50B83FEA1B0CBFD2AEF94CEC778586BF572DF6EA83D2F425F4D",
+    "executable_sha256": "8E4EA7ED88DB070399E367F66FE82C8A95298A84F8DA42FA0AFB1EA2F2167869"
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x1138a0",
+      "file_offset": 6072480,
+      "len": 37,
+      "old_prefix": "f0b503af2de9000dadf1100424f00f04a54604f9ef8abcb0",
+      "new_prefix": "07b5184601f74cfc034600bf40f24c1cc0f22d0cbde80740",
+      "note": "new sub9 stub (r4-safe tail call) + the ' +%%d\u7ecf\u9a8c' literal"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x054272",
+      "file_offset": 5288562,
+      "len": 4,
+      "old_prefix": "7bf26cef",
+      "new_prefix": "bff015fb",
+      "note": "localise the '%%@' item name before displayToolTip: (issue #1)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x476198",
+      "file_offset": 4690328,
+      "len": 4,
+      "old_prefix": "781c3d00",
+      "new_prefix": "34751700",
+      "note": "CFString ' +%d\u7ecf\u9a8c' data -> 0x177534"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x47619c",
+      "file_offset": 4690332,
+      "len": 4,
+      "old_prefix": "08000000",
+      "new_prefix": "0a000000",
+      "note": "CFString ' +%d\u7ecf\u9a8c' size -> 10"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3b2128",
+      "file_offset": 8818984,
+      "len": 4,
+      "old_prefix": "78dc3000",
+      "new_prefix": "ba381100",
+      "note": "CFString ' +%d\u7ecf\u9a8c' data -> 0x1138ba"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3b212c",
+      "file_offset": 8818988,
+      "len": 4,
+      "old_prefix": "08000000",
+      "new_prefix": "0a000000",
+      "note": "CFString ' +%d\u7ecf\u9a8c' size -> 10"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x177534",
+      "file_offset": 1549620,
+      "len": 11,
+      "old_prefix": "f0402de90c708de2000d2d",
+      "new_prefix": "202b2564e7bb8fe9aa8c00",
+      "note": "the ' +%%d\u7ecf\u9a8c' literal for sub6"
+    }
+  ],
+  "site_count": 7,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191051,
+    "padding_bytes": 12006,
+    "compression_strategy": "default",
+    "crc32": "3da79ed9",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v17fix.ipa",
+    "size": 59564493,
+    "sha256": "73F434FF49B186AEEA98C3B5981DB1E4988BD943635EB18D867F4EE4351AA261",
+    "executable_sha256": "353FD60088FEB8F8D1DABD293BE60A0BC141544BDD626F100EFBC9799C8C5C8C"
+  }
+}

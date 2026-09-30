@@ -1,0 +1,165 @@
+{
+  "generated": "2026-09-16T11:47:37+00:00",
+  "tool": "patch_zfr_ability_v13.py",
+  "kind": "FIX",
+  "root_cause": "getRandomAbilityToUnlock passes the raw internal actor name (a __cfstring such as 'ZomBumpkin') as the %@ argument of the localised template 'Unlocked a new %@ ability!'; the name is never passed through localizedStringForKey:",
+  "fix": "retarget both stringWithFormat: objc_msgSend calls to a stub that runs r3 = zfrLoc(r3) first, where zfrLoc = [[NSBundle mainBundle] localizedStringForKey:s value:s table:nil] (already present in the codex code cave)",
+  "stub_cave": "the prologue of -[ZFQuestMan removeSeasonalQuests], which is dead in both slices (selector absent from __objc_selrefs, no branch targets its entry, string occurs only in __objc_methname)",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v12fix.ipa",
+    "size": 59564493,
+    "sha256": "A608A5E79E497DD8105DD7742FD23B185FC113D7751072983931A5DD12545F93",
+    "executable_sha256": "AAB4184477458924690FFCCC6B547DB07DB9E82C58FFD0C64E962267B5897E97"
+  },
+  "instruction_checks": {
+    "sub6_stub_0x16d594": {
+      "instructions": [
+        "push {r0, r1, r2, lr}",
+        "mov r0, r5",
+        "bl #0x1b6d0",
+        "mov r3, r0",
+        "pop {r0, r1, r2, lr}",
+        "b #0x393fe0"
+      ]
+    },
+    "sub9_stub_0x10c470": {
+      "instructions": [
+        "push {r0, r1, r2, lr}",
+        "mov r0, r4",
+        "bl #0x15140",
+        "mov r3, r0",
+        "pop.w {r0, r1, r2, lr}",
+        "push {r4, lr}",
+        "blx #0x2d014c",
+        "pop {r4, pc}"
+      ]
+    },
+    "sub6_retarget_0xb75ac": {
+      "instruction": "bl #0x16d594",
+      "target": "0x16d594"
+    },
+    "sub6_retarget_0xb76d4": {
+      "instruction": "bl #0x16d594",
+      "target": "0x16d594"
+    },
+    "sub9_retarget_0x86112": {
+      "instruction": "bl #0x10c470",
+      "target": "0x10c470"
+    },
+    "sub9_retarget_0x86218": {
+      "instruction": "bl #0x10c470",
+      "target": "0x10c470"
+    }
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x16d594",
+      "file_offset": 1508756,
+      "len": 24,
+      "old_prefix": "f0402de90c708de2000d2de95edf4de207d0cde30040a0e1",
+      "new_prefix": "07402de90500a0e14bb8faeb0030a0e10740bde88c9a08ea",
+      "note": "-[ZFQuestMan removeSeasonalQuests] prologue (dead) -> zfrLocFormat stub"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10c470",
+      "file_offset": 6042736,
+      "len": 22,
+      "old_prefix": "f0b503af2de9000dadf1100424f00f04a54604f9ef8a",
+      "new_prefix": "07b5204608f764fe0346bde8074010b5c3f164ee10bd",
+      "note": "-[ZFQuestMan removeSeasonalQuests] prologue (dead) -> zfrLocFormat stub"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0b75ac",
+      "file_offset": 763308,
+      "len": 4,
+      "old_prefix": "8b720beb",
+      "new_prefix": "f8d702eb",
+      "note": "CJK branch: bl objc_msgSend -> bl zfrLocFormat (name in r5)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0b76d4",
+      "file_offset": 763604,
+      "len": 4,
+      "old_prefix": "41720beb",
+      "new_prefix": "aed702eb",
+      "note": "default branch: bl objc_msgSend -> bl zfrLocFormat (name in r5)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x086112",
+      "file_offset": 5493010,
+      "len": 4,
+      "old_prefix": "4af21ce8",
+      "new_prefix": "86f0adf9",
+      "note": "CJK branch: blx objc_msgSend -> bl zfrLocFormat (name in r4)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x086218",
+      "file_offset": 5493272,
+      "len": 4,
+      "old_prefix": "49f298ef",
+      "new_prefix": "86f02af9",
+      "note": "default branch: blx objc_msgSend -> bl zfrLocFormat (name in r4)"
+    }
+  ],
+  "site_count": 6,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ]
+    ]
+  },
+  "new_stub_regions": {
+    "6": [
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ]
+    ],
+    "9": [
+      [
+        "0x10c470",
+        "0x10c486"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191011,
+    "padding_bytes": 12046,
+    "compression_strategy": "default",
+    "crc32": "3dc104c9",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v13fix.ipa",
+    "size": 59564493,
+    "sha256": "67B26EEB87F6BB7722985899FBA4382AB3EE1BC344093C9A0F26CE23EE7BC1AB",
+    "executable_sha256": "2903F3105A0847411D917CC3C30EDAD8C75216D1D052E4465855BEC4BBCF8D41"
+  }
+}

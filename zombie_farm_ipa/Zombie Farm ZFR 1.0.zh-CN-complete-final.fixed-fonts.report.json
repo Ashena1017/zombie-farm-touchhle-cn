@@ -1,0 +1,127 @@
+{
+  "input": "C:\\Users\\Loner\\Haven\\AI_workstation\\touchHLE-zombiefarm\\zombie_farm\\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed.ipa",
+  "output": "C:\\Users\\Loner\\Haven\\AI_workstation\\touchHLE-zombiefarm\\zombie_farm\\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts.ipa",
+  "input_sha256_ipa": "D3EB82807CBF287A75F2368B7642B23A9DD1B790A8CDBC3FAE88E49362603704",
+  "output_sha256_ipa": "059E8782A2DE9165C229AC8B740A2C1655692C6A8AC14F1709D8CAE1AD38A13C",
+  "input_sha256_executable": "8A93D2C6829D9B7FB0D271B17B8D9A6BE3EAF038A0A4785509F059E0A9DFA42A",
+  "output_sha256_executable": "F79C28AC26B3B9170C5009DA010DE7C0F6B5690D01E7C5C06307463660DC7B6A",
+  "executable": "Payload/ZFR.app/ZFR",
+  "font_change": {
+    "title": "20.0 -> 22.0 (+2)",
+    "body": "15.0 -> 18.0 (+3)",
+    "scope": "ZFAlertWindow initWithWindow: common alert-label path",
+    "note": "The common path may also enlarge other alert windows using this class."
+  },
+  "audit": [
+    {
+      "slice": 0,
+      "subtype": 6,
+      "existing_crash_fix": [
+        {
+          "selector": "showRateIt",
+          "imp": 111716,
+          "file_offset": 107620,
+          "mode": "arm",
+          "bytes": "1eff2fe10000a0e1"
+        },
+        {
+          "selector": "showTreeWorldPopUp",
+          "imp": 112264,
+          "file_offset": 108168,
+          "mode": "arm",
+          "bytes": "1eff2fe10000a0e1"
+        }
+      ],
+      "font_patches": [
+        {
+          "address": 656396,
+          "file_offset": 652300,
+          "role": "title",
+          "old_value": 20.0,
+          "new_value": 22.0,
+          "original": "1a36a0e3",
+          "replacement": "1b36a0e3",
+          "absolute_file_offset": 668684,
+          "slice_size": 4919392
+        },
+        {
+          "address": 656488,
+          "file_offset": 652392,
+          "role": "body",
+          "old_value": 15.0,
+          "new_value": 18.0,
+          "original": "1726a0e3",
+          "replacement": "1926a0e3",
+          "absolute_file_offset": 668776,
+          "slice_size": 4919392
+        },
+        {
+          "address": 656572,
+          "file_offset": 652476,
+          "role": "body",
+          "old_value": 15.0,
+          "new_value": 18.0,
+          "original": "1726a0e3",
+          "replacement": "1926a0e3",
+          "absolute_file_offset": 668860,
+          "slice_size": 4919392
+        }
+      ]
+    },
+    {
+      "slice": 1,
+      "subtype": 9,
+      "existing_crash_fix": [
+        {
+          "selector": "showRateIt",
+          "imp": 85869,
+          "file_offset": 81772,
+          "mode": "thumb",
+          "bytes": "704700bf"
+        },
+        {
+          "selector": "showTreeWorldPopUp",
+          "imp": 86289,
+          "file_offset": 82192,
+          "mode": "thumb",
+          "bytes": "704700bf"
+        }
+      ],
+      "font_patches": [
+        {
+          "address": 477414,
+          "file_offset": 473318,
+          "role": "title",
+          "old_value": 20.0,
+          "new_value": 22.0,
+          "original": "c4f2a011",
+          "replacement": "c4f2b011",
+          "absolute_file_offset": 5421286,
+          "slice_size": 4104864
+        },
+        {
+          "address": 477494,
+          "file_offset": 473398,
+          "role": "body_shared",
+          "old_value": 15.0,
+          "new_value": 18.0,
+          "original": "c4f27016",
+          "replacement": "c4f29016",
+          "absolute_file_offset": 5421366,
+          "slice_size": 4104864
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "zip_crc": "ok",
+    "changed_members": [
+      "Payload/ZFR.app/ZFR"
+    ],
+    "non_executable_members_unchanged": true,
+    "fat_macho_reparsed": true,
+    "font_constants_verified": true,
+    "existing_crash_fix_verified": true
+  },
+  "code_signature": "invalidated by executable modification; intended for touchHLE"
+}

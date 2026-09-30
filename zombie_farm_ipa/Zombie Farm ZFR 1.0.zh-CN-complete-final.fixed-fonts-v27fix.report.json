@@ -1,0 +1,96 @@
+{
+  "generated": "2026-09-17T06:42:18+00:00",
+  "tool": "patch_zfr_b2_v27.py",
+  "kind": "FIX",
+  "#2": "text top = 1.5*boxHeight + C; v26 (C=-22) still reads a touch low, so C becomes -20 (top = 1.5*34-20 = 31, +2px vs v26, box stays 34)",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v26fix.ipa",
+    "size": 59564493,
+    "sha256": "E845ABFE03FC9F825C172113A582ECD172CF3C7A9FF72DB3CF4415C91BAC49CE",
+    "executable_sha256": "A6A21EC74FB3ACB0DFCD1A3537D5E00BC21137457C7AF6027EEB7B5F5D768955"
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x076d0e",
+      "file_offset": 5430542,
+      "len": 4,
+      "old_prefix": "c3ff160f",
+      "new_prefix": "c3ff140f",
+      "note": "#2 title1 position constant -22.0 -> -20.0 (nudge text top +2px toward visual centre)"
+    }
+  ],
+  "site_count": 1,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ],
+      [
+        "0x1138c8",
+        "0x1138f3"
+      ],
+      [
+        "0x1138f4",
+        "0x113909"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191106,
+    "padding_bytes": 11951,
+    "compression_strategy": "default",
+    "crc32": "de509248",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v27fix.ipa",
+    "size": 59564493,
+    "sha256": "3D4CA38B66FAA55CA476FD4417443E814848BE44D978594E604EF81003AAC131",
+    "executable_sha256": "CE84E9C86A40500F7F96D40A7C22D73EE424A92C06CB6C18D5E4B1E2ABEE6E3A"
+  }
+}

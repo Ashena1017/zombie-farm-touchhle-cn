@@ -1,0 +1,127 @@
+{
+  "generated": "2026-09-16T17:27:47+00:00",
+  "tool": "patch_zfr_b2_v18.py",
+  "kind": "FIX",
+  "findings": {
+    "tiers": "the game builds font sizes as floats; v5's whole sweep was 20.0 -> 24.0 (titles) and 14.0 -> 18.0 (bodies)",
+    "issue_2": "ZFAlertWindowStorageItem overrides the slide-in factory, so the base-class title site never runs for it; its only 20.0 is the title size -> 24.0",
+    "issue_6": "ZFMarketMenu -checkBoughtItem: rebuilds its confirmation label with labelWithString:...fontSize: at 14.0, the same idiom v6 fixed in -unlockItem: -- the instruction bytes are identical"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v17fix.ipa",
+    "size": 59564493,
+    "sha256": "73F434FF49B186AEEA98C3B5981DB1E4988BD943635EB18D867F4EE4351AA261",
+    "executable_sha256": "353FD60088FEB8F8D1DABD293BE60A0BC141544BDD626F100EFBC9799C8C5C8C"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x1aae94",
+      "file_offset": 1760916,
+      "len": 4,
+      "old_prefix": "1a36a0e3",
+      "new_prefix": "1c36a0e3",
+      "float_before": 20.0,
+      "float_after": 24.0,
+      "note": "#2 ZFAlertWindowStorageItem title 20.0 -> 24.0 (mov r3,#0x1a00000 -> #0x1c00000)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x139d16",
+      "file_offset": 6229270,
+      "len": 4,
+      "old_prefix": "c4f2a012",
+      "new_prefix": "c4f2c012",
+      "float_before": 20.0,
+      "float_after": 24.0,
+      "note": "#2 ZFAlertWindowStorageItem title 20.0 -> 24.0 (movt r2,#0x41a0 -> #0x41c0)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x06b7c8",
+      "file_offset": 452552,
+      "len": 4,
+      "old_prefix": "1626a0e3",
+      "new_prefix": "1926a0e3",
+      "float_before": 14.0,
+      "float_after": 18.0,
+      "note": "#6 ZFMarketMenu -checkBoughtItem: body 14.0 -> 18.0 (mov r2,#0x1600000 -> #0x1900000)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x04e5fa",
+      "file_offset": 5264890,
+      "len": 4,
+      "old_prefix": "c4f26013",
+      "new_prefix": "c4f29013",
+      "float_before": 14.0,
+      "float_after": 18.0,
+      "note": "#6 ZFMarketMenu -checkBoughtItem: body 14.0 -> 18.0 (movt r3,#0x4160 -> #0x4190)"
+    }
+  ],
+  "site_count": 4,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191050,
+    "padding_bytes": 12007,
+    "compression_strategy": "default",
+    "crc32": "f4f29bbe",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v18fix.ipa",
+    "size": 59564493,
+    "sha256": "D84A536BC2351A633E739F7BBED0A0C4FD586688E506B8A578A037536CB55CE4",
+    "executable_sha256": "059613B330A6FCCA56182A794DB2C71305CF56C4B2F57F4274BBE051D1AA99C7"
+  }
+}

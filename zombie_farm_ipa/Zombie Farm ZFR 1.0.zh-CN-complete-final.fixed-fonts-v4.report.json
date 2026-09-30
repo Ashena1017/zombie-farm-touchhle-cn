@@ -1,0 +1,292 @@
+{
+  "generated": "2026-09-15T04:53:54+00:00",
+  "tool": "patch_zfr_helper_v4.py",
+  "purpose": "repair helper network; remove its +4.0/+3.0 sizing so v3's absolute 24/18 is not compounded",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v3.ipa",
+    "size": 59564493,
+    "sha256": "EF33F88F8E692719D629952F06A1A18D88BA075C465681FF4DEFC3D2CD3C6585",
+    "executable_sha256": "8D7FE526BD85D2B05A056AF9C79BFFE066F515A0F740BB30BB68B64E120B4554"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x01b480",
+      "file_offset": 124032,
+      "old": "010a30ee",
+      "new": "640a94ed",
+      "note": "showRateIt helper: vadd.f32 s0,s0,s2(+4.0) -> vldr s0,[r4,#0x190] (no-op)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b6a4",
+      "file_offset": 124580,
+      "old": "010a30ee",
+      "new": "640a94ed",
+      "note": "showTreeWorldPopUp helper: vadd.f32 s0,s0,s2(+3.0) -> vldr s0,[r4,#0x190] (no-op)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b4dc",
+      "file_offset": 124124,
+      "old": "690000eb",
+      "new": "6b0000eb",
+      "note": "bl 0x1b688 -> 0x1b690 (showOkButtonIn: title1)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b4f4",
+      "file_offset": 124148,
+      "old": "630000eb",
+      "new": "650000eb",
+      "note": "bl 0x1b688 -> 0x1b690 (showOkButtonIn: body1)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b500",
+      "file_offset": 124160,
+      "old": "600000eb",
+      "new": "620000eb",
+      "note": "bl 0x1b688 -> 0x1b690 (showOkButtonIn: body1)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b50c",
+      "file_offset": 124172,
+      "old": "d4ffffeb",
+      "new": "d6ffffeb",
+      "note": "bl 0x1b464 -> 0x1b46c (showOkButtonIn: buttonLabel)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b5cc",
+      "file_offset": 124364,
+      "old": "2d0000eb",
+      "new": "2f0000eb",
+      "note": "bl 0x1b688 -> 0x1b690 (getActorName: title1)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b5dc",
+      "file_offset": 124380,
+      "old": "290000eb",
+      "new": "2b0000eb",
+      "note": "bl 0x1b688 -> 0x1b690 (getActorName: body1)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b758",
+      "file_offset": 124760,
+      "old": "caffffeb",
+      "new": "ccffffeb",
+      "note": "bl 0x1b688 -> 0x1b690 (combinerTapped title1)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x01b768",
+      "file_offset": 124776,
+      "old": "c6ffffeb",
+      "new": "c8ffffeb",
+      "note": "bl 0x1b688 -> 0x1b690 (combinerTapped body1)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x014f7e",
+      "file_offset": 5029758,
+      "old": "30ee010a",
+      "new": "94ed640a",
+      "note": "showRateIt helper: vadd.f32 s0,s0,s2(+4.0) -> vldr s0,[r4,#0x190] (no-op)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x015122",
+      "file_offset": 5030178,
+      "old": "30ee010a",
+      "new": "94ed640a",
+      "note": "showTreeWorldPopUp helper: vadd.f32 s0,s0,s2(+3.0) -> vldr s0,[r4,#0x190] (no-op)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x014fc6",
+      "file_offset": 5029830,
+      "old": "00f0a3f8",
+      "new": "00f0a5f8",
+      "note": "bl 0x15110 -> 0x15114 (showOkButtonIn: title1)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x014fda",
+      "file_offset": 5029850,
+      "old": "00f099f8",
+      "new": "00f09bf8",
+      "note": "bl 0x15110 -> 0x15114 (showOkButtonIn: body1)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x014fe4",
+      "file_offset": 5029860,
+      "old": "00f094f8",
+      "new": "00f096f8",
+      "note": "bl 0x15110 -> 0x15114 (showOkButtonIn: body1)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x014fee",
+      "file_offset": 5029870,
+      "old": "fff7bdff",
+      "new": "fff7bfff",
+      "note": "bl 0x14f6c -> 0x14f70 (showOkButtonIn: buttonLabel)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x015094",
+      "file_offset": 5030036,
+      "old": "00f03cf8",
+      "new": "00f03ef8",
+      "note": "bl 0x15110 -> 0x15114 (getActorName: title1)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0150a0",
+      "file_offset": 5030048,
+      "old": "00f036f8",
+      "new": "00f038f8",
+      "note": "bl 0x15110 -> 0x15114 (getActorName: body1)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0151a0",
+      "file_offset": 5030304,
+      "old": "fff7b6ff",
+      "new": "fff7b8ff",
+      "note": "bl 0x15110 -> 0x15114 (combinerTapped title1)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0151ac",
+      "file_offset": 5030316,
+      "old": "fff7b0ff",
+      "new": "fff7b2ff",
+      "note": "bl 0x15110 -> 0x15114 (combinerTapped body1)"
+    }
+  ],
+  "executable_checks": {
+    "sites_verified": 20,
+    "readback": [
+      "sub6 0x01b480 640a94ed",
+      "sub6 0x01b6a4 640a94ed",
+      "sub6 0x01b4dc 6b0000eb",
+      "sub6 0x01b4f4 650000eb",
+      "sub6 0x01b500 620000eb",
+      "sub6 0x01b50c d6ffffeb",
+      "sub6 0x01b5cc 2f0000eb",
+      "sub6 0x01b5dc 2b0000eb",
+      "sub6 0x01b758 ccffffeb",
+      "sub6 0x01b768 c8ffffeb",
+      "sub9 0x014f7e 94ed640a",
+      "sub9 0x015122 94ed640a",
+      "sub9 0x014fc6 00f0a5f8",
+      "sub9 0x014fda 00f09bf8",
+      "sub9 0x014fe4 00f096f8",
+      "sub9 0x014fee fff7bfff",
+      "sub9 0x015094 00f03ef8",
+      "sub9 0x0150a0 00f038f8",
+      "sub9 0x0151a0 fff7b8ff",
+      "sub9 0x0151ac fff7b2ff"
+    ],
+    "entries_still_neutered": [
+      "sub6 0x1b464 1eff2fe1",
+      "sub6 0x1b688 1eff2fe1",
+      "sub9 0x14f6c 7047",
+      "sub9 0x15110 7047"
+    ],
+    "branches_decode_correctly": [
+      "sub6 0x1b4dc -> 0x1b690",
+      "sub6 0x1b4f4 -> 0x1b690",
+      "sub6 0x1b500 -> 0x1b690",
+      "sub6 0x1b50c -> 0x1b46c",
+      "sub6 0x1b5cc -> 0x1b690",
+      "sub6 0x1b5dc -> 0x1b690",
+      "sub6 0x1b758 -> 0x1b690",
+      "sub6 0x1b768 -> 0x1b690",
+      "sub9 0x14fc6 -> 0x15114",
+      "sub9 0x14fda -> 0x15114",
+      "sub9 0x14fe4 -> 0x15114",
+      "sub9 0x14fee -> 0x14f70",
+      "sub9 0x15094 -> 0x15114",
+      "sub9 0x150a0 -> 0x15114",
+      "sub9 0x151a0 -> 0x15114",
+      "sub9 0x151ac -> 0x15114"
+    ]
+  },
+  "cave_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ]
+    ]
+  },
+  "protected_entry_words": {
+    "6": [
+      [
+        "0x1b464",
+        4
+      ],
+      [
+        "0x1b468",
+        4
+      ],
+      [
+        "0x1b688",
+        4
+      ],
+      [
+        "0x1b68c",
+        4
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        2
+      ],
+      [
+        "0x14f6e",
+        2
+      ],
+      [
+        "0x15110",
+        2
+      ],
+      [
+        "0x15112",
+        2
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191072,
+    "padding_bytes": 11985,
+    "compression_strategy": "default",
+    "crc32": "3fc84ac7",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v4.ipa",
+    "size": 59564493,
+    "sha256": "1087C7006AC3C62DFBAA52507CB5E786B4DD5F67A14ED16DBA3D7EF57E0491AE",
+    "executable_sha256": "9B9251122C86E0CA5B1F1D98DB93BD49B787E33F837C07E3E7CA0BD2A5DC0EEF"
+  }
+}

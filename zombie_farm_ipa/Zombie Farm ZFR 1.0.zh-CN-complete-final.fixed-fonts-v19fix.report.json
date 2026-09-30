@@ -1,0 +1,126 @@
+{
+  "generated": "2026-09-16T18:14:20+00:00",
+  "tool": "patch_zfr_b2_v19.py",
+  "kind": "FIX",
+  "findings": {
+    "table": "the codex patch created Arial-BoldMT.strings (and its zh-Hans copy); no earlier build step ever rewrote it, so its eight mojibake values survived v15/v16/v17",
+    "symptom": "the floating label shown when a zombie fertilizes a crop",
+    "slot": "the fixed DEFLATE slot is 189 bytes and the faithful repair needs 193; only shortening the fertilize message to '%@施肥' fits (188)"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v18fix.ipa",
+    "size": 59564493,
+    "sha256": "D84A536BC2351A633E739F7BBED0A0C4FD586688E506B8A578A037536CB55CE4"
+  },
+  "members": [
+    {
+      "member": "Payload/ZFR.app/Arial-BoldMT.strings",
+      "usize_before": 257,
+      "usize_after": 253,
+      "slot": 189,
+      "raw_deflate_size": 188,
+      "padding_bytes": 1,
+      "compression_strategy": "default",
+      "crc32": "5764ab17",
+      "repairs": [
+        {
+          "key": "Fertilized by %@!",
+          "before": " %@ČđĂ",
+          "after": "%@施肥"
+        },
+        {
+          "key": "Cupid Zombie",
+          "before": "āčĎĄĊ",
+          "after": "丘比特僵尸"
+        },
+        {
+          "key": "Flower Zombie",
+          "before": "ĒĒĄĊ",
+          "after": "花花僵尸"
+        },
+        {
+          "key": "Garden Zombie",
+          "before": "ćĀĄĊ",
+          "after": "园丁僵尸"
+        },
+        {
+          "key": "Green Flower Zombie",
+          "before": "ĒĒĄĊ",
+          "after": "花花僵尸"
+        },
+        {
+          "key": "ZomBotanist",
+          "before": "ďċĄĊ",
+          "after": "生态僵尸"
+        },
+        {
+          "key": "Zombee",
+          "before": "ĔēĄĊ",
+          "after": "蜜蜂僵尸"
+        },
+        {
+          "key": "Zombutterfly",
+          "before": "ĕĖĄĊ",
+          "after": "蝴蝶僵尸"
+        }
+      ]
+    },
+    {
+      "member": "Payload/ZFR.app/zh-Hans.lproj/Arial-BoldMT.strings",
+      "usize_before": 257,
+      "usize_after": 253,
+      "slot": 189,
+      "raw_deflate_size": 188,
+      "padding_bytes": 1,
+      "compression_strategy": "default",
+      "crc32": "5764ab17",
+      "repairs": [
+        {
+          "key": "Fertilized by %@!",
+          "before": " %@ČđĂ",
+          "after": "%@施肥"
+        },
+        {
+          "key": "Cupid Zombie",
+          "before": "āčĎĄĊ",
+          "after": "丘比特僵尸"
+        },
+        {
+          "key": "Flower Zombie",
+          "before": "ĒĒĄĊ",
+          "after": "花花僵尸"
+        },
+        {
+          "key": "Garden Zombie",
+          "before": "ćĀĄĊ",
+          "after": "园丁僵尸"
+        },
+        {
+          "key": "Green Flower Zombie",
+          "before": "ĒĒĄĊ",
+          "after": "花花僵尸"
+        },
+        {
+          "key": "ZomBotanist",
+          "before": "ďċĄĊ",
+          "after": "生态僵尸"
+        },
+        {
+          "key": "Zombee",
+          "before": "ĔēĄĊ",
+          "after": "蜜蜂僵尸"
+        },
+        {
+          "key": "Zombutterfly",
+          "before": "ĕĖĄĊ",
+          "after": "蝴蝶僵尸"
+        }
+      ]
+    }
+  ],
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v19fix.ipa",
+    "size": 59564493,
+    "sha256": "760D183FCE12081D8BFC87C6DBAC5762ADC26C9EAC6C483A7D643D116296E206"
+  }
+}

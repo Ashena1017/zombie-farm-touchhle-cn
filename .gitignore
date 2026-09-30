@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# touchHLE-zombiefarm —— 仓库只放「源码 / 文档 / 补丁工具」，不放构建产物
+#
+# 设计原则：
+#   1. 能重新生成的（编译产物、cargo 缓存、工具链）一律不进仓库；
+#   2. 运行时状态（存档、日志、当前设置、上次选择）不进仓库；
+#   3. 分发用的完整压缩包走 GitHub Releases，不打进 git 历史
+#      （否则每个补丁代都会让仓库膨胀几十 MB）。
+#
+# 这样 6.25 GB 的工作目录最终只提交约 11 MB。
+# ---------------------------------------------------------------------------
+
+# === 交付包（构建产物，由 _analysis/_build_release.ps1 生成）================
+# 用 Releases 的 zip 分发；直接改 Release/ 会被下次构建覆盖。
+Release/
+
+# === 游戏 IPA / 二进制补丁产物 ==============================================
+# IPA 是第三方游戏本体，既大又不适合放在 git 历史里；
+# 补丁谱系与每个版本的哈希见 zombie_farm_ipa/README.md（未打包，见仓库说明）。
+zombie_farm_ipa/*.ipa
+
+# === 模拟器：构建依赖与工具链（可重新获取，体积以 GB 计）====================
+touchHLE/_build_tools/
+touchHLE/touchHLE-fork/vendor/
+touchHLE/touchHLE-fork/target/
+touchHLE/touchHLE-fork/target-fork/
+
+# === 模拟器：编译产物 ======================================================
+# 想直接跑就下 Releases 里的 zip；想自己编译见 README「从源码构建」。
+touchHLE/touchHLE.exe
+touchHLE/touchHLE_fork.exe
+touchHLE/touchHLE.exe.backup-*
+
+# === 模拟器：运行时资源与状态 ==============================================
+# dylibs / fonts 是上游的可再分发资源，随 Release 包走，不进 git。
+touchHLE/touchHLE_dylibs/
+touchHLE/touchHLE_fonts/
+touchHLE/touchHLE_sandbox/
+touchHLE/touchHLE_options.txt
+touchHLE/touchHLE_log.txt
+touchHLE/zfr_last_run.log
+touchHLE/zfr_last_launch.txt
+touchHLE/zfrpatch_current.dylib
+touchHLE/touchHLE_time_offset_seconds.txt
+
+# === fork 目录内的本机运行状态（上游模板文件保留）==========================
+touchHLE/touchHLE-fork/touchHLE_options.txt
+touchHLE/touchHLE-fork/touchHLE_default_options.txt
+touchHLE/touchHLE-fork/touchHLE_sandbox/
+touchHLE/touchHLE-fork/touchHLE_log.txt
+
+# 内嵌的上游浅克隆（见该目录里的 UPSTREAM-COMMIT.txt）。
+# 若留着 .git，git 只会把 fork 记成一个 gitlink，源码就完全不在仓库里了。
+touchHLE/touchHLE-fork/.git-upstream-fa3d095/
+
+# === 管理器 / 启动器的本机状态 =============================================
+launcher_selected_ipa.txt
+launcher_skip_memory.txt
+# 启动脚本的历史备份（本机遗留，不属于源码）
+StartZombieFarmNextHour.ps1.backup-*
+
+# === 分析产物（可由 _analysis 下的脚本重跑出来）============================
+_analysis/archive/
+_analysis/dumps/
+_analysis/perf/
+_analysis/*.log
+_analysis/*.png
+_analysis/*.txt
+_analysis/test_*.bin2
+
+# 小体积的取证存档副本（验证脚本自己会生成）
+_analysis/save_backups_safe/
+
+# === 通用忽略 ==============================================================
+__pycache__/
+*.pyc
+*.bak
+*.bak-*
+*.tmp
+*~
+Thumbs.db
+desktop.ini

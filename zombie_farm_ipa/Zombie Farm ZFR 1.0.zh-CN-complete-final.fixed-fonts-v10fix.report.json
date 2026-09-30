@@ -1,0 +1,148 @@
+{
+  "generated": "2026-09-16T03:57:38+00:00",
+  "tool": "patch_zfr_questfix_v10.py",
+  "kind": "FIX",
+  "fixes": "quest progress being zeroed on save (image 3 / tu3)",
+  "mechanism": "GameData's throwaway ZFQuestNotification got an autorelease where it needed an unregister; replaced with a direct stopListening call so its object:nil observers die at once",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v6.ipa",
+    "size": 59564493,
+    "sha256": "68A0A76F71BF5DA770A7745E32F6051F8996D55C4E1694CE3C840E7E2C31EC1A",
+    "executable_sha256": "A1CCFA05B24B61D0A1040B5A15F7789BE9DF64C29B8CB02D03051FDC482A0D9B"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x186d40",
+      "file_offset": 1613120,
+      "old": "28109de5",
+      "new": "0080a0e1",
+      "note": "addUserData: keep notification in r8"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x186d50",
+      "file_offset": 1613136,
+      "old": "0080a0e1",
+      "new": "0000a0e1",
+      "note": "addUserData: drop dead post-call save"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x187dcc",
+      "file_offset": 1617356,
+      "old": "28109de5",
+      "new": "0080a0e1",
+      "note": "readUserData: keep notification in r8"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x187dd8",
+      "file_offset": 1617368,
+      "old": "0080a0e1",
+      "new": "0000a0e1",
+      "note": "readUserData: drop dead post-call save"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x11f43a",
+      "file_offset": 6120506,
+      "old": "0799",
+      "new": "8046",
+      "note": "addUserData: keep notification in r8"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x11f440",
+      "file_offset": 6120512,
+      "old": "8046",
+      "new": "c046",
+      "note": "addUserData: drop dead post-call save"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x120030",
+      "file_offset": 6123568,
+      "old": "0699",
+      "new": "0546",
+      "note": "readUserData: keep notification in r5"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x120038",
+      "file_offset": 6123576,
+      "old": "0546",
+      "new": "c046",
+      "note": "readUserData: drop dead post-call save"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x186d44",
+      "file_offset": 1613124,
+      "old": "a53408eb",
+      "new": "288effeb",
+      "note": "addUserData: autorelease -> stopListening"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x187dd0",
+      "file_offset": 1617360,
+      "old": "823008eb",
+      "new": "058affeb",
+      "note": "readUserData: autorelease -> stopListening"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x11f43c",
+      "file_offset": 6120508,
+      "old": "b0f186ee",
+      "new": "eaf7cefe",
+      "note": "addUserData: autorelease -> stopListening"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x120032",
+      "file_offset": 6123570,
+      "old": "b0f18ce8",
+      "new": "eaf7d3f8",
+      "note": "readUserData: autorelease -> stopListening"
+    }
+  ],
+  "executable_checks": {
+    "sites_verified": 12,
+    "bl_sites_disasm_verified": 4,
+    "helper_region_intact": true
+  },
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191089,
+    "padding_bytes": 11968,
+    "compression_strategy": "default",
+    "crc32": "9a715422",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v10fix.ipa",
+    "size": 59564493,
+    "sha256": "ADBF2648CA9F7639B67A5B43C09033682377086B1C6932DD9C2C024E2ACC5659",
+    "executable_sha256": "86BE1BA115D85B012CF161EFFF64084A67807C43088387750AF30822BD2D714B"
+  }
+}

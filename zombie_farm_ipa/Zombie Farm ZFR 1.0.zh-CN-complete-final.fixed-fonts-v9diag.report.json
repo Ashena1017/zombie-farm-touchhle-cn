@@ -1,0 +1,326 @@
+{
+  "generated": "2026-09-16T03:38:10+00:00",
+  "tool": "patch_zfr_questdiag_v9.py",
+  "kind": "DIAGNOSTIC #3 (not a fix)",
+  "purpose": "instrument the normal `@(countCurrent)` write of requirementUpdated: (value forced to 3), which is the only dict writer with no literal 0 and hence no earlier sentinel",
+  "legend": {
+    "A=7": "addQuestWithID: hardcoded zeros",
+    "B=8": "requirementUpdated: zero branch",
+    "C=9": "restoreQuestsFromSave zero branch",
+    "D=5": "addUserData: out-of-range/NSNull fallback",
+    "E=4": "readUserData: progress padding",
+    "F=3": "requirementUpdated: NORMAL path value (was countCurrent)"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v6.ipa",
+    "size": 59564493,
+    "sha256": "68A0A76F71BF5DA770A7745E32F6051F8996D55C4E1694CE3C840E7E2C31EC1A",
+    "executable_sha256": "A1CCFA05B24B61D0A1040B5A15F7789BE9DF64C29B8CB02D03051FDC482A0D9B"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x16c5b4",
+      "path": "A",
+      "file_offset": 1504692,
+      "old": "0020a0e3",
+      "new": "0720a0e3",
+      "sentinel": 7,
+      "note": "A addQuestWithID: zeros #1"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16c5d0",
+      "path": "A",
+      "file_offset": 1504720,
+      "old": "0020a0e3",
+      "new": "0720a0e3",
+      "sentinel": 7,
+      "note": "A addQuestWithID: zeros #2"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16c5e4",
+      "path": "A",
+      "file_offset": 1504740,
+      "old": "0020a0e3",
+      "new": "0720a0e3",
+      "sentinel": 7,
+      "note": "A addQuestWithID: zeros #3"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16a8c8",
+      "path": "B",
+      "file_offset": 1497288,
+      "old": "0020a0e3",
+      "new": "0820a0e3",
+      "sentinel": 8,
+      "note": "B requirementUpdated: zero-branch #1"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16a8e4",
+      "path": "B",
+      "file_offset": 1497316,
+      "old": "0020a0e3",
+      "new": "0820a0e3",
+      "sentinel": 8,
+      "note": "B requirementUpdated: zero-branch #2"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16a8f8",
+      "path": "B",
+      "file_offset": 1497336,
+      "old": "0020a0e3",
+      "new": "0820a0e3",
+      "sentinel": 8,
+      "note": "B requirementUpdated: zero-branch #3"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16e1a4",
+      "path": "C",
+      "file_offset": 1511844,
+      "old": "0020a0e3",
+      "new": "0920a0e3",
+      "sentinel": 9,
+      "note": "C restoreQuestsFromSave zero-branch #1"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16e1c4",
+      "path": "C",
+      "file_offset": 1511876,
+      "old": "0020a0e3",
+      "new": "0920a0e3",
+      "sentinel": 9,
+      "note": "C restoreQuestsFromSave zero-branch #2"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16e1d8",
+      "path": "C",
+      "file_offset": 1511896,
+      "old": "0020a0e3",
+      "new": "0920a0e3",
+      "sentinel": 9,
+      "note": "C restoreQuestsFromSave zero-branch #3"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x186ecc",
+      "path": "D",
+      "file_offset": 1613516,
+      "old": "0020a0e3",
+      "new": "0520a0e3",
+      "sentinel": 5,
+      "note": "D addUserData: out-of-range/NSNull"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x187e34",
+      "path": "E",
+      "file_offset": 1617460,
+      "old": "0020a0e3",
+      "new": "0420a0e3",
+      "sentinel": 4,
+      "note": "E readUserData: progress padding"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16aadc",
+      "path": "F",
+      "file_offset": 1497820,
+      "old": "0020a0e1",
+      "new": "0320a0e3",
+      "sentinel": 3,
+      "note": "F requirementUpdated: replace value"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16ab20",
+      "path": "F",
+      "file_offset": 1497888,
+      "old": "0020a0e1",
+      "new": "0320a0e3",
+      "sentinel": 3,
+      "note": "F requirementUpdated: addObject value"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10b9c6",
+      "path": "A",
+      "file_offset": 6040006,
+      "old": "0022",
+      "new": "0722",
+      "sentinel": 7,
+      "note": "A addQuestWithID: zeros #1"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10b9de",
+      "path": "A",
+      "file_offset": 6040030,
+      "old": "0022",
+      "new": "0722",
+      "sentinel": 7,
+      "note": "A addQuestWithID: zeros #2"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10b9ec",
+      "path": "A",
+      "file_offset": 6040044,
+      "old": "0022",
+      "new": "0722",
+      "sentinel": 7,
+      "note": "A addQuestWithID: zeros #3"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10a3fe",
+      "path": "B",
+      "file_offset": 6034430,
+      "old": "0022",
+      "new": "0822",
+      "sentinel": 8,
+      "note": "B requirementUpdated: zero-branch #1"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10a410",
+      "path": "B",
+      "file_offset": 6034448,
+      "old": "0022",
+      "new": "0822",
+      "sentinel": 8,
+      "note": "B requirementUpdated: zero-branch #2"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10a41c",
+      "path": "B",
+      "file_offset": 6034460,
+      "old": "0022",
+      "new": "0822",
+      "sentinel": 8,
+      "note": "B requirementUpdated: zero-branch #3"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10cd18",
+      "path": "C",
+      "file_offset": 6044952,
+      "old": "0022",
+      "new": "0922",
+      "sentinel": 9,
+      "note": "C restoreQuestsFromSave zero-branch #1"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10cd3e",
+      "path": "C",
+      "file_offset": 6044990,
+      "old": "0022",
+      "new": "0922",
+      "sentinel": 9,
+      "note": "C restoreQuestsFromSave zero-branch #2"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10cd4a",
+      "path": "C",
+      "file_offset": 6045002,
+      "old": "0022",
+      "new": "0922",
+      "sentinel": 9,
+      "note": "C restoreQuestsFromSave zero-branch #3"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x11f53c",
+      "path": "D",
+      "file_offset": 6120764,
+      "old": "0022",
+      "new": "0522",
+      "sentinel": 5,
+      "note": "D addUserData: out-of-range/NSNull"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x120074",
+      "path": "E",
+      "file_offset": 6123636,
+      "old": "0022",
+      "new": "0422",
+      "sentinel": 4,
+      "note": "E readUserData: progress padding"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10a568",
+      "path": "F",
+      "file_offset": 6034792,
+      "old": "0246",
+      "new": "0322",
+      "sentinel": 3,
+      "note": "F requirementUpdated: replace value"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10a598",
+      "path": "F",
+      "file_offset": 6034840,
+      "old": "0246",
+      "new": "0322",
+      "sentinel": 3,
+      "note": "F requirementUpdated: addObject value"
+    }
+  ],
+  "executable_checks": {
+    "sites_verified": 26,
+    "sites_per_path": {
+      "A": 6,
+      "B": 6,
+      "C": 6,
+      "D": 2,
+      "E": 2,
+      "F": 4
+    },
+    "helper_region_intact": true
+  },
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191103,
+    "padding_bytes": 11954,
+    "compression_strategy": "default",
+    "crc32": "515062ba",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v9diag.ipa",
+    "size": 59564493,
+    "sha256": "56D7EA5BC40A79B1509D8E4629B1EC5E1A4D5C913E4D7801D8CC44927D616D80",
+    "executable_sha256": "52691B322884D20E5F636FCB1DDFAD6EC26E86C8BD91AE253D9F03D0667ACBC8"
+  }
+}

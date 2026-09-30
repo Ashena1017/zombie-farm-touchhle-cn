@@ -1,0 +1,238 @@
+{
+  "generated": "2026-09-16T16:16:21+00:00",
+  "tool": "patch_zfr_b2_v16.py",
+  "kind": "FIX",
+  "findings": {
+    "executed_slice": "sub9 (Thumb) - only its stub could corrupt the %i stack argument, which is exactly what the live test showed",
+    "stub_bug": "the v13 sub9 stub pushed {r4, lr} before blx objc_msgSend, moving sp 8 bytes down so stringWithFormat: read the second vararg (the %i count) from the wrong slot",
+    "mojibake": "the plain '+200eE' came from hard-coded CFStrings in __const (+%i\u0117\u011a / -%i\u0117\u011a / +%i\u0118\u0119 / %d\u0117\u011a) that the codex patch corrupted; Localizable.strings was only half the story"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v15fix.ipa",
+    "size": 59564493,
+    "sha256": "BC3D2ECCDA9CFC05A4AD02CF98F5CC4E3EE9E1E88733B03E2B8D5E2ADC50F5FD",
+    "executable_sha256": "3FB9F452BC75D8C1C78033A4D11AF55C6191EC3DB0677BAF0B9C5D14EA920179"
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x10c470",
+      "file_offset": 6042736,
+      "len": 22,
+      "old_prefix": "07b5184608f764fe0346bde8074010b5c3f164ee10bd",
+      "new_prefix": "07b5184608f764fe034617bcc3f166ee204700bf00bf",
+      "note": "zfrLocFormat stub: keep sp at the caller's value (fixes the %i stack arg)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16d5b0",
+      "file_offset": 1508784,
+      "len": 48,
+      "old_prefix": "e8039fe538408de501109fe700009fe7869a08ebd8139fe5",
+      "new_prefix": "2b2569e98791e5b881002d2569e98791e5b881002b2569e7",
+      "note": "corrected Chinese UTF-8 for the 4 hard-coded format CFStrings"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x468b88",
+      "file_offset": 4635528,
+      "len": 4,
+      "old_prefix": "006e4000",
+      "new_prefix": "b0d51600",
+      "note": "CFString '+%i\u91d1\u5e01' data -> 0x16d5b0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x468b8c",
+      "file_offset": 4635532,
+      "len": 4,
+      "old_prefix": "07000000",
+      "new_prefix": "09000000",
+      "note": "CFString '+%i\u91d1\u5e01' size -> 9"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x468ee8",
+      "file_offset": 4636392,
+      "len": 4,
+      "old_prefix": "086e4000",
+      "new_prefix": "bad51600",
+      "note": "CFString '-%i\u91d1\u5e01' data -> 0x16d5ba"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x468eec",
+      "file_offset": 4636396,
+      "len": 4,
+      "old_prefix": "07000000",
+      "new_prefix": "09000000",
+      "note": "CFString '-%i\u91d1\u5e01' size -> 9"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x468ef8",
+      "file_offset": 4636408,
+      "len": 4,
+      "old_prefix": "106e4000",
+      "new_prefix": "c4d51600",
+      "note": "CFString '+%i\u7ecf\u9a8c' data -> 0x16d5c4"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x468efc",
+      "file_offset": 4636412,
+      "len": 4,
+      "old_prefix": "07000000",
+      "new_prefix": "09000000",
+      "note": "CFString '+%i\u7ecf\u9a8c' size -> 9"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x469388",
+      "file_offset": 4637576,
+      "len": 4,
+      "old_prefix": "186e4000",
+      "new_prefix": "ced51600",
+      "note": "CFString '%d\u91d1\u5e01' data -> 0x16d5ce"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x46938c",
+      "file_offset": 4637580,
+      "len": 4,
+      "old_prefix": "06000000",
+      "new_prefix": "08000000",
+      "note": "CFString '%d\u91d1\u5e01' size -> 8"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10c490",
+      "file_offset": 6042768,
+      "len": 48,
+      "old_prefix": "c0f228014df65a10c0f228007944784409680068c3f152ee",
+      "new_prefix": "2b2569e98791e5b881002d2569e98791e5b881002b2569e7",
+      "note": "corrected Chinese UTF-8 for the 4 hard-coded format CFStrings"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a4b18",
+      "file_offset": 8764184,
+      "len": 4,
+      "old_prefix": "002e3400",
+      "new_prefix": "90c41000",
+      "note": "CFString '+%i\u91d1\u5e01' data -> 0x10c490"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a4b1c",
+      "file_offset": 8764188,
+      "len": 4,
+      "old_prefix": "07000000",
+      "new_prefix": "09000000",
+      "note": "CFString '+%i\u91d1\u5e01' size -> 9"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a4e78",
+      "file_offset": 8765048,
+      "len": 4,
+      "old_prefix": "082e3400",
+      "new_prefix": "9ac41000",
+      "note": "CFString '-%i\u91d1\u5e01' data -> 0x10c49a"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a4e7c",
+      "file_offset": 8765052,
+      "len": 4,
+      "old_prefix": "07000000",
+      "new_prefix": "09000000",
+      "note": "CFString '-%i\u91d1\u5e01' size -> 9"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a4e88",
+      "file_offset": 8765064,
+      "len": 4,
+      "old_prefix": "102e3400",
+      "new_prefix": "a4c41000",
+      "note": "CFString '+%i\u7ecf\u9a8c' data -> 0x10c4a4"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a4e8c",
+      "file_offset": 8765068,
+      "len": 4,
+      "old_prefix": "07000000",
+      "new_prefix": "09000000",
+      "note": "CFString '+%i\u7ecf\u9a8c' size -> 9"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a5318",
+      "file_offset": 8766232,
+      "len": 4,
+      "old_prefix": "182e3400",
+      "new_prefix": "aec41000",
+      "note": "CFString '%d\u91d1\u5e01' data -> 0x10c4ae"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x3a531c",
+      "file_offset": 8766236,
+      "len": 4,
+      "old_prefix": "06000000",
+      "new_prefix": "08000000",
+      "note": "CFString '%d\u91d1\u5e01' size -> 8"
+    }
+  ],
+  "site_count": 19,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191007,
+    "padding_bytes": 12050,
+    "compression_strategy": "default",
+    "crc32": "5d6c141b",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v16fix.ipa",
+    "size": 59564493,
+    "sha256": "D51BE79A5886E50B83FEA1B0CBFD2AEF94CEC778586BF572DF6EA83D2F425F4D",
+    "executable_sha256": "8E4EA7ED88DB070399E367F66FE82C8A95298A84F8DA42FA0AFB1EA2F2167869"
+  }
+}

@@ -1,0 +1,155 @@
+name: Build Zombie Farm Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - zombiefarm
+
+env:
+  CARGO_TERM_COLOR: always
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+  ANDROID_NDK_VERSION: 25.2.9519653
+  CMAKE_VERSION: 3.31.6
+  GRADLE_VERSION: 8.11.1
+  BOOST_VERSION: 1.81.0
+
+jobs:
+  build-android:
+    name: Android arm64 APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-31" "platform-tools" "build-tools;35.0.0"
+
+      - name: Cache Boost
+        id: cache-boost
+        uses: actions/cache@v4
+        with:
+          path: vendor/boost
+          key: boost-${{ env.BOOST_VERSION }}
+
+      - name: Download Boost
+        if: steps.cache-boost.outputs.cache-hit != 'true'
+        run: curl -L -o boost_1_81_0.7z "https://archives.boost.io/release/1.81.0/source/boost_1_81_0.7z"
+
+      - name: Extract Boost
+        if: steps.cache-boost.outputs.cache-hit != 'true'
+        run: 7z -ovendor x boost_1_81_0.7z && mv vendor/boost_1_81_0 vendor/boost
+
+      - name: Cache CMake
+        id: cache-cmake
+        uses: actions/cache@v4
+        with:
+          path: vendor/cmake
+          key: cmake-${{ env.CMAKE_VERSION }}-linux
+
+      - name: Download CMake
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
+        run: curl -L -O "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"
+
+      - name: Extract CMake
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
+        run: tar xzf "cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz" -C vendor && mv "vendor/cmake-${CMAKE_VERSION}-linux-x86_64" vendor/cmake
+
+      - name: Install Rust Android target
+        run: rustup target add aarch64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk@3.5.4
+
+      - name: Cache Gradle
+        id: cache-gradle
+        uses: actions/cache@v4
+        with:
+          path: gradle
+          key: gradle-${{ env.GRADLE_VERSION }}
+
+      - name: Download Gradle
+        if: steps.cache-gradle.outputs.cache-hit != 'true'
+        run: curl -L -o gradle-${GRADLE_VERSION}-bin.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+
+      - name: Extract Gradle
+        if: steps.cache-gradle.outputs.cache-hit != 'true'
+        run: 7z -ogradle x gradle-${GRADLE_VERSION}-bin.zip
+
+      - name: Cache Android NDK
+        id: cache-android-ndk
+        uses: actions/cache@v4
+        with:
+          path: android-ndk
+          key: android-ndk-r25c
+
+      - name: Download Android NDK
+        if: steps.cache-android-ndk.outputs.cache-hit != 'true'
+        run: curl -L -o android-ndk-r25c-linux.zip "https://dl.google.com/android/repository/android-ndk-r25c-linux.zip"
+
+      - name: Extract Android NDK
+        if: steps.cache-android-ndk.outputs.cache-hit != 'true'
+        run: 7z -oandroid-ndk -snld x android-ndk-r25c-linux.zip
+
+      - name: Link Android NDK
+        run: |
+          rm -rf "$ANDROID_SDK_ROOT/ndk/${ANDROID_NDK_VERSION}"
+          mkdir -p "$ANDROID_SDK_ROOT/ndk"
+          ln -s "$PWD/android-ndk/android-ndk-r25c" "$ANDROID_SDK_ROOT/ndk/${ANDROID_NDK_VERSION}"
+
+      - name: Generate local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+
+      - name: Decode Android signing key
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/zombiefarm-release.jks
+          fi
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Build release APK
+        run: |
+          cd android
+          "../gradle/gradle-${GRADLE_VERSION}/bin/gradle" assembleRelease
+          mv app/build/outputs/apk/release/app-release.apk ../touchHLE-zombiefarm-android-arm64.apk
+        env:
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.ANDROID_NDK_VERSION }}
+          ANDROID_NDK: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.ANDROID_NDK_VERSION }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.ANDROID_NDK_VERSION }}
+          # Build one APK for modern heterogeneous Arm phones. Cortex-A75 and
+          # Cortex-A55 expose the same LLVM target features, so the resulting
+          # code can run on both the performance and efficiency cores of that
+          # generation while dropping compatibility with much older Armv8 CPUs.
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS: -C target-cpu=cortex-a75
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: "3"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+          CARGO_PROFILE_RELEASE_LTO: fat
+          CFLAGS_aarch64_linux_android: -mcpu=cortex-a75
+          CXXFLAGS_aarch64_linux_android: -mcpu=cortex-a75
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/app/zombiefarm-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          CMAKE: ${{ github.workspace }}/vendor/cmake/bin/cmake
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: touchHLE-zombiefarm-android-arm64
+          path: touchHLE-zombiefarm-android-arm64.apk

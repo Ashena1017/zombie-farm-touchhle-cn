@@ -1,0 +1,71 @@
+{
+  "generated": "2026-09-15T11:04:09+00:00",
+  "tool": "patch_zfr_fonts_v6.py",
+  "purpose": "enlarge the market 'unlock item early' confirmation body text from 14.0 to 18.0 so it matches the rest of the alert tier",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v5.ipa",
+    "size": 59564493,
+    "sha256": "622A2F88EB6D93C6810E1D8649929C3F23A08817E3332E2A75C7AB841275CE86",
+    "executable_sha256": "A5EE43C6772181CEF370329FC37D8E06270486260927898A1EB0028A3E7D5DF0"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x06a49c",
+      "file_offset": 447644,
+      "old": "1626a0e3",
+      "new": "1926a0e3",
+      "float": "18",
+      "note": "ZFMarketMenu -unlockItem: body label 14.0 -> 18.0 (mov r2,#0x1600000 -> #0x1900000)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x04d6f4",
+      "file_offset": 5261044,
+      "old": "c4f26013",
+      "new": "c4f29013",
+      "float": "18",
+      "note": "ZFMarketMenu -unlockItem: body label 14.0 -> 18.0 (movt r3,#0x4160 -> #0x4190)"
+    }
+  ],
+  "executable_checks": {
+    "sites_verified": 2,
+    "readback": [
+      "sub6 0x06a49c 1926a0e3 (18)",
+      "sub9 0x04d6f4 c4f29013 (18)"
+    ],
+    "v4_helper_region_intact": true
+  },
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191086,
+    "padding_bytes": 11971,
+    "compression_strategy": "default",
+    "crc32": "8c97e9c8",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v6.ipa",
+    "size": 59564493,
+    "sha256": "68A0A76F71BF5DA770A7745E32F6051F8996D55C4E1694CE3C840E7E2C31EC1A",
+    "executable_sha256": "A1CCFA05B24B61D0A1040B5A15F7789BE9DF64C29B8CB02D03051FDC482A0D9B"
+  }
+}

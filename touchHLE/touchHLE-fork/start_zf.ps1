@@ -1,0 +1,1 @@
+.\target\release\touchHLE.exe ".\zombie_farm\ZFR06.ipa" --device-family="ipad"

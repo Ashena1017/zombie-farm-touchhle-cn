@@ -1,0 +1,154 @@
+{
+  "generated": "2026-09-17T04:43:56+00:00",
+  "tool": "patch_zfr_b2_v21.py",
+  "kind": "FIX",
+  "findings": {
+    "#2": "ZFAlertWindowStorageItem renders the base factory's title1 (18.0) and body1 (12.0); the base slide-in factory has only two callers, both on the storage-item path, so raising them to 24/18 only affects that panel",
+    "#8": "ZFZombieMenu -initLowerMenu builds the Mausoleum caption (lowerMenuLabel1, ivar +0x124) at 14.0 and then tints it black; raise to 17.0"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v20fix.ipa",
+    "size": 59564493,
+    "sha256": "1332012775BE94E0AC0F0AA7623B191412782266C2C458D9BAC7E51ADB2E4321",
+    "executable_sha256": "EC8768A50180182815162A93DE4220ADC9E31BDE9C0E11C6D903C975C01CD5ED"
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x076b7a",
+      "file_offset": 5430138,
+      "len": 4,
+      "old_prefix": "c4f29013",
+      "new_prefix": "c4f2c013",
+      "float_before": 18.0,
+      "float_after": 24.0,
+      "style": "thumb-movt",
+      "note": "#2 ZFAlertWindow -alertWindowSlideInInformative: title1 fontSize 18.0 -> 24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x076de8",
+      "file_offset": 5430760,
+      "len": 4,
+      "old_prefix": "c4f24010",
+      "new_prefix": "c4f29010",
+      "float_before": 12.0,
+      "float_after": 18.0,
+      "style": "thumb-movt",
+      "note": "#2 ZFAlertWindow -alertWindowSlideInInformative: body1 fontSize 12.0 -> 18.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0d290a",
+      "file_offset": 5806346,
+      "len": 4,
+      "old_prefix": "c4f26010",
+      "new_prefix": "c4f28810",
+      "float_before": 14.0,
+      "float_after": 17.0,
+      "style": "thumb-movt",
+      "note": "#8 ZFZombieMenu -initLowerMenu Mausoleum caption 14.0 -> 17.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a31a4",
+      "file_offset": 680356,
+      "len": 4,
+      "old_prefix": "1936a0e3",
+      "new_prefix": "0735a0e3",
+      "float_before": 18.0,
+      "float_after": 24.0,
+      "style": "arm-mov",
+      "note": "#2 ZFAlertWindow -alertWindowSlideInInformative: title1 fontSize 18.0 -> 24.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a3464",
+      "file_offset": 681060,
+      "len": 4,
+      "old_prefix": "0535a0e3",
+      "new_prefix": "1936a0e3",
+      "float_before": 12.0,
+      "float_after": 18.0,
+      "style": "arm-mov",
+      "note": "#2 ZFAlertWindow -alertWindowSlideInInformative: body1 fontSize 12.0 -> 18.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x11efc4",
+      "file_offset": 1187780,
+      "len": 4,
+      "old_prefix": "1636a0e3",
+      "new_prefix": "6237a0e3",
+      "float_before": 14.0,
+      "float_after": 17.0,
+      "style": "arm-mov",
+      "note": "#8 ZFZombieMenu -initLowerMenu Mausoleum caption 14.0 -> 17.0"
+    }
+  ],
+  "site_count": 6,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191048,
+    "padding_bytes": 12009,
+    "compression_strategy": "default",
+    "crc32": "f766c4a5",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v21fix.ipa",
+    "size": 59564493,
+    "sha256": "358D2887D43F613748581EB29FAFC385976629ED791188FBF973D2C6922C2052",
+    "executable_sha256": "7DBAC66BB28DEBA9812C5F9D9ED81850E93E4B3381924EDEC9AF39494BE4394F"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "input": "C:\\Users\\Loner\\Haven\\AI_workstation\\touchHLE-zombiefarm\\zombie_farm\\Zombie Farm ZFR 1.0.zh-CN-complete-final.ipa",
+  "output": "C:\\Users\\Loner\\Haven\\AI_workstation\\touchHLE-zombiefarm\\zombie_farm\\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed.ipa",
+  "input_sha256_executable": "8FAD42BEB224988EFDE4D588100694E6864231400058E1C91D8289F79F37D03B",
+  "output_sha256_executable": "8A93D2C6829D9B7FB0D271B17B8D9A6BE3EAF038A0A4785509F059E0A9DFA42A",
+  "input_sha256_ipa": "C326AC3D1DD6594A83AF0A8D2FFA8FC31DF67AAFBC18AADFBDE6F24CF929E31D",
+  "output_sha256_ipa": "D3EB82807CBF287A75F2368B7642B23A9DD1B790A8CDBC3FAE88E49362603704",
+  "executable": "Payload/ZFR.app/ZFR",
+  "audit": [
+    {
+      "slice": 0,
+      "subtype": 6,
+      "patches": [
+        {
+          "selector": "showRateIt",
+          "imp": 111716,
+          "file_offset": 107620,
+          "mode": "arm",
+          "original": "000050e31eff2f01",
+          "replacement": "1eff2fe10000a0e1",
+          "selector_addr": 3759348
+        },
+        {
+          "selector": "showTreeWorldPopUp",
+          "imp": 112264,
+          "file_offset": 108168,
+          "mode": "arm",
+          "original": "000050e31eff2f01",
+          "replacement": "1eff2fe10000a0e1",
+          "selector_addr": 3759348
+        }
+      ]
+    },
+    {
+      "slice": 1,
+      "subtype": 9,
+      "patches": [
+        {
+          "selector": "showRateIt",
+          "imp": 85869,
+          "file_offset": 81772,
+          "mode": "thumb",
+          "original": "002810d070b50446",
+          "replacement": "704700bf",
+          "selector_addr": 2956536
+        },
+        {
+          "selector": "showTreeWorldPopUp",
+          "imp": 86289,
+          "file_offset": 82192,
+          "mode": "thumb",
+          "original": "002810d070b50446",
+          "replacement": "704700bf",
+          "selector_addr": 2956536
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "zip_crc": "ok",
+    "changed_members": [
+      "Payload/ZFR.app/ZFR"
+    ],
+    "non_executable_members_unchanged": true,
+    "entrypoints_verified": true
+  },
+  "code_signature": "invalidated by executable modification; intended for touchHLE"
+}

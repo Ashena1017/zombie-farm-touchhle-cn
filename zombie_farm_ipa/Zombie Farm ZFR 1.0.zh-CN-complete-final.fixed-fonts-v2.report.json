@@ -1,0 +1,606 @@
+{
+  "input": "C:\\Users\\Loner\\Haven\\AI_workstation\\touchHLE-zombiefarm\\zombie_farm\\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed.ipa",
+  "output": "C:\\Users\\Loner\\Haven\\AI_workstation\\touchHLE-zombiefarm\\zombie_farm\\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v2.ipa",
+  "input_sha256_ipa": "D3EB82807CBF287A75F2368B7642B23A9DD1B790A8CDBC3FAE88E49362603704",
+  "output_sha256_ipa": "7CF8BB4E2D1C4BB73473946865845A046F010CDDBCA6963574AB56A6E9244D0F",
+  "input_sha256_executable": "8A93D2C6829D9B7FB0D271B17B8D9A6BE3EAF038A0A4785509F059E0A9DFA42A",
+  "output_sha256_executable": "4671032BD27B2F8F76C9A5E7FCC7CFB2CC79EF1BA96EEEE5D9E3047DC6A1EF51",
+  "executable": "Payload/ZFR.app/ZFR",
+  "font_change": {
+    "title": "20.0 -> 23.0 (+3)",
+    "body": "15.0 -> 18.0 (+3)",
+    "button": "18.0 unchanged",
+    "implementation": "post-factory CCLabel fontSize_ write followed by original setString:",
+    "scope": "invasion unlock, level-up, and zombie-camera alert factories"
+  },
+  "audit": [
+    {
+      "slice": 0,
+      "subtype": 6,
+      "fat_offset": 16384,
+      "fat_size": 4919392,
+      "existing_crash_fix": [
+        {
+          "selector": "showRateIt",
+          "imp": 111716,
+          "file_offset": 107620,
+          "bytes": "1eff2fe10000a0e1"
+        },
+        {
+          "selector": "showTreeWorldPopUp",
+          "imp": 112264,
+          "file_offset": 108168,
+          "bytes": "1eff2fe10000a0e1"
+        }
+      ],
+      "region_guards": [
+        {
+          "name": "helper_plus3",
+          "address": 112272,
+          "end": 112324,
+          "sha256": "40789498e6a15daf0bc6eecd0371d0b5117478961d6a234bb5ceb830311a958e"
+        },
+        {
+          "name": "two_label_cave",
+          "address": 112424,
+          "end": 112516,
+          "sha256": "fe8e9bb7135e146b4856e513096d8e2633bd4a214802b98fe7a04c0dd7ce797a"
+        },
+        {
+          "name": "cave_gap",
+          "address": 112516,
+          "end": 112520,
+          "sha256": "487d96356744c11aa8e76bac8087f4365cae16fdee66d4aea7cdd030f354e44b"
+        },
+        {
+          "name": "three_label_cave",
+          "address": 112520,
+          "end": 112640,
+          "sha256": "7ff6e391f1f34e3d47238b6e2139db500ea7ddf8c5265aaabdc1bc07ddeea7fa"
+        }
+      ],
+      "call_sites": [
+        {
+          "name": "invasion_simple",
+          "address": 131016,
+          "wrapper": "two",
+          "bytes": "04d00deb"
+        },
+        {
+          "name": "invasion_informative",
+          "address": 132084,
+          "wrapper": "two",
+          "bytes": "f9ce0deb"
+        },
+        {
+          "name": "level_up",
+          "address": 133396,
+          "wrapper": "three",
+          "bytes": "b1cd0deb"
+        },
+        {
+          "name": "zombie_camera",
+          "address": 1047672,
+          "wrapper": "two",
+          "bytes": "d8500aeb"
+        }
+      ],
+      "wrappers": [
+        {
+          "name": "two",
+          "address": 112424,
+          "length": 92,
+          "sha256": "69F8BA3DBC1BA8A7C7B8CFE4B38A2F509C859D9F608F579CF0AFE91A05E19BE3",
+          "branch_targets": [
+            {
+              "kind": "arm_bl",
+              "address": 112448,
+              "target": 3751904
+            },
+            {
+              "kind": "arm_beq",
+              "address": 112464,
+              "target": 112512
+            },
+            {
+              "kind": "arm_beq",
+              "address": 112476,
+              "target": 112512
+            },
+            {
+              "kind": "arm_bl",
+              "address": 112484,
+              "target": 112272
+            },
+            {
+              "kind": "arm_bl",
+              "address": 112504,
+              "target": 112272
+            }
+          ]
+        },
+        {
+          "name": "three",
+          "address": 112520,
+          "length": 120,
+          "sha256": "8E6B857ADF43F08CF9F3D27EEDCBF49EECC09ABF065E106B0292DC94EED08081",
+          "branch_targets": [
+            {
+              "kind": "arm_bl",
+              "address": 112552,
+              "target": 3751904
+            },
+            {
+              "kind": "arm_beq",
+              "address": 112568,
+              "target": 112636
+            },
+            {
+              "kind": "arm_beq",
+              "address": 112580,
+              "target": 112600
+            },
+            {
+              "kind": "arm_bl",
+              "address": 112588,
+              "target": 112272
+            },
+            {
+              "kind": "arm_beq",
+              "address": 112600,
+              "target": 112636
+            },
+            {
+              "kind": "arm_bl",
+              "address": 112608,
+              "target": 112272
+            },
+            {
+              "kind": "arm_beq",
+              "address": 112620,
+              "target": 112636
+            },
+            {
+              "kind": "arm_bl",
+              "address": 112628,
+              "target": 112272
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slice": 1,
+      "subtype": 9,
+      "fat_offset": 4947968,
+      "fat_size": 4104864,
+      "existing_crash_fix": [
+        {
+          "selector": "showRateIt",
+          "imp": 85869,
+          "file_offset": 81772,
+          "bytes": "704700bf"
+        },
+        {
+          "selector": "showTreeWorldPopUp",
+          "imp": 86289,
+          "file_offset": 82192,
+          "bytes": "704700bf"
+        }
+      ],
+      "region_guards": [
+        {
+          "name": "helper_plus3",
+          "address": 86292,
+          "end": 86332,
+          "sha256": "07250d37e951753bb267eac5a706a71bfc342b5a968d44c18959d194e5f3d493"
+        },
+        {
+          "name": "two_label_cave",
+          "address": 86332,
+          "end": 86388,
+          "sha256": "8356464eec1139c80761e04a5fc3bcee247c59df54cac69463d8cf36c42a1af8"
+        },
+        {
+          "name": "three_label_cave",
+          "address": 86388,
+          "end": 86462,
+          "sha256": "d50e9e02d67b88613d1d546b9214521ada3490d6a4b0d672e3da823b1848a56d"
+        }
+      ],
+      "call_sites": [
+        {
+          "name": "invasion_simple",
+          "address": 100240,
+          "wrapper": "two",
+          "bytes": "b7f2dcec"
+        },
+        {
+          "name": "invasion_informative",
+          "address": 101124,
+          "wrapper": "two",
+          "bytes": "b7f222eb"
+        },
+        {
+          "name": "level_up",
+          "address": 102184,
+          "wrapper": "three",
+          "bytes": "b7f210e9"
+        },
+        {
+          "name": "zombie_camera",
+          "address": 768792,
+          "wrapper": "two",
+          "bytes": "14f218eb"
+        }
+      ],
+      "wrappers": [
+        {
+          "name": "two",
+          "address": 86332,
+          "length": 56,
+          "sha256": "C4FF4AAFEB93DD961B5CC6AEB16498138F0640648E4747F670FD634AC222BF67",
+          "branch_targets": [
+            {
+              "kind": "thumb_blx",
+              "address": 86344,
+              "target": 2949452
+            },
+            {
+              "kind": "thumb_beq",
+              "address": 86354,
+              "target": 86384
+            },
+            {
+              "kind": "thumb_beq",
+              "address": 86362,
+              "target": 86384
+            },
+            {
+              "kind": "thumb_bl",
+              "address": 86366,
+              "target": 86292
+            },
+            {
+              "kind": "thumb_beq",
+              "address": 86376,
+              "target": 86384
+            },
+            {
+              "kind": "thumb_bl",
+              "address": 86380,
+              "target": 86292
+            }
+          ]
+        },
+        {
+          "name": "three",
+          "address": 86388,
+          "length": 74,
+          "sha256": "7103A8EDAC06FC191E80F24FB3DD0B1B2E2E7866A654AE35A7D90242ECA93F7E",
+          "branch_targets": [
+            {
+              "kind": "thumb_blx",
+              "address": 86404,
+              "target": 2949452
+            },
+            {
+              "kind": "thumb_beq",
+              "address": 86414,
+              "target": 86460
+            },
+            {
+              "kind": "thumb_beq",
+              "address": 86422,
+              "target": 86460
+            },
+            {
+              "kind": "thumb_bl",
+              "address": 86426,
+              "target": 86292
+            },
+            {
+              "kind": "thumb_beq",
+              "address": 86436,
+              "target": 86460
+            },
+            {
+              "kind": "thumb_bl",
+              "address": 86440,
+              "target": 86292
+            },
+            {
+              "kind": "thumb_beq",
+              "address": 86450,
+              "target": 86460
+            },
+            {
+              "kind": "thumb_bl",
+              "address": 86454,
+              "target": 86292
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "fat": {
+      "fat_macho_reparsed": true,
+      "slice_count": 2,
+      "subtypes": [
+        6,
+        9
+      ],
+      "existing_crash_fix_verified": true,
+      "wrapper_branches_verified": true,
+      "call_site_targets_verified": true,
+      "slices": [
+        {
+          "slice": 0,
+          "subtype": 6,
+          "existing_crash_fix_verified": true,
+          "wrappers": [
+            {
+              "name": "two",
+              "address": 112424,
+              "length": 92,
+              "sha256": "69F8BA3DBC1BA8A7C7B8CFE4B38A2F509C859D9F608F579CF0AFE91A05E19BE3",
+              "branch_targets": [
+                {
+                  "kind": "arm_bl",
+                  "address": 112448,
+                  "target": 3751904
+                },
+                {
+                  "kind": "arm_beq",
+                  "address": 112464,
+                  "target": 112512
+                },
+                {
+                  "kind": "arm_beq",
+                  "address": 112476,
+                  "target": 112512
+                },
+                {
+                  "kind": "arm_bl",
+                  "address": 112484,
+                  "target": 112272
+                },
+                {
+                  "kind": "arm_bl",
+                  "address": 112504,
+                  "target": 112272
+                }
+              ]
+            },
+            {
+              "name": "three",
+              "address": 112520,
+              "length": 120,
+              "sha256": "8E6B857ADF43F08CF9F3D27EEDCBF49EECC09ABF065E106B0292DC94EED08081",
+              "branch_targets": [
+                {
+                  "kind": "arm_bl",
+                  "address": 112552,
+                  "target": 3751904
+                },
+                {
+                  "kind": "arm_beq",
+                  "address": 112568,
+                  "target": 112636
+                },
+                {
+                  "kind": "arm_beq",
+                  "address": 112580,
+                  "target": 112600
+                },
+                {
+                  "kind": "arm_bl",
+                  "address": 112588,
+                  "target": 112272
+                },
+                {
+                  "kind": "arm_beq",
+                  "address": 112600,
+                  "target": 112636
+                },
+                {
+                  "kind": "arm_bl",
+                  "address": 112608,
+                  "target": 112272
+                },
+                {
+                  "kind": "arm_beq",
+                  "address": 112620,
+                  "target": 112636
+                },
+                {
+                  "kind": "arm_bl",
+                  "address": 112628,
+                  "target": 112272
+                }
+              ]
+            }
+          ],
+          "call_sites": [
+            {
+              "name": "invasion_simple",
+              "address": 131016,
+              "wrapper": "two",
+              "bytes": "d6edffeb",
+              "target": 112424
+            },
+            {
+              "name": "invasion_informative",
+              "address": 132084,
+              "wrapper": "two",
+              "bytes": "cbecffeb",
+              "target": 112424
+            },
+            {
+              "name": "level_up",
+              "address": 133396,
+              "wrapper": "three",
+              "bytes": "9bebffeb",
+              "target": 112520
+            },
+            {
+              "name": "zombie_camera",
+              "address": 1047672,
+              "wrapper": "two",
+              "bytes": "aa6efceb",
+              "target": 112424
+            }
+          ]
+        },
+        {
+          "slice": 1,
+          "subtype": 9,
+          "existing_crash_fix_verified": true,
+          "wrappers": [
+            {
+              "name": "two",
+              "address": 86332,
+              "length": 56,
+              "sha256": "C4FF4AAFEB93DD961B5CC6AEB16498138F0640648E4747F670FD634AC222BF67",
+              "branch_targets": [
+                {
+                  "kind": "thumb_blx",
+                  "address": 86344,
+                  "target": 2949452
+                },
+                {
+                  "kind": "thumb_beq",
+                  "address": 86354,
+                  "target": 86384
+                },
+                {
+                  "kind": "thumb_beq",
+                  "address": 86362,
+                  "target": 86384
+                },
+                {
+                  "kind": "thumb_bl",
+                  "address": 86366,
+                  "target": 86292
+                },
+                {
+                  "kind": "thumb_beq",
+                  "address": 86376,
+                  "target": 86384
+                },
+                {
+                  "kind": "thumb_bl",
+                  "address": 86380,
+                  "target": 86292
+                }
+              ]
+            },
+            {
+              "name": "three",
+              "address": 86388,
+              "length": 74,
+              "sha256": "7103A8EDAC06FC191E80F24FB3DD0B1B2E2E7866A654AE35A7D90242ECA93F7E",
+              "branch_targets": [
+                {
+                  "kind": "thumb_blx",
+                  "address": 86404,
+                  "target": 2949452
+                },
+                {
+                  "kind": "thumb_beq",
+                  "address": 86414,
+                  "target": 86460
+                },
+                {
+                  "kind": "thumb_beq",
+                  "address": 86422,
+                  "target": 86460
+                },
+                {
+                  "kind": "thumb_bl",
+                  "address": 86426,
+                  "target": 86292
+                },
+                {
+                  "kind": "thumb_beq",
+                  "address": 86436,
+                  "target": 86460
+                },
+                {
+                  "kind": "thumb_bl",
+                  "address": 86440,
+                  "target": 86292
+                },
+                {
+                  "kind": "thumb_beq",
+                  "address": 86450,
+                  "target": 86460
+                },
+                {
+                  "kind": "thumb_bl",
+                  "address": 86454,
+                  "target": 86292
+                }
+              ]
+            }
+          ],
+          "call_sites": [
+            {
+              "name": "invasion_simple",
+              "address": 100240,
+              "wrapper": "two",
+              "bytes": "fcf7d4fc",
+              "target": 86332
+            },
+            {
+              "name": "invasion_informative",
+              "address": 101124,
+              "wrapper": "two",
+              "bytes": "fcf71afb",
+              "target": 86332
+            },
+            {
+              "name": "level_up",
+              "address": 102184,
+              "wrapper": "three",
+              "bytes": "fcf724f9",
+              "target": 86388
+            },
+            {
+              "name": "zombie_camera",
+              "address": 768792,
+              "wrapper": "two",
+              "bytes": "59f710fb",
+              "target": 86332
+            }
+          ]
+        }
+      ]
+    },
+    "zip": {
+      "zip_crc": "ok",
+      "member_order_and_names_unchanged": true,
+      "changed_members": [
+        "Payload/ZFR.app/ZFR"
+      ],
+      "non_target_members_unchanged": true,
+      "raw_non_target_bytes_unchanged": true,
+      "archive_size_unchanged": true,
+      "fixed_slot_compression": {
+        "target_member": "Payload/ZFR.app/ZFR",
+        "source_compressed_size": 4203057,
+        "raw_deflate_size": 4191119,
+        "padding_bytes": 11938,
+        "compression_strategy": "default",
+        "crc32": "e7950285",
+        "local_crc_offset": 51314818,
+        "central_crc_offset": 59551101,
+        "data_start": 51314853,
+        "data_end": 55517910
+      }
+    }
+  },
+  "code_signature": "invalidated by executable modification; intended for touchHLE"
+}

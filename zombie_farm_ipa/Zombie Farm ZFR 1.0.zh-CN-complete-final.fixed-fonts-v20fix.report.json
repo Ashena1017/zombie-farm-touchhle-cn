@@ -1,0 +1,126 @@
+{
+  "generated": "2026-09-17T03:28:02+00:00",
+  "tool": "patch_zfr_b2_v20.py",
+  "kind": "FIX",
+  "findings": {
+    "root_cause": "ZFToolsLayer toolName/toolNameShadow are right-anchored (anchor 1.0,0.5) with right edges at winWidth/2-56 and winWidth/2-54; the widest count string '(10)' runs under the hourglass icon",
+    "fix": "move both right edges 4px left: -56 -> -60, -54 -> -58; each pool constant has exactly one vldr reader"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v19fix.ipa",
+    "size": 59564493,
+    "sha256": "760D183FCE12081D8BFC87C6DBAC5762ADC26C9EAC6C483A7D643D116296E206",
+    "executable_sha256": "059613B330A6FCCA56182A794DB2C71305CF56C4B2F57F4274BBE051D1AA99C7"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x130c98",
+      "file_offset": 1260696,
+      "len": 4,
+      "old_prefix": "000060c2",
+      "new_prefix": "000070c2",
+      "float_before": -56.0,
+      "float_after": -60.0,
+      "note": "#4 toolName x -56.0 -> -60.0 (vldr @0x130dc0)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x130c9c",
+      "file_offset": 1260700,
+      "len": 4,
+      "old_prefix": "000058c2",
+      "new_prefix": "000068c2",
+      "float_before": -54.0,
+      "float_after": -58.0,
+      "note": "#4 toolNameShadow x -54.0 -> -58.0 (vldr @0x130ec8)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0dfac0",
+      "file_offset": 5860032,
+      "len": 4,
+      "old_prefix": "000060c2",
+      "new_prefix": "000070c2",
+      "float_before": -56.0,
+      "float_after": -60.0,
+      "note": "#4 toolName x -56.0 -> -60.0 (vldr @0xdfbc8)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0dfac4",
+      "file_offset": 5860036,
+      "len": 4,
+      "old_prefix": "000058c2",
+      "new_prefix": "000068c2",
+      "float_before": -54.0,
+      "float_after": -58.0,
+      "note": "#4 toolNameShadow x -54.0 -> -58.0 (vldr @0xdfcce)"
+    }
+  ],
+  "site_count": 4,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191053,
+    "padding_bytes": 12004,
+    "compression_strategy": "default",
+    "crc32": "08da0a3c",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v20fix.ipa",
+    "size": 59564493,
+    "sha256": "1332012775BE94E0AC0F0AA7623B191412782266C2C458D9BAC7E51ADB2E4321",
+    "executable_sha256": "EC8768A50180182815162A93DE4220ADC9E31BDE9C0E11C6D903C975C01CD5ED"
+  }
+}

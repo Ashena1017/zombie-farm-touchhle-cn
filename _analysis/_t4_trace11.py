@@ -1,0 +1,111 @@
+"""#4 v11: trace onTileClickUp:forTool: from method start (aligned) with full
+movw/movt/add-pc/ldr tracking + selref deref. Print every msgsend with r1 name."""
+import struct
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tools"))
+from audit_zfr_ipa import parse_fat
+from inspect_v3_facts import classes_by_name, all_methods
+from capstone import CS_ARCH_ARM, CS_MODE_THUMB, Cs
+from capstone.arm_const import (ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG, ARM_REG_PC)
+
+IPA = ROOT / "zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v19fix.ipa"
+with zipfile.ZipFile(IPA) as z:
+    fat = z.read("Payload/ZFR.app/ZFR")
+sl = next(s for s in parse_fat(fat) if s.subtype == 9)
+
+
+def u32(a):
+    o = sl.addr_to_file(a)
+    return None if o is None or o + 4 > len(sl.data) else struct.unpack_from("<I", sl.data, o)[0]
+
+
+def cs_(a, limit=100):
+    o = sl.addr_to_file(a)
+    if o is None:
+        return None
+    try:
+        e = sl.data.index(b"\0", o, o + limit)
+    except ValueError:
+        return None
+    try:
+        s = sl.data[o:e].decode("utf-8")
+    except Exception:
+        return None
+    return s if s and s.isprintable() else None
+
+
+sel_of = {}
+for sec in sl.sections:
+    if sec.name != "__objc_selrefs":
+        continue
+    for off in range(0, sec.size, 4):
+        a = sec.addr + off
+        v = u32(a)
+        if v:
+            t = cs_(v)
+            if t and not t.startswith("<addr"):
+                sel_of[a] = t
+# reverse: cstring -> selector name
+name_of_cstr = {}
+for a, t in sel_of.items():
+    name_of_cstr.setdefault(u32(a), t)
+
+cb = classes_by_name(sl)
+c, info = cb["ZFToolManager"]
+ms = {m.selector: (m.imp & ~1) for m in all_methods(sl, c, info)}
+START = ms["onTileClickUp:forTool:"]
+print("start %#x" % START)
+
+md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+md.detail = True
+md.skipdata = True
+o = sl.addr_to_file(START)
+ins = list(md.disasm(sl.data[o:o + 0x6000], START))
+regs = {}
+for x in ins:
+    if x.address >= 0x26E20:
+        break
+    if not x.id or not x.operands:
+        regs = {}
+        continue
+    ops = x.operands
+    m = x.mnemonic.split(".")[0]
+    if m in ("movw", "movt") and ops[0].type == ARM_OP_REG and ops[-1].type == ARM_OP_IMM:
+        dst = ops[0].reg
+        imm = ops[-1].imm & 0xFFFF
+        regs[dst] = imm if m == "movw" else ((imm << 16) | ((regs.get(dst) or 0) & 0xFFFF))
+    elif m == "mov" and len(ops) == 2 and ops[0].type == ARM_OP_REG and ops[1].type == ARM_OP_REG:
+        regs[ops[0].reg] = regs.get(ops[1].reg)
+    elif m in ("mov", "movs") and ops[0].type == ARM_OP_REG and len(ops) >= 2 and ops[-1].type == ARM_OP_IMM:
+        regs[ops[0].reg] = ops[-1].imm
+    elif m == "add" and len(ops) == 2 and ops[0].type == ARM_OP_REG and ops[1].type == ARM_OP_REG \
+            and ops[1].reg == ARM_REG_PC:
+        v = regs.get(ops[0].reg)
+        if v is not None:
+            regs[ops[0].reg] = ((x.address + 4) + v) & 0xFFFFFFFF
+    elif m == "ldr" and len(ops) == 2 and ops[0].type == ARM_OP_REG and ops[1].type == ARM_OP_MEM:
+        mm = ops[1].mem
+        if mm.base == ARM_REG_PC:
+            pcw = (x.address + 4) & ~3
+            idx = regs.get(mm.index) if mm.index else 0
+            regs[ops[0].reg] = u32((pcw + (mm.disp or 0) + idx) & 0xFFFFFFFF) if idx is not None else None
+        elif mm.base in regs and regs[mm.base] is not None and not mm.index:
+            regs[ops[0].reg] = u32((regs[mm.base] + (mm.disp or 0)) & 0xFFFFFFFF)
+        else:
+            regs[ops[0].reg] = None
+    elif m in ("bl", "blx") and ops and ops[0].type == ARM_OP_IMM:
+        t = ops[0].imm & ~1
+        if t == 0x2D014C and x.address >= 0x26D00:
+            r1 = regs.get(1)
+            nm = name_of_cstr.get(r1, sel_of.get(r1, "?")) if r1 is not None else "?"
+            print("%#x msgsend %-50s r0=%s r2=%s r3=%s" % (
+                x.address, nm,
+                hex(regs[0]) if regs.get(0) is not None else "?",
+                hex(regs[2]) if regs.get(2) is not None else "?",
+                hex(regs[3]) if regs.get(3) is not None else "?"))
+        for r in (0, 1, 2, 3, 12):
+            regs.pop(r, None)

@@ -1,0 +1,141 @@
+{
+  "generated": "2026-09-17T05:14:40+00:00",
+  "tool": "patch_zfr_b2_v23.py",
+  "kind": "FIX",
+  "#1": "title1's dimensions box (200x20) clipped the 24pt glyph bottoms; a stub rewrites the stack height to 34.0 and tail-calls objc_msgSend",
+  "#7": "abilityTabLabel was explicitly set white at 0xcfb1e; now 0",
+  "#8": "Mausoleum caption 17.0 -> 19.0",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v22fix.ipa",
+    "size": 59564493,
+    "sha256": "BD99FD793C23D0CEA2D92D4309E6DDE1F3772CF44B337C69425C307D542C2EA3",
+    "executable_sha256": "3666A9D34C5A97F22D75806B42D831FAC5BA8AD3A3AC6747E452924088527B7D"
+  },
+  "stub": {
+    "addr": "0x1138f4",
+    "len": 22,
+    "height_before": 20.0,
+    "height_after": 34.0
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x1138f4",
+      "file_offset": 6072564,
+      "len": 22,
+      "kind": "stub",
+      "old_prefix": "bcf12aec0b9040f2ec01c0f228011022794424ab0092",
+      "new_prefix": "40f2000cc4f2082ccdf800c040f24c1cc0f22d0c6047",
+      "note": "#2 dimensions.height 20.0 -> 34.0 wrapper stub"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x076b9e",
+      "file_offset": 5430174,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "59f2d6ea",
+      "new_prefix": "9cf0a9fe",
+      "note": "#2 title1 label factory -> height-fix stub"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0cfb1e",
+      "file_offset": 5794590,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "6ff07f42",
+      "new_prefix": "4ff00002",
+      "note": "#7 abilityTabLabel setColor:(0,0,0) instead of white"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0d290a",
+      "file_offset": 5806346,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "c4f28810",
+      "new_prefix": "c4f29810",
+      "note": "#8 Mausoleum caption 17.0 -> 19.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x11efc4",
+      "file_offset": 1187780,
+      "len": 4,
+      "kind": "site",
+      "old_prefix": "6237a0e3",
+      "new_prefix": "6637a0e3",
+      "note": "#8 Mausoleum caption 17.0 -> 19.0"
+    }
+  ],
+  "site_count": 5,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ],
+      [
+        "0x1138c8",
+        "0x1138f3"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191104,
+    "padding_bytes": 11953,
+    "compression_strategy": "default",
+    "crc32": "3cf8e0de",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v23fix.ipa",
+    "size": 59564493,
+    "sha256": "4179AF102A75D9371A66FB847BE5AA061F61712D5B9463248766B4761C3E4028",
+    "executable_sha256": "275626B2F8A551A5C219AEA37BEC6EB0A0B2BA307F39424D374BAB2F5534C6C8"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "generated": "2026-09-19T20:03:00+00:00",
+  "tool": "patch_zfr_b2_v29.py",
+  "kind": "FIX",
+  "supersedes": "fixed-fonts-v28fix.ipa",
+  "problem": "v19fix shortened 'Fertilized by %@!' from ' %@施肥了' to '%@施肥' because the faithful text needs 193 compressed bytes and the member's DEFLATE slot is 189.",
+  "correction": "189 bytes was a FORMAT limit, not a hard limit.  v19fix only tried binary plists; an OpenStep property list with \\Uxxxx escapes compresses the same content to 182 bytes.",
+  "loader_evidence": "-[NSBundle localizedStringForKey:value:table:] -> [NSDictionary dictionaryWithContentsOfURL:] -> deserialize_plist_from_file -> plist::Value::from_reader; the plist 1.8.0 Reader auto-detects binary/XML/OpenStep. Confirmed with a probe compiled against the same crate: braced OpenStep + \\U escapes parses to the right Chinese; a bare unbraced list is rejected; raw UTF-8 becomes Latin-1 mojibake.",
+  "value": {
+    "key": "Fertilized by %@!",
+    "before": "%@施肥",
+    "after": " %@施肥啦！"
+  },
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v28fix.ipa",
+    "size": 59564493,
+    "sha256": "7B37DC7CF874D478BA25D458871B2D19F1B58532E83223C52A5C9519B5BDA7F8",
+    "executable_sha256": "45D647787CC6256DBE83B041808E5845739A7B331B72DC030C7FD6E9CC04B05B"
+  },
+  "members": [
+    {
+      "member": "Payload/ZFR.app/Arial-BoldMT.strings",
+      "format_before": "binary plist",
+      "format_after": "OpenStep text",
+      "usize_before": 253,
+      "usize_after": 396,
+      "slot": 189,
+      "raw_deflate_size": 186,
+      "padding_bytes": 3,
+      "compression_strategy": "default",
+      "crc32": "12a77a80"
+    },
+    {
+      "member": "Payload/ZFR.app/zh-Hans.lproj/Arial-BoldMT.strings",
+      "format_before": "binary plist",
+      "format_after": "OpenStep text",
+      "usize_before": 253,
+      "usize_after": 396,
+      "slot": 189,
+      "raw_deflate_size": 186,
+      "padding_bytes": 3,
+      "compression_strategy": "default",
+      "crc32": "12a77a80"
+    }
+  ],
+  "member_count": 2,
+  "other_values_unchanged": {
+    "Cupid Zombie": "丘比特僵尸",
+    "Flower Zombie": "花花僵尸",
+    "Garden Zombie": "园丁僵尸",
+    "Green Flower Zombie": "花花僵尸",
+    "ZomBotanist": "生态僵尸",
+    "Zombee": "蜜蜂僵尸",
+    "Zombutterfly": "蝴蝶僵尸"
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa",
+    "size": 59564493,
+    "sha256": "E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED",
+    "executable_sha256": "45D647787CC6256DBE83B041808E5845739A7B331B72DC030C7FD6E9CC04B05B"
+  }
+}

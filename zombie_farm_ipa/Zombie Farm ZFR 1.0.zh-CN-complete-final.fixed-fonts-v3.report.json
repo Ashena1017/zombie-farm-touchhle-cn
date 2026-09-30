@@ -1,0 +1,169 @@
+{
+  "generated": "2026-09-01T12:33:10+00:00",
+  "tool": "patch_zfr_fonts_v3.py",
+  "title_pt": 24.0,
+  "body_pt": 18.0,
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed.ipa",
+    "size": 59564493,
+    "sha256": "D3EB82807CBF287A75F2368B7642B23A9DD1B790A8CDBC3FAE88E49362603704",
+    "executable_sha256": "8A93D2C6829D9B7FB0D271B17B8D9A6BE3EAF038A0A4785509F059E0A9DFA42A"
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x0a040c",
+      "file_offset": 668684,
+      "old": "1a36a0e3",
+      "new": "1c36a0e3",
+      "note": "initWithWindow: title mov r3,#0x1a00000 -> #0x1c00000 (20.0 -> 24.0)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a0468",
+      "file_offset": 668776,
+      "old": "1726a0e3",
+      "new": "1926a0e3",
+      "note": "initWithWindow: body mov r2,#0x1700000 -> #0x1900000 (15.0 -> 18.0) [1/2]"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a04bc",
+      "file_offset": 668860,
+      "old": "1726a0e3",
+      "new": "1926a0e3",
+      "note": "initWithWindow: body mov r2,#0x1700000 -> #0x1900000 (15.0 -> 18.0) [2/2]"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a0f04",
+      "file_offset": 671492,
+      "old": "c00ab8ee",
+      "new": "020ab3ee",
+      "note": "alertWindowInformative: body vcvt.f32.s32 s0,s0 -> vmov.f32 s0,#18.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a1048",
+      "file_offset": 671816,
+      "old": "c00ab8ee",
+      "new": "080ab3ee",
+      "note": "alertWindowInformative: title vcvt.f32.s32 s0,s0 -> vmov.f32 s0,#24.0"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a16fc",
+      "file_offset": 673532,
+      "old": "1726a0e3",
+      "new": "1926a0e3",
+      "note": "alertWindowSimple:...withWindow: body1 rebuild mov r2 (15.0 -> 18.0)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x0a2190",
+      "file_offset": 676240,
+      "old": "1736a0e3",
+      "new": "1936a0e3",
+      "note": "alertWindowSimpleChoice:...withWindow: body1 rebuild mov r3 (15.0 -> 18.0)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0748e6",
+      "file_offset": 5421286,
+      "old": "c4f2a011",
+      "new": "c4f2c011",
+      "note": "initWithWindow: title movt r1,#0x41a0 -> #0x41c0 (20.0 -> 24.0)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x074936",
+      "file_offset": 5421366,
+      "old": "c4f27016",
+      "new": "c4f29016",
+      "note": "initWithWindow: body movt r6,#0x4170 -> #0x4190 (15.0 -> 18.0, both bodies)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0750f8",
+      "file_offset": 5423352,
+      "old": "bbff0006",
+      "new": "b3ee020a",
+      "note": "alertWindowInformative: body vcvt.f32.s32 -> vmov.f32 s0,#18.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x075200",
+      "file_offset": 5423616,
+      "old": "bbff0006",
+      "new": "b3ee080a",
+      "note": "alertWindowInformative: title vcvt.f32.s32 -> vmov.f32 s0,#24.0"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x075788",
+      "file_offset": 5425032,
+      "old": "c4f27012",
+      "new": "c4f29012",
+      "note": "alertWindowSimple:...withWindow: body1 rebuild movt r2 (15.0 -> 18.0)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x075faa",
+      "file_offset": 5427114,
+      "old": "c4f27014",
+      "new": "c4f29014",
+      "note": "alertWindowSimpleChoice:...withWindow: body1 rebuild movt r4 (15.0 -> 18.0)"
+    }
+  ],
+  "executable_checks": {
+    "sites_verified": 13,
+    "readback": [
+      "sub6 0x0a040c 1c36a0e3",
+      "sub6 0x0a0468 1926a0e3",
+      "sub6 0x0a04bc 1926a0e3",
+      "sub6 0x0a0f04 020ab3ee",
+      "sub6 0x0a1048 080ab3ee",
+      "sub6 0x0a16fc 1926a0e3",
+      "sub6 0x0a2190 1936a0e3",
+      "sub9 0x0748e6 c4f2c011",
+      "sub9 0x074936 c4f29016",
+      "sub9 0x0750f8 b3ee020a",
+      "sub9 0x075200 b3ee080a",
+      "sub9 0x075788 c4f29012",
+      "sub9 0x075faa c4f29014"
+    ],
+    "caves_intact": true
+  },
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191078,
+    "padding_bytes": 11979,
+    "compression_strategy": "default",
+    "crc32": "34b620ac",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v3.ipa",
+    "size": 59564493,
+    "sha256": "EF33F88F8E692719D629952F06A1A18D88BA075C465681FF4DEFC3D2CD3C6585",
+    "executable_sha256": "8D7FE526BD85D2B05A056AF9C79BFFE066F515A0F740BB30BB68B64E120B4554"
+  }
+}

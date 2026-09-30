@@ -1,0 +1,234 @@
+{
+  "generated": "2026-09-16T04:26:30+00:00",
+  "tool": "patch_zfr_questfix_v11.py",
+  "kind": "FIX",
+  "supersedes": "fixed-fonts-v10fix.ipa (which patched the wrong method)",
+  "root_cause": "initWithID:loadSprite: registers the notification itself for requirementUpdated:/requirementComplete: with object:nil; the throwaway created by GameData is never deallocated, so dealloc's [center removeObserver:self] never runs and the throwaway keeps rewriting every quest dict from its own countCurrent == 0",
+  "fix": "stopListening now performs [[NSNotificationCenter defaultCenter] removeObserver:self], and the v10 factory patch calls it on every throwaway right after initWithID:",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v6.ipa",
+    "size": 59564493,
+    "sha256": "68A0A76F71BF5DA770A7745E32F6051F8996D55C4E1694CE3C840E7E2C31EC1A",
+    "executable_sha256": "A1CCFA05B24B61D0A1040B5A15F7789BE9DF64C29B8CB02D03051FDC482A0D9B"
+  },
+  "rewrite_checks": {
+    "sub6_0x16a5f8": {
+      "instructions": 66,
+      "calls": [
+        [
+          "0x16a614",
+          "bl",
+          "0x393fe0"
+        ],
+        [
+          "0x16a628",
+          "bl",
+          "0x393fe0"
+        ]
+      ]
+    },
+    "sub9_0x10a1dc": {
+      "instructions": 88,
+      "calls": [
+        [
+          "0x10a1f8",
+          "blx",
+          "0x2d014c"
+        ],
+        [
+          "0x10a20c",
+          "blx",
+          "0x2d014c"
+        ]
+      ]
+    }
+  },
+  "r0_handoff_checks": {
+    "sub6_0x187dd8": {
+      "instruction": "mov r0, r8",
+      "restores_r0": true
+    },
+    "sub9_0x120038": {
+      "instruction": "mov r0, r5",
+      "restores_r0": true
+    },
+    "sub6_0x186d50": {
+      "instruction": "mov r0, r0",
+      "restores_r0": false
+    },
+    "sub9_0x11f440": {
+      "instruction": "mov r8, r8",
+      "restores_r0": false
+    }
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x16a5f8",
+      "file_offset": 1496568,
+      "len": 264,
+      "old_prefix": "70d04de207d0cde3fc209fe5f4109fe5",
+      "new_prefix": "0040a0e1fc009fe500008fe0000090e5",
+      "note": "stopListening body -> [[NSNotificationCenter defaultCenter] removeObserver:self]"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x16a700",
+      "file_offset": 1496832,
+      "len": 12,
+      "old_prefix": "30d42e001c543100ecd32e00",
+      "new_prefix": "1c392f0030d72e00a0d72e00",
+      "note": "stopListening literal pool: 3 deltas retargeted"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x10a1dc",
+      "file_offset": 6033884,
+      "len": 192,
+      "old_prefix": "f0b503af2de9000d9bb041f2cc7313aa",
+      "new_prefix": "10b504464ff6c040c0f2280078440068",
+      "note": "stopListening whole method -> removeObserver:self"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x186d40",
+      "file_offset": 1613120,
+      "len": 4,
+      "old_prefix": "28109de5",
+      "new_prefix": "0080a0e1",
+      "note": "addUserData: keep notification in r8"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x186d50",
+      "file_offset": 1613136,
+      "len": 4,
+      "old_prefix": "0080a0e1",
+      "new_prefix": "0000a0e1",
+      "note": "addUserData: r0 rewritten before next read"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x187dcc",
+      "file_offset": 1617356,
+      "len": 4,
+      "old_prefix": "28109de5",
+      "new_prefix": "0080a0e1",
+      "note": "readUserData: keep notification in r8"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x187dd8",
+      "file_offset": 1617368,
+      "len": 4,
+      "old_prefix": "0080a0e1",
+      "new_prefix": "0800a0e1",
+      "note": "readUserData: r0 = r8 (receiver of next call)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x11f43a",
+      "file_offset": 6120506,
+      "len": 2,
+      "old_prefix": "0799",
+      "new_prefix": "8046",
+      "note": "addUserData: keep notification in r8"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x11f440",
+      "file_offset": 6120512,
+      "len": 2,
+      "old_prefix": "8046",
+      "new_prefix": "c046",
+      "note": "addUserData: r0 rewritten before next read"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x120030",
+      "file_offset": 6123568,
+      "len": 2,
+      "old_prefix": "0699",
+      "new_prefix": "0546",
+      "note": "readUserData: keep notification in r5"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x120038",
+      "file_offset": 6123576,
+      "len": 2,
+      "old_prefix": "0546",
+      "new_prefix": "2846",
+      "note": "readUserData: r0 = r5 (receiver of next call)"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x186d44",
+      "file_offset": 1613124,
+      "len": 4,
+      "old_prefix": "a53408eb",
+      "new_prefix": "288effeb",
+      "note": "addUserData: autorelease -> stopListening"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x187dd0",
+      "file_offset": 1617360,
+      "len": 4,
+      "old_prefix": "823008eb",
+      "new_prefix": "058affeb",
+      "note": "readUserData: autorelease -> stopListening"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x11f43c",
+      "file_offset": 6120508,
+      "len": 4,
+      "old_prefix": "b0f186ee",
+      "new_prefix": "eaf7cefe",
+      "note": "addUserData: autorelease -> stopListening"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x120032",
+      "file_offset": 6123570,
+      "len": 4,
+      "old_prefix": "b0f18ce8",
+      "new_prefix": "eaf7d3f8",
+      "note": "readUserData: autorelease -> stopListening"
+    }
+  ],
+  "site_count": 15,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4190985,
+    "padding_bytes": 12072,
+    "compression_strategy": "default",
+    "crc32": "2fc0de8b",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v12fix.ipa",
+    "size": 59564493,
+    "sha256": "A608A5E79E497DD8105DD7742FD23B185FC113D7751072983931A5DD12545F93",
+    "executable_sha256": "AAB4184477458924690FFCCC6B547DB07DB9E82C58FFD0C64E962267B5897E97"
+  }
+}

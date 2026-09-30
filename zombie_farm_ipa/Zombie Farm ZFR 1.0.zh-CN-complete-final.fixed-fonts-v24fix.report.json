@@ -1,0 +1,115 @@
+{
+  "generated": "2026-09-17T05:40:59+00:00",
+  "tool": "patch_zfr_b2_v24.py",
+  "kind": "FIX",
+  "#2": "text top = 1.5*boxHeight + C; with the v23 box of 34 the -6.0 constant put the top 21px too high, so it becomes -27.0 (1.5*34-27 == 1.5*20-6 == 24)",
+  "#8": "the Mausoleum caption is de-bolded by pointing its fontName CFString at 'AmericanTypewriter' instead of 'AmericanTypewriter-Bold' (sub9 instruction + sub6 literal pool)",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v23fix.ipa",
+    "size": 59564493,
+    "sha256": "4179AF102A75D9371A66FB847BE5AA061F61712D5B9463248766B4761C3E4028",
+    "executable_sha256": "275626B2F8A551A5C219AEA37BEC6EB0A0B2BA307F39424D374BAB2F5534C6C8"
+  },
+  "sites": [
+    {
+      "subtype": 9,
+      "addr": "0x076d0e",
+      "file_offset": 5430542,
+      "len": 4,
+      "old_prefix": "c1ff180f",
+      "new_prefix": "c3ff1b0f",
+      "note": "#2 title1 position constant -6.0 -> -27.0 (keeps the text top where it was)"
+    },
+    {
+      "subtype": 9,
+      "addr": "0x0d28fa",
+      "file_offset": 5806330,
+      "len": 4,
+      "old_prefix": "40f6e823",
+      "new_prefix": "43f21873",
+      "note": "#8 Mausoleum caption: AmericanTypewriter-Bold -> AmericanTypewriter"
+    },
+    {
+      "subtype": 6,
+      "addr": "0x11f1e4",
+      "file_offset": 1188324,
+      "len": 4,
+      "old_prefix": "84843400",
+      "new_prefix": "b4b03400",
+      "note": "#8 sub6 literal pool: same font swap"
+    }
+  ],
+  "site_count": 3,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ],
+      [
+        "0x16d5b0",
+        "0x16d5e0"
+      ],
+      [
+        "0x177534",
+        "0x17753f"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ],
+      [
+        "0x10c490",
+        "0x10c4c0"
+      ],
+      [
+        "0x1138a0",
+        "0x1138c5"
+      ],
+      [
+        "0x1138c8",
+        "0x1138f3"
+      ],
+      [
+        "0x1138f4",
+        "0x113909"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4191113,
+    "padding_bytes": 11944,
+    "compression_strategy": "default",
+    "crc32": "8414cf35",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v24fix.ipa",
+    "size": 59564493,
+    "sha256": "564A7BB2491C5B6C6420013F3A3157908460ED617DBE2B4ECB8D2996F5012DAE",
+    "executable_sha256": "A77B4278A5BE0E5C73E289C5390CF3790DA60BBFEC6DBFC937CAF4F3707C3A8A"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "generated": "2026-09-16T12:25:59+00:00",
+  "tool": "patch_zfr_lang_v14.py",
+  "kind": "FIX",
+  "root_cause": "+[ZombieFarmAppDelegate getCurrentLanguage] reads NSUserDefaults AppleLanguages, which is not set under touchHLE, so it returns nil and every injected 'is this a CJK language?' test fails; ~30 font branches therefore use CCLabelBMFont with ABD26.fnt (122 Latin glyphs) instead of CCLabelTTF with Arial, and all Chinese text on those labels is silently dropped",
+  "fix": "getCurrentLanguage returns the CFString 'zh-Hans' (this is a zh_CN build), which is what the callers already compare against",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v13fix.ipa",
+    "size": 59564493,
+    "sha256": "67B26EEB87F6BB7722985899FBA4382AB3EE1BC344093C9A0F26CE23EE7BC1AB",
+    "executable_sha256": "2903F3105A0847411D917CC3C30EDAD8C75216D1D052E4465855BEC4BBCF8D41"
+  },
+  "instruction_checks": {
+    "sub6_0x195004": {
+      "returns": "0x467520"
+    },
+    "sub9_0x12980c": {
+      "returns": "0x3a34b0"
+    }
+  },
+  "sites": [
+    {
+      "subtype": 6,
+      "addr": "0x195004",
+      "file_offset": 1671172,
+      "len": 68,
+      "old_prefix": "80402de938109fe538009fe50d70a0e1",
+      "new_prefix": "38009fe500008fe01eff2fe10000a0e1",
+      "note": "+[ZombieFarmAppDelegate getCurrentLanguage] -> @\"zh-Hans\""
+    },
+    {
+      "subtype": 9,
+      "addr": "0x12980c",
+      "file_offset": 6162444,
+      "len": 78,
+      "old_prefix": "80b54af60c116f46c0f2260140f23670",
+      "new_prefix": "49f69840c0f227007844704700bf00bf",
+      "note": "+[ZombieFarmAppDelegate getCurrentLanguage] -> @\"zh-Hans\""
+    }
+  ],
+  "site_count": 2,
+  "forbidden_regions": {
+    "6": [
+      [
+        "0x1b464",
+        "0x1b810"
+      ],
+      [
+        "0x16a5f8",
+        "0x16a70c"
+      ],
+      [
+        "0x16d594",
+        "0x16d5ac"
+      ]
+    ],
+    "9": [
+      [
+        "0x14f6c",
+        "0x151c0"
+      ],
+      [
+        "0x10a1dc",
+        "0x10a29c"
+      ],
+      [
+        "0x10c470",
+        "0x10c486"
+      ]
+    ]
+  },
+  "zip": {
+    "target_member": "Payload/ZFR.app/ZFR",
+    "source_compressed_size": 4203057,
+    "raw_deflate_size": 4190985,
+    "padding_bytes": 12072,
+    "compression_strategy": "default",
+    "crc32": "511c2199",
+    "local_crc_offset": 51314818,
+    "central_crc_offset": 59551101,
+    "data_start": 51314853,
+    "data_end": 55517910
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v14fix.ipa",
+    "size": 59564493,
+    "sha256": "216A33396456C7C128F072F2DB0E167A2E7E5C70C44D3150358E9C0D65B79C51",
+    "executable_sha256": "94A730E23ECDF03CD870FF5094FC7459D7D46CD6F62743A6388525446B48C7C5"
+  }
+}

@@ -1,0 +1,58 @@
+touchHLE Zombie Farm 使用教程
+
+Windows 
+
+一、游戏.ipa文件路径：
+
+	.\zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.ipa
+
+二、普通启动游戏（保持当前模拟时间，不增加时间）：
+
+	直接在目录找到“运行游戏.bat”双击运行
+
+	或在 touchhole 目录右键选择“在终端中打开”，
+	运行  "./运行游戏.bat" 或 ".\StartZombieFarmNextHour.ps1 -NoSkip"
+
+三、跳过游戏时间：
+
+	直接在目录找到并双击“选择跳过时间并启动.bat”，按 `小时:分钟` 格式输入，例如 `6:15`。
+
+	或在 touchhole 目录右键选择“在终端中打开”，运行  ".\StartZombieFarmNextHour.ps1 -Hours 6 -Minutes 15"
+	上面的示例会使游戏时间快进 6 小时 15 分钟。
+
+	如果要重置在"./touchHLE_time_offset_seconds.txt"中累计的时间并重新增加 1 小时，可以运行：
+	.\StartZombieFarmNextHour.ps1 -Hours 1 -Reset
+
+四、游戏存档目录位置：
+
+	.\touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGames.bin2
+	
+	可删除此文件重开存档
+
+五、修改脑子和金币（不建议，游戏会变得无聊）：
+
+	1. 先完全退出 touchHLE，避免游戏退出时覆盖存档。
+	2. 在本目录的终端运行：
+
+	   .\SetZombieFarmCurrency.ps1 -Brains 999999999 -Gold 999999999
+
+	脚本会修改 `saveGame.bin2` 并在同目录创建带时间戳的 `.bak-...` 备份文件。
+	如需确认脚本将修改的数值但不写入文件，可附加 `-WhatIf`。
+
+六、测试前还原存档（测试新版本时用）：
+
+	每次入侵/解锁都会消耗存档状态（比如「待解锁技能」的池子会越来越少），
+	所以测试前先跑：
+
+	   .\RestoreTestSave.ps1
+
+	它会把当前的 `saveGame.bin2` 归档成 `saveGame.bin2.bak-<时间戳>-pre-restore`，
+	再把参考存档 `saveGame.bin2.bak` 换进去，不会丢东西。
+
+	   .\RestoreTestSave.ps1 -List    # 看现有的存档和备份
+
+七、目录说明：
+
+	根目录只放运行时和交付物。分析/诊断脚本和历史输出都在 `_analysis\` 下，
+	详见 `_analysis\TECHNICAL.md`；补丁工具（patcher）和反汇编基础设施在 `tools\`。
+
