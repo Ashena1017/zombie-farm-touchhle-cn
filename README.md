@@ -15,6 +15,7 @@
 
 - [这个项目解决了什么](#这个项目解决了什么)
 - [快速开始](#快速开始)
+- [想玩原版还是重制版](#想玩原版还是重制版)
 - [仓库里有什么](#仓库里有什么)
 - [模拟器 fork 的扩展](#模拟器-fork-的扩展)
 - [游戏 IPA 补丁谱系](#游戏-ipa-补丁谱系)
@@ -86,6 +87,39 @@
 
 见 [从源码构建](#从源码构建)。注意本仓库**不含**编译好的 `touchHLE.exe` 与游戏 IPA，
 需要自己编译，或从 Releases 取。
+
+---
+
+## 想玩原版还是重制版
+
+先说背景：这游戏是 2011 年前后的 iPhone 作品，**开发与发行方早已解散，游戏也已从商店下架**，
+官方服务端同样停运。也就是说原版目前没有任何在售渠道 —— 这正是社区会去做补丁与重制的根本原因
+（否则大家直接玩原版就好了）。于是现在有两条路，目标完全不同：
+
+| 你的目标 | 去哪 |
+|---|---|
+| **想玩原版那版游戏**（原美术、原数值、原玩法，离线单机，中文界面） | 你就在这儿 —— 用上面的 [Releases](../../releases) |
+| **想玩现代化重写版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市） | [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged) |
+
+### 推荐：Zombie Farm 2 Reforged
+
+这是另一位粉丝**完全重写**的作品 —— [**Zombie Farm 2 Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)
+（TypeScript，MIT 许可）：把 ZF2 的机制与 ZF1 的大量内容
+重新实现了一遍，**不依赖 touchHLE**，也不依赖原版二进制；美术与音频资源随仓库一并提交，
+克隆下来即自足。
+
+- **直接玩**：打开 <https://zombiefarmreforged.com> 就可以，标题界面选 **Local Farm**
+  无需账号（纯前端，存档在浏览器本地）；配置了在线服务时另有 Google 登录的 Online Farm，
+  带云存档、好友、礼物与黑市。
+- **离线玩**：其 Releases 提供了 Windows 包 —— 一个是双击即用的独立窗口版，
+  一个是调用默认浏览器打开的启动器，都免安装、免管理员权限。
+
+> 两个项目是**互补**的，不是竞争关系：
+> 本项目的目标是「**让原版能在 PC 上舒服地玩**」—— 玩法、数值、美术一律保持原样，
+> 只修崩溃、修中文、放大界面；Reforged 的目标是「**把这游戏重做成一个现代游戏**」——
+> 重写引擎、加入联机与社交，所以画面与手感会和原版不同。
+> 而原版的素材本来就可以直接复用（见 [技术难点](#技术难点与结论) ⑤），
+> 两边其实在同一件「别让这游戏消失」的事上。
 
 ---
 
@@ -281,9 +315,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps
 ## 免责声明与许可
 
 - **本项目是非官方的粉丝作品**，与 Zombie Farm 的开发商 / 发行商没有任何关系。
+- **原版已无处可买**：开发与发行方已解散，游戏已从应用商店下架，官方服务端亦已停运 ——
+  这也是社区会去做补丁与重制（如上面的
+  [Reforged](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)）的原因。
+  若权利方日后重新上架，请优先购买正版。
 - **游戏本体**（`Zombie Farm Reforged` 的 IPA）版权归其原权利人所有。
   仓库里不含 IPA；Releases 中的压缩包为了方便「下载即可玩」而包含一份游戏文件，
-  **仅供个人学习与备份用途**，请在下载后 24 小时内自行判断是否合规，并支持正版。
+  **仅供个人学习与备份用途**，请自行判断在你所在地区的合规性。
 - **模拟器部分**：`touchHLE` 采用 MIT 许可，见 [`touchHLE/LICENSE`](touchHLE/LICENSE)。
   fork 的源码改动同样以 MIT 发布；`touchHLE-fork/.git-upstream-fa3d095/UPSTREAM-COMMIT.txt`
   记录了上游仓库与所用提交。

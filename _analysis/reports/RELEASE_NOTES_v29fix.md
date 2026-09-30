@@ -7,6 +7,13 @@
 > 《Zombie Farm Reforged》中文版，并做了三件事 —— 修好崩溃、把界面文字统一放大到看得清、
 > 修掉中文缺字与乱码。游戏本体是 2011 年前后的 iPhone 老游戏，原分辨率只有 480×320。
 
+> **想玩原版，还是想玩现代化重制版？**
+> 这游戏的开发 / 发行方早已解散、游戏已从商店下架，所以社区做了各种粉丝版本。
+> 想玩**原版那一版游戏**（原美术、原数值、离线单机）就用本页这个包；
+> 想玩**从头重写的现代化版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市，不依赖 touchHLE）
+> 则去看 [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)
+> —— 在线即玩 <https://zombiefarmreforged.com>，也有 Windows 离线包。
+
 ---
 
 ## 下载与使用
@@ -121,8 +128,12 @@ Get-FileHash .\touchHLE-zombiefarm-v29fix.zip -Algorithm SHA256
 ## 免责声明
 
 - 本项目是**非官方的粉丝作品**，与 Zombie Farm 的开发商 / 发行商无任何关系。
+- **原版已无处可买**：开发与发行方已解散，游戏已从应用商店下架，官方服务端亦已停运 ——
+  这也是社区会去做补丁与重制（如
+  [Zombie Farm 2 Reforged](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)）的原因。
+  若权利方日后重新上架，请优先购买正版。
 - 本包内包含的**游戏本体版权归其原权利人所有**，此处仅为方便「下载即可玩」而附带，
-  **请仅用于个人学习与备份**，并支持正版。
+  **请仅用于个人学习与备份**。
 - 模拟器 [touchHLE](https://github.com/touchHLE/touchHLE) 采用 MIT 许可；
   本项目对其的改动同样以 MIT 发布。本项目自己的代码与文档亦为 MIT。
 - 源码、补丁工具链与全部技术文档见仓库：
