@@ -4,7 +4,7 @@
 管理器、字体、依赖库和游戏本体都已经在包里。
 
 > **这个包是什么**：在 Windows 上用 [touchHLE](https://touchhle.org/) 模拟器运行
-> 《Zombie Farm Reforged》中文版，并做了三件事 —— 修好崩溃、把界面文字统一放大到看得清、
+> 《僵尸农场》（Zombie Farm，bundle 代号 `ZFR`）中文版，并做了三件事 —— 修好崩溃、把界面文字统一放大到看得清、
 > 修掉中文缺字与乱码。游戏本体是 2011 年前后的 iPhone 老游戏，原分辨率只有 480×320。
 
 > **想玩原版，还是想玩现代化重制版？**
@@ -13,6 +13,8 @@
 > 想玩**从头重写的现代化版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市，不依赖 touchHLE）
 > 则去看 [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)
 > —— 在线即玩 <https://zombiefarmreforged.com>，也有 Windows 离线包。
+>
+> **注意**：「Reforged」是**那个**项目的名字，**不是本包** —— 本包跑的是原版《僵尸农场》游戏本体。
 
 ---
 

@@ -1,6 +1,7 @@
 # touchHLE-zombiefarm
 
-在 Windows 上用 [touchHLE](https://touchhle.org/) 模拟器运行《Zombie Farm Reforged (ZFR)》中文版，
+在 Windows 上用 [touchHLE](https://touchhle.org/) 模拟器运行《僵尸农场》（Zombie Farm，
+游戏自报的 bundle 代号为 `ZFR`，bundle id `com.playforge.ZombieFarm.ZFR`）中文版，
 并对游戏 IPA 做**二进制补丁**：修复崩溃、统一界面字号、改善中文本地化。
 
 本文件是给**新会话**的入口文档。读完它应当能理解：项目在做什么、产物在哪、怎么改、以及踩过哪些坑。
