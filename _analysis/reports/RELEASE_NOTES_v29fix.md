@@ -13,6 +13,11 @@
 > 想玩**从头重写的现代化版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市，不依赖 touchHLE）
 > 则去看 [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)
 > —— 在线即玩 <https://zombiefarmreforged.com>，也有 Windows 离线包。
+> **注意：Reforged 原生只有英文**，想玩中文请再装上配套的
+> [**纯汉化脚本**](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn)
+> （Tampermonkey 用户脚本，词库取自原版官方简体中文语言包，**精翻，不是浏览器机翻**，
+> 连 Canvas 里画出来的游戏文字也能翻；只翻译，不改游戏行为）。
+> 本页这个包则**开箱即中文**，不需要额外装东西。
 >
 > **注意**：「Reforged」是**那个**项目的名字，**不是本包** —— 本包跑的是原版《僵尸农场》游戏本体。
 
@@ -132,7 +137,8 @@ Get-FileHash .\touchHLE-zombiefarm-v29fix.zip -Algorithm SHA256
 - 本项目是**非官方的粉丝作品**，与 Zombie Farm 的开发商 / 发行商无任何关系。
 - **原版已无处可买**：开发与发行方已解散，游戏已从应用商店下架，官方服务端亦已停运 ——
   这也是社区会去做补丁与重制（如
-  [Zombie Farm 2 Reforged](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)）的原因。
+  [Zombie Farm 2 Reforged](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)，
+  以及配套的[纯汉化脚本](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn)）的原因。
   若权利方日后重新上架，请优先购买正版。
 - 本包内包含的**游戏本体版权归其原权利人所有**，此处仅为方便「下载即可玩」而附带，
   **请仅用于个人学习与备份**。

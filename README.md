@@ -11,12 +11,15 @@
 >
 > **想玩「现代化重制版」的话，那不是这个项目** —— 见下面的
 > [想玩原版还是重制版](#想玩原版还是重制版)。
+> 重制版（Reforged）原生是英文，**想玩中文的话，配我写的
+> [汉化脚本](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn)**。
 
 ---
 
 ## 目录
 
 - [想玩原版还是重制版](#想玩原版还是重制版)
+  - [想让 Reforged 显示中文就用我的汉化脚本](#想让-reforged-显示中文就用我的汉化脚本)
 - [这个项目解决了什么](#这个项目解决了什么)
 - [快速开始](#快速开始)
 - [仓库里有什么](#仓库里有什么)
@@ -39,7 +42,7 @@
 | 你的目标 | 去哪 |
 |---|---|
 | **想玩原版那一版游戏**（原美术、原数值、原玩法，离线单机，中文界面） | 就是本仓库 —— 用 [Releases](../../releases) |
-| **想玩现代化重写版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市） | [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged) |
+| **想玩现代化重写版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市；**原生只有英文**） | [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)，再配 [**中文汉化脚本**](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn) |
 
 ### 推荐：Zombie Farm 2 Reforged
 
@@ -63,6 +66,53 @@
 > 重写引擎、加入联机与社交，所以画面与手感会和原版不同。
 > 而原版的素材本来就可以直接复用（见 [技术难点](#技术难点与结论) ⑤），
 > 两边其实在同一件「别让这游戏消失」的事上。
+>
+> 唯一要注意的是**语言**：本仓库这个包**开箱即中文**；Reforged 原生是英文，
+> 想玩中文记得装上 [下面那个汉化脚本](#想让-reforged-显示中文就用我的汉化脚本)。
+
+### 想让 Reforged 显示中文就用我的汉化脚本
+
+Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明全是英文。浏览器自带的翻译插件
+（右键「翻译成中文」那类）在这里基本没用 —— 它看不懂 Canvas 里画出来的游戏文字，
+专有名词也一律机翻（`Zombie` 译成「僵尸」还是「丧尸」、道具名对不上），翻出来的界面没法用。
+
+我为此写了 [**Ashena1017/zombie-farm-reforged-translation-cn**](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn)
+—— 一个 **Tampermonkey 用户脚本**，把 Reforged 的界面**精翻**成简体中文。**需要中文的话，
+请装上它**；不装就只能玩英文原版界面。
+
+**为什么说是「精翻」而不是机翻：**
+
+- 词条**以原版游戏官方简体中文语言包为参考**，再补译重制版新增的内容 ——
+  也就是说，同一个道具、同一个僵尸，在**原版中文版**里叫什么，在 Reforged 里就叫什么，
+  和本仓库这个原版中文版**用词完全对得上**。
+- 词库规模：**4,330 条词条 + 617 条模板 + 582 个商店名**，全部内嵌在脚本里。
+- **不联网、不调用任何在线翻译 API、不填 API Key**，所以没有机翻那种「每次翻出来不一样」的问题。
+
+**它翻译什么：**
+
+- 菜单、弹窗、按钮、倒计时、任务、商店说明等页面文案与动态提示。
+- **Canvas 游戏文字** —— 战斗与场景里**绘制在画布上**的文字（浏览器翻译插件做不到的就是这块）。
+- 僵尸属性、技能说明、道具效果。
+- 商店**中文搜索联想**：输入中文，选中候选后按商品英文原名执行**原生搜索**（只搜索，**不会购买**）。
+
+**它不做什么**（这点很重要）：不自动选目标、不出战、不自动购买 / 战斗 / 撤退 / 出售，
+不上传游戏数据，不读写游戏存档。玩家名、自定义僵尸名等用户输入保持原样。
+它就是一个**纯汉化**脚本，不改变游戏行为。
+
+**怎么装：**
+
+1. 装 [Tampermonkey](https://www.tampermonkey.net/) 扩展。
+2. 从该仓库 [Releases](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn/releases)
+   下载 `ZFR在线网页版-纯汉化脚本.zip`（或从仓库 `dist/` 取 `zombie-farm-translation.user.js`）。
+3. Tampermonkey 管理面板 → **实用工具** → 「导入」选那个 ZIP，确认导入其中的用户脚本。
+4. 确认脚本已启用，然后打开或刷新 <https://zombiefarmreforged.com/>。**装好即为中文**，
+   右下角小图标可点击切换中文 / 原文，按住可拖到不挡游戏的位置（位置会记住）。
+
+> 手机也能用：Via 浏览器「设置 → 脚本 → + → 导入脚本」，选解压出来的 `.user.js`
+> （注意导入的是 **`.user.js` 文件本身，不是 ZIP**）。脚本为 MIT 许可。
+
+> 另外说明一下：该脚本有「纯汉化」和「汉化 + 自动入侵」两个独立版本，
+> **两者都内置翻译器，同一个页面只启用其中一份**。本仓库推荐的是**纯汉化**那份。
 
 ---
 
@@ -323,7 +373,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps
 - **本项目是非官方的粉丝作品**，与 Zombie Farm 的开发商 / 发行商没有任何关系。
 - **原版已无处可买**：开发与发行方已解散，游戏已从应用商店下架，官方服务端亦已停运 ——
   这也是社区会去做补丁与重制（如上面的
-  [Reforged](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)）的原因。
+  [Reforged](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)，
+  以及配套的[汉化脚本](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn)）的原因。
   若权利方日后重新上架，请优先购买正版。
 - **游戏本体**（《僵尸农场》的 IPA，bundle id `com.playforge.ZombieFarm.ZFR`）版权归其原权利人所有。
   仓库里不含 IPA；Releases 中的压缩包为了方便「下载即可玩」而包含一份游戏文件，
