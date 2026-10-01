@@ -184,6 +184,126 @@ _analysis\_gui_tip_test.ps1        # 验证没有 ? 按钮，且说明书覆盖�
 _analysis\_device_size_e2e.ps1
 ```
 
+### 3.5 发 PR（`git-pr.mjs`，Gitee / GitHub 通用）
+
+脚本：`C:\Users\Loner\.dsh\tools\git-pr.mjs`（零依赖，只用 Node 内置模块）。
+**默认是预演，加了 `--apply` 才真动手** —— 这个设计是刻意的，别绕过它。
+
+```powershell
+# 0. 先确认 git 身份（新克隆的仓库必然没有；用仓库本地配置，不要 --global）
+git config user.name; git config user.email
+git config user.name "Lonerwcq"; git config user.email "754663659@qq.com"
+
+# 1. 预演：只检查权限与分支，不推送、不开 PR
+node "$env:USERPROFILE\.dsh\tools\git-pr.mjs" --repo <本地仓库路径> --branch <分支> --title "<标题>"
+
+# 2. 真提交：推 fork → 开 PR → 回读文件清单（幂等，可重复运行）
+node "$env:USERPROFILE\.dsh\tools\git-pr.mjs" --repo <本地仓库路径> --branch <分支> `
+  --title "<标题>" --body-file <PR描述.md> --base main --apply
+```
+
+**四条必守规则：**
+
+1. **GitHub 上必须显式传 `--base main`** —— 脚本的 `--base` 默认是 `master`，
+   而 GitHub 仓库默认分支是 `main`；不传就会以不存在的 `master` 为目标去建 PR，
+   **必然失败**（脚本会把它当 `HTTP 4xx` 抛出）。先查准：
+   `git -C <仓库> remote show origin | Select-String 'HEAD branch'`。
+   本仓库 `zombie-farm-touchhle-cn` 是例外，它的默认分支**就是 `master`**。
+2. **目标必须是自己的 fork，不是上游**。上游一般 `permission.push = false`，
+   直推 `origin` 必然 **403** —— 403 的根因几乎总是「推错仓库」，不是令牌无效。
+   脚本会先探测上游权限、不可推时自动改用 fork。
+3. **分支必须与当前 HEAD 一致**（脚本会校验），且**基线要基于上游默认分支的最新 HEAD**
+   （先 `git fetch`），否则会把上游较新的提交一起带进 PR，看起来像在回退别人的工作。
+4. **脚本只认文档里列出的参数，未知参数直接报错**（同样是刻意的）——
+   别自己发明 `--force` 之类的参数，否则「以为在预演、其实已经推送并开了 PR」。
+
+**注意本仓库不需要走这条路**：`zombie-farm-touchhle-cn` 就是主人自己的仓库
+（origin = `Ashena1017/zombie-farm-touchhle-cn`），直接 `git push origin master` 即可。
+`git-pr.mjs` 是给**往别人的仓库提 PR** 用的（例如给上游 touchHLE 提改动、
+或给 `actualdoctornerd-ai/Zombie-Farm-2-Reforged` 提 PR）。
+
+**令牌与安全**：令牌由脚本从 Windows 凭据管理器自动读取（GitHub / Gitee 都已存在，
+不需要主人做任何事）。**绝不打印令牌值**，不写进文件、不 `echo`、不贴进会话。
+自己写 PowerShell 取令牌时有个静默陷阱：`git credential fill` 返回的是**字符串数组**，
+`$x.Length` 是**元素个数**而不是字符数（40 字符的令牌会显示成 `4`），必须先 join 再解析：
+
+```powershell
+$raw = (("protocol=https`nhost=github.com`n`n" | git credential fill 2>$null) -join "`n")
+$tok = (($raw -split "`n") | Where-Object { $_ -like 'password=*' }) -replace '^password=', ''
+if (-not $tok) { throw '未取到令牌' }   # 别把空值带进后续请求
+```
+
+### 3.6 发 Release（打包 → 建 tag → 传附件 → 回读）
+
+**只有 `_build_release.ps1` 能产出交付包**，`Release\` 是构建产物，`zip` 不入库
+（`.gitignore` 排除 `Release/`）。完整流程：
+
+```powershell
+# 1. 重建 Release\ 并自检（它会先清空 Release\ 再重建）
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_layout_match.ps1
+
+# 2. 打包：顶层必须是一个同名目录，收到 %TEMP%（zip 不进仓库）
+$stage = "$env:TEMP\touchHLE-zombiefarm-<版本>"
+$zip   = "$env:TEMP\touchHLE-zombiefarm-<版本>.zip"
+robocopy Release $stage /E /NFL /NDL /NJH /NJS | Out-Null   # 别用 Copy-Item -LiteralPath "…\*"（它不展开通配符）
+Compress-Archive -Path $stage -DestinationPath $zip -CompressionLevel Optimal -Force
+
+# 3. 记下大小与 sha256，写进 Release 说明的「校验信息」表
+(Get-Item $zip).Length
+(Get-FileHash $zip -Algorithm SHA256).Hash
+```
+
+**回读校验**（`$zip` 里应有 43 个文件，IPA 59,564,493 B，`touchHLE.exe` 26,376,704 B）：
+
+```powershell
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$a = [System.IO.Compression.ZipFile]::OpenRead($zip)
+($a.Entries | Where-Object { $_.Name -ne '' }).Count      # 应为 43
+$a.Entries | Where-Object { $_.FullName -match '\.ipa$' } | ForEach-Object { "$($_.FullName)  $($_.Length)" }
+$a.Dispose()
+```
+
+**建 Release 与传附件**（本项目实测走 GitHub REST；`curl.exe` 可用，**.NET WebRequest 不行**）：
+
+```powershell
+# ⚠️ 先清掉代理变量，否则 api.github.com 连不上（本机 HTTP_PROXY 指向本地代理）
+$env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
+
+# 建 Release（body 从本地说明文件读，中文必须按 UTF-8 字节发，否则乱码）
+# POST https://api.github.com/repos/<owner>/<repo>/releases
+#   {"tag_name":"<tag>","name":"<标题>","body":"<说明>","draft":false,"prerelease":false}
+# 传附件：POST https://uploads.github.com/repos/<owner>/<repo>/releases/<id>/assets?name=<文件名>
+```
+
+**五个坑（都踩过）：**
+
+1. **附件名必须纯 ASCII**。`POST …?name=<文件名>` 里的中文名会被**静默丢弃** ——
+   内容传上去了，但资产名变成 `default.html`，**且不报错**。中文名文件仍可正常放**仓库内**。
+   所以附件名用 `touchHLE-zombiefarm-v29fix.zip` 这种，中文留给说明正文。
+2. **上传后必须回读** `GET /releases/tags/<tag>` 核对 `assets[].name` 与 `size`，
+   不能只看 HTTP 200；**内容完好**要下载回来算 SHA-256 与本地比对（大小相同 ≠ 内容相同）。
+3. **改了 Release 说明要 PATCH 并回读**：`PATCH /repos/<owner>/<repo>/releases/<id>`，
+   body 用 `ConvertTo-Json` 后**按 UTF-8 字节**发，回读时与本地文件 `-eq` 比对确认逐字符一致。
+4. **发布后要核验线上渲染**：抓 release 页面 HTML 确认新链接/新文案真的渲染出来了
+   （本会话就是靠这一步发现正文已更新但需刷新确认）。
+5. **别忘 `.git/config`**：推送用的令牌不要留在 remote URL 里，发完检查
+   `Get-Content .git\config -Raw` 里没有 `ghp_` / `github_pat_` / `x-access-token` 之类的串。
+
+**当前已发布的 Release**（作为格式参考）：
+
+| 项 | 值 |
+|---|---|
+| 仓库 | `Ashena1017/zombie-farm-touchhle-cn`（public，默认分支 `master`） |
+| Release | tag `v29fix`，release id `399756311` |
+| 附件 | `touchHLE-zombiefarm-v29fix.zip`，asset id `600164778`，95,050,820 B，state `uploaded` |
+| 说明源文件 | `_analysis\reports\RELEASE_NOTES_v29fix.md`（**改完要 PATCH 到线上**） |
+| zip 的 sha256 | `39601F129B20E53C641E1D6D37D22057B8B9D578E36E75B22060919C5ADA8841` |
+
+> ⚠️ **重建 zip 会让说明里记录的 sha256 失效** —— 重新打包后必须同步更新
+> `RELEASE_NOTES_*.md` 的「校验信息」表并 PATCH 到线上。
+
 ---
 
 ## 4. 当前设置模型（`GameManager.ps1` 的 `$script:SettingDefs`）
@@ -322,3 +442,48 @@ _analysis\_device_size_e2e.ps1
    已列在核验报告 §4，**均未改动**，等主人决定是否订正。
 
 **状态**：无阻塞项，环境全绿。
+
+---
+
+## 10. 交接后追加（2026-10-01，发布流程）
+
+本节记录**发布到 GitHub** 这条链路的固定做法。新增两节工作流在 §3.5（发 PR）与
+§3.6（发 Release），**动手前务必先读那两节**，这里只列最容易忘的几条。
+
+**仓库与 Release 现状**：
+
+| 项 | 值 |
+|---|---|
+| 仓库 | <https://github.com/Ashena1017/zombie-farm-touchhle-cn>（public，默认分支 **`master`**） |
+| Release | <https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix>（release id `399756311`） |
+| 附件 | `touchHLE-zombiefarm-v29fix.zip`（asset id `600164778`，95,050,820 B，`uploaded`） |
+| 说明源文件 | `_analysis\reports\RELEASE_NOTES_v29fix.md` —— 改完**必须 PATCH 到线上** |
+| zip 的 sha256 | `39601F129B20E53C641E1D6D37D22057B8B9D578E36E75B22060919C5ADA8841` |
+
+**入库范围**（`.gitignore` 已排除，别再手动 `git add -f`）：构建产物、Rust 工具链（4.4 GB）、
+上游 `vendor/`（843 MB）、游戏 IPA、`Release/`、存档、日志。6.25 GB 的工作树压成 **38.6 MB** 的提交。
+
+**关键提醒**：
+
+1. **`Release/` 与 zip 都不入库**，交付靠 Release 附件；改交付内容 = 重建 → 重新打包 → 重新上传。
+2. **附件名必须纯 ASCII** —— 中文名会被 GitHub **静默丢弃**成 `default.html`，且不报错。
+3. **上传/改说明后一律回读**：附件核对 `name` + `size` + 下载回来算 sha256；
+   说明正文与本地文件做 `-eq` 比对。
+4. **重建 zip 会让说明里的 sha256 失效**，必须同步更新「校验信息」表并 PATCH 到线上。
+5. **`curl.exe` 能用，.NET `WebRequest` 在这台机器上不行**（代理变量会让它返回 HTTP 0）——
+   调用 API 前先 `$env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''`。
+6. **`git credential fill` 返回的是字符串数组**，`$x.Length` 是元素个数不是字符数，
+   必须先 join 再解析（见 §3.5）。
+7. **绝不打印令牌**，不写进文件、不 `echo`、不贴进会话；发完检查 `.git/config` 里没有残留令牌。
+
+**文档命名口径**（本会话订正过，别再改回去）：
+
+- 本项目跑的是**原版**《僵尸农场》（Zombie Farm）。`ZFR` 是**游戏自己的 bundle 代号**，
+  来自 `Payload/ZFR.app/Info.plist`（`CFBundleIdentifier` = `com.playforge.ZombieFarm.ZFR`，
+  `zh-Hans` 显示名 = `僵尸农场`，`zh-Hant` = `殭屍農場`）—— **不要把 `ZFR` 展开成任何词**。
+- **「Reforged」只指 `actualdoctornerd-ai/Zombie-Farm-2-Reforged`**（另一位粉丝从零重写的
+  TypeScript 项目），**不是本项目**。README 与 Release 说明里都有显式辟谣句，别删。
+- 配套的**汉化脚本**是主人另一个仓库
+  `Ashena1017/zombie-farm-reforged-translation-cn`（Tampermonkey 用户脚本，精翻，
+  词库取自原版官方简体中文语言包），在 README 的「想玩原版还是重制版」小节里推荐。
+

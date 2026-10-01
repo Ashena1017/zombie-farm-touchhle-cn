@@ -3,6 +3,9 @@
 解压后**双击 `游戏管理.exe`** 就能玩。不需要安装 Python、Rust 或任何运行库 —— 模拟器、
 管理器、字体、依赖库和游戏本体都已经在包里。
 
+> **本说明由 AI 整理**：内容基于实机取证与逐项验证，但行文由 AI 撰写，可能存在表述偏差。
+> 技术结论以仓库里的脚本与报告为准。
+
 > **这个包是什么**：在 Windows 上用 [touchHLE](https://touchhle.org/) 模拟器运行
 > 《僵尸农场》（Zombie Farm，bundle 代号 `ZFR`）中文版，并做了三件事 —— 修好崩溃、把界面文字统一放大到看得清、
 > 修掉中文缺字与乱码。游戏本体是 2011 年前后的 iPhone 老游戏，原分辨率只有 480×320。
@@ -13,10 +16,11 @@
 > 想玩**从头重写的现代化版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市，不依赖 touchHLE）
 > 则去看 [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)
 > —— 在线即玩 <https://zombiefarmreforged.com>，也有 Windows 离线包。
-> **注意：Reforged 原生只有英文**，想玩中文请再装上配套的
+> **注意：Reforged 原生只有英文**，想玩中文的话可以再装一个配套的
 > [**纯汉化脚本**](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn)
 > （Tampermonkey 用户脚本，词库取自原版官方简体中文语言包，**精翻，不是浏览器机翻**，
-> 连 Canvas 里画出来的游戏文字也能翻；只翻译，不改游戏行为）。
+> 连 Canvas 里画出来的游戏文字也能翻；只翻译，不改游戏行为）—— 纯属可选，
+> 不装也能正常玩，只是界面保持英文。
 > 本页这个包则**开箱即中文**，不需要额外装东西。
 >
 > **注意**：「Reforged」是**那个**项目的名字，**不是本包** —— 本包跑的是原版《僵尸农场》游戏本体。
