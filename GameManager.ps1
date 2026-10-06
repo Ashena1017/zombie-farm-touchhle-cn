@@ -2032,10 +2032,21 @@ $btnTheme.Size = New-Object System.Drawing.Size(38, 38)
 $btnTheme.FlatStyle = 'Flat'
 $btnTheme.FlatAppearance.BorderSize = 1
 $btnTheme.UseVisualStyleBackColor = $false
-$btnTheme.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-$btnTheme.Padding = New-Object System.Windows.Forms.Padding(0)
+$btnTheme.Text = ''
 $btnTheme.Font = New-Object System.Drawing.Font('Segoe MDL2 Assets', 13)
 $btnTheme.AccessibleName = '日夜模式切换'
+$btnTheme.Add_Paint({
+    param($sender, $eventArgs)
+    if ($btnTheme.Tag) {
+        $flags = [System.Windows.Forms.TextFormatFlags]::HorizontalCenter -bor
+            [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor
+            [System.Windows.Forms.TextFormatFlags]::NoPadding -bor
+            [System.Windows.Forms.TextFormatFlags]::SingleLine
+        [System.Windows.Forms.TextRenderer]::DrawText(
+            $eventArgs.Graphics, [string]$btnTheme.Tag, $btnTheme.Font,
+            $btnTheme.ClientRectangle, $btnTheme.ForeColor, $flags)
+    }
+})
 $form.Controls.Add($btnTheme)
 $themeTip = New-Object System.Windows.Forms.ToolTip
 
@@ -3560,11 +3571,12 @@ function Set-ManagerPalette {
     $tabs.SelectedTabTextColor = [System.Drawing.Color]::White
     $title.ForeColor = $script:Ink
     $subtitle.ForeColor = $script:Grey
-    $btnTheme.Text = if ($Night) { [char]0xE708 } else { [char]0xE706 }
+    $btnTheme.Tag = if ($Night) { [char]0xE708 } else { [char]0xE706 }
     $btnTheme.BackColor = $script:Surface
     $btnTheme.ForeColor = $script:Forest
     $btnTheme.FlatAppearance.BorderColor = $script:Line
     $themeTip.SetToolTip($btnTheme, $(if ($Night) { '切换到日间模式' } else { '切换到夜间模式' }))
+    $btnTheme.Invalidate()
     $headerRule.BackColor = $script:Amber
     $lblIpaInfo.ForeColor = $script:Grey
     $lblCurrencyState.ForeColor = $script:Grey

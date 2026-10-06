@@ -679,3 +679,10 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 3. 修复后 Windows ZIP 为 `95,055,963 B`，SHA-256 `0FC4DC8E3EF544C3945651F04434D883181586120E836E6953BBE374FBA49924`，42 个文件、0 个 sandbox/save 条目；Android APK 为 `97,302,385 B`，SHA-256 `8644CB871D01C0DDFD28C7E4ED80620865EA2E6FB2B471EE8EA6823F1E96FED6`。两者已重新上传到现有 `v29fix-platforms`，Release 说明、GitHub 首页也已更新。Assets API 下载回读的两份文件大小和 SHA-256 均与本地一致；直接 release 下载域名当时连接超时，API octet-stream 下载成功。
 4. 验证：BOM/Syntax、`GameManager.ps1 -SelfTest`、`_verify_layout_match.ps1`、`_verify_release.ps1`、`_verify_android_package.ps1`、`_gui_controls_test.ps1`、`git diff --check` PASS；Release standalone launch 45 秒仍存活。工作目录 `touchHLE\touchHLE_sandbox` 未被构建/测试写入，SelfTest 显示真实存档金币 `140586` / 脑子 `4410` 且只读。新截图显示 Android 夜间模式，但本次 MuMu 未连接，因此没有做 APK 新默认主题的设备端启动验证。
 5. GitHub `master` 为 `3cae4df063a6ab95cc499f5ffbe1f6f6695b2050`；包含本批代码与 README 更新的 tree `abf3e979bf801cd6ec65c98d1ee172d235310396`。`process.md` 最新批次 #30。
+
+## 27. 交接后追加（2026-10-07，Windows 日夜图标绘制居中）
+
+1. 主人指出之前的 `TextAlign=MiddleCenter` 并未让 Segoe MDL2 Assets 太阳字形视觉居中。现清空按钮文字，`Paint` 事件用 `TextRenderer.DrawText` 配合 `HorizontalCenter | VerticalCenter | NoPadding | SingleLine` 在 `ClientRectangle` 画 Tag 中的太阳/月亮字形；换主题后显式 `Invalidate()`。不要恢复为 Button.Text 绘制。
+2. 日间窗口实拍 `_analysis\dumps\windows-day-icon-centered-review.png`，图标在边框客户区内目视居中。`GameManager.ps1 -SelfTest` 与 `_analysis\_gui_controls_test.ps1` PASS；重建 Release 后 `_analysis\_verify_release.ps1` 运行 45 秒通过，布局匹配 PASS。截图前将 `launcher_night_mode.txt` 字节快照，临时日间取图后原字节写回。
+3. Windows ZIP 重建后 42 个文件且不含 sandbox/save，`95,056,542 B`，SHA-256 `92C6D2B2D541B3C332DA1427DF4D8A447B89309B481A0446F5726A91D7F4D477`。已替换 `v29fix-platforms` 的 Windows 附件并更新 Release body 哈希；GitHub Assets API 下载回读大小和哈希完全匹配。Android 附件未改。
+4. 本节代码及当前 Windows ZIP 哈希尚待提交同步到远端 `master`；`process.md` 最新 #31。真实游戏 sandbox 未读写。

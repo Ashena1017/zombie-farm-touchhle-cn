@@ -2,6 +2,8 @@
 
 > **2026-10-07 双平台默认夜间 + 发行包清空存档（#30）**：Windows 日夜按钮明确居中；Windows 无主题状态文件时默认夜间，Android 新安装偏好默认夜间；README 截图换成 Android 夜间实拍，并分别说明 iPhone 原生 480×320 与 iPad 原生 1024×768、×1.5 后 1536×1152。发现 `_build_release.ps1` 曾把开发机 `touchHLE_sandbox\...\saveGame.bin2` 当作 starting save 复制进公开 Windows ZIP；现改为空 sandbox，游戏首次进入后自行创建存档，Release 校验器强制检查 sandbox 无文件；APK 校验器也拒绝打包 sandbox/save。Windows 42 文件 ZIP、Android APK 均已重建，通过 Release 独立启动、SELFTEST、UI 控件回归、Android 包静态校验；GitHub 原附件已替换，API 下载回读 SHA-256 相同。Release ZIP `95,055,963 B` / `0FC4DC8E3EF544C3945651F04434D883181586120E836E6953BBE374FBA49924`；APK `97,302,385 B` / `8644CB871D01C0DDFD28C7E4ED80620865EA2E6FB2B471EE8EA6823F1E96FED6`。源码已同步 `master`（远端 `3cae4df063a6ab95cc499f5ffbe1f6f6695b2050`）。开发机真实 sandbox 未被构建或测试修改。详见 `HANDOVER.md` §26。
 
+> **2026-10-07 Windows 日夜图标视觉居中追加（#31）**：主人指出仅设置按钮文字 MiddleCenter 后，日间太阳字形仍看起来偏位。改为空按钮文字，在 Paint 中以 TextRenderer `HorizontalCenter | VerticalCenter | NoPadding | SingleLine` 按客户区居中绘制太阳/月亮，主题切换时显式 Invalidate。日间真实窗口截图 `_analysis\dumps\windows-day-icon-centered-review.png` 目视确认，GUI 控件回归与 Release standalone launch 45 秒通过；主题偏好测试前后字节恢复。Windows ZIP 仍为 42 文件、sandbox/save 条目为 0，已替换 GitHub 同名附件并通过 Assets API 下载回读哈希相同。新 ZIP `95,056,542 B` / `92C6D2B2D541B3C332DA1427DF4D8A447B89309B481A0446F5726A91D7F4D477`。详见 `HANDOVER.md` §27。
+
 > **2026-10-07 Windows 系统标题栏配色**：DWM 标题栏现在跟随管理器日夜模式；夜间采用深色背景/浅色文字，日间恢复系统默认浅色标题栏。Windows 11 23H2 两种主题均已实窗截图确认；日夜切换控件回归与 Release 独立启动验证通过。旧 Windows 对自定义 caption color 的支持依系统版本而定。详见 `HANDOVER.md` §25。
 
 > **2026-10-07 夜间模式控件收尾**：设置页组合框系统边框与箭头分隔线改为主题绘制，消除实测单像素纯白线；存档列表末列铺满宽度，清除右侧系统白块，夜间分隔线同步压暗。开发版三页实窗核验、控件回归与 Release 包验证通过，Release 已重建同步；未写入真实存档。详见 `HANDOVER.md` §24。
