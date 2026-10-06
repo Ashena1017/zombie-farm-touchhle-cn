@@ -60,7 +60,7 @@ public class ManagerActivity extends Activity {
             page = state.getInt("page", 0); pendingId = state.getString("pendingId");
             String path = state.getString("exportFile"); if (path != null) exportFile = new File(path);
         }
-        nightMode = getPreferences(MODE_PRIVATE).getBoolean("night_mode", false);
+        nightMode = getPreferences(MODE_PRIVATE).getBoolean("night_mode", true);
         applyPalette();
         try { storage = new ZfStorage(this); }
         catch (Exception e) { error(e); return; }

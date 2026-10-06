@@ -120,21 +120,14 @@ Copy-Item -LiteralPath $ipaSrc -Destination (Join-Path $release 'zombie_farm_ipa
 Log ("  zombie_farm_ipa\{0}" -f $ipaName)
 Log ("  {0,12:N0} B" -f (Get-Item -LiteralPath $ipaSrc).Length)
 
-# --- a fresh sandbox with the reference save -------------------------------
-# Empty apart from the save folder, so the game starts from a clean profile. The
-# user's own saves are NOT included; only a starting save is.
+# --- a fresh, empty sandbox -------------------------------------------------
+# Never seed a release with a save from the development machine. The game will
+# create a new profile and save after the player enters it for the first time.
 Log ''
 Log '--- sandbox ---'
-$sandboxDocs = Join-Path $hleDir 'touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents'
-New-Item -ItemType Directory -Force -Path $sandboxDocs | Out-Null
-
-$refSave = Join-Path $hleRoot 'touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGame.bin2'
-if (Test-Path -LiteralPath $refSave) {
-    Copy-Item -LiteralPath $refSave -Destination (Join-Path $sandboxDocs 'saveGame.bin2')
-    Log ("  starting save included ({0:N0} B)" -f (Get-Item -LiteralPath $refSave).Length)
-} else {
-    Log '  no starting save found; the game will create one'
-}
+$sandbox = Join-Path $hleDir 'touchHLE_sandbox'
+New-Item -ItemType Directory -Force -Path $sandbox | Out-Null
+Log '  empty; the game will create a save after the player enters'
 
 # --- a short readme for the recipient --------------------------------------
 # Single self-contained HTML page (inline CSS, no external deps, system fonts)
@@ -345,7 +338,7 @@ $readme = @'
 <p>「新增备份」会同时记录当时的游戏存档和累计跳过时间；恢复备份后，两者都会回到备份时的状态。旧版管理器创建的备份没有时间记录，恢复时只还原存档，并保留当前累计时间。</p>
 
 <h2>五、存档在哪</h2>
-<p><code>touchHLE\touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGame.bin2</code></p>
+<p>首次进入游戏后会在 <code>touchHLE\touchHLE_sandbox</code> 中创建新的玩家存档；交付包不预置任何人物进度。</p>
 <div class="warn">删除它就会重新开始。建议先用管理器里的「新增备份」存一份，出问题随时能还原。</div>
 
 <h2>六、电脑要求</h2>

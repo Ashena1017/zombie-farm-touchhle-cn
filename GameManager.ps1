@@ -65,8 +65,9 @@ $script:SelectionFile = Join-Path $script:Root 'launcher_selected_ipa.txt'
 # SelectionFile: manager state, top level, tiny plain-text file.
 $script:SkipMemoryFile = Join-Path $script:Root 'launcher_skip_memory.txt'
 $script:NightModeFile = Join-Path $script:Root 'launcher_night_mode.txt'
-$script:NightMode = (Test-Path -LiteralPath $script:NightModeFile -PathType Leaf) -and
-    ([System.IO.File]::ReadAllText($script:NightModeFile).Trim() -eq '1')
+$script:NightMode = if (Test-Path -LiteralPath $script:NightModeFile -PathType Leaf) {
+    [System.IO.File]::ReadAllText($script:NightModeFile).Trim() -eq '1'
+} else { $true }
 
 # NOTE: this manager is self-contained. It does NOT call
 # StartZombieFarmNextHour.ps1 or SetZombieFarmCurrency.ps1 -- the launching and
@@ -2031,6 +2032,8 @@ $btnTheme.Size = New-Object System.Drawing.Size(38, 38)
 $btnTheme.FlatStyle = 'Flat'
 $btnTheme.FlatAppearance.BorderSize = 1
 $btnTheme.UseVisualStyleBackColor = $false
+$btnTheme.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$btnTheme.Padding = New-Object System.Windows.Forms.Padding(0)
 $btnTheme.Font = New-Object System.Drawing.Font('Segoe MDL2 Assets', 13)
 $btnTheme.AccessibleName = '日夜模式切换'
 $form.Controls.Add($btnTheme)

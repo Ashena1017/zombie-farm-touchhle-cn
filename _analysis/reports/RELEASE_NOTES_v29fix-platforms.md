@@ -4,8 +4,8 @@
 
 | 平台 | 附件 | 大小 | SHA-256 |
 |---|---|---:|---|
-| Windows 10/11 x64 | `zombie-farm-windows-x64-v29fix.zip` | 95,058,432 B | `1BCB9DE0390D1C0DEEA5D2BCBED3620912B8AC970FB49E8909D62EF7B46504C5` |
-| Android 5.0+ / ARM64 | `zombie-farm-android-arm64-v29fix.apk` | 97,302,179 B | `349258E48739DDB17FF956A61D604175956B7A4F7F977CAA2147770DF3E88BE1` |
+| Windows 10/11 x64 | `zombie-farm-windows-x64-v29fix.zip` | 95,055,963 B | `0FC4DC8E3EF544C3945651F04434D883181586120E836E6953BBE374FBA49924` |
+| Android 5.0+ / ARM64 | `zombie-farm-android-arm64-v29fix.apk` | 97,302,385 B | `8644CB871D01C0DDFD28C7E4ED80620865EA2E6FB2B471EE8EA6823F1E96FED6` |
 
 ## Windows
 
@@ -15,11 +15,13 @@
 
 安装 APK 后打开 **ZF游戏管理**。APK 内置最新 v29fix IPA，首次启动时会校验并安装到应用数据目录；无需手动复制游戏文件。其他 IPA 可用系统文件选择器导入。管理器提供启动/跳过时间、iPhone/iPad、渲染倍率、帧率、帧率修复、金币/脑子及存档备份、恢复、导入、导出和删除。
 
-Android 默认横屏、iPhone 原生画面、60 FPS；触屏缩放使用游戏原生两指捏合，不采用 Windows 滚轮选项。此 APK 为 arm64-v8a，最低 Android API 21。
+两个版本首次启动管理器时都默认使用夜间模式。Android 默认横屏、iPhone 原生画面、60 FPS；触屏缩放使用游戏原生两指捏合，不采用 Windows 滚轮选项。此 APK 为 arm64-v8a，最低 Android API 21。
+
+Windows sandbox 不预置人物存档；玩家首次进入游戏后会生成自己的存档。APK 仅内置 IPA，不包含任何 sandbox 存档。
 
 ## 验证
 
-- Windows 交付包：43 个文件；独立启动验证通过。
+- Windows 交付包：42 个文件；sandbox 为空且不含任何人物存档；独立启动验证通过。
 - Android APK：内置 IPA 的大小为 59,564,493 B，SHA-256 为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`；包结构、默认参数和 arm64 native libraries 静态校验通过。
 - Android 管理器 instrumentation 30 项通过；MuMu Android API 35 上验证管理器启动、启动游戏进入中文开始菜单及存档备份/恢复。该验证不等于已在所有 Android 手机型号上实测。
 

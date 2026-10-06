@@ -40,7 +40,7 @@ $devOnly = @(
     'StartZombieFarmNextHour.ps1', 'RestoreTestSave.ps1', 'SetZombieFarmCurrency.ps1',
     '运行游戏.bat', '选择跳过时间并启动.bat', '使用教程.txt',
     'StartZombieFarmNextHour.ps1.backup-20260919-204040',
-    'tools', '_analysis', 'Release', 'touchHLE-zombiefarm-android-arm64'
+    'tools', '_analysis', 'Release', 'docs', 'touchHLE-zombiefarm-android-arm64'
 )
 
 # Present in the bundle but generated at build time (so not a source file).

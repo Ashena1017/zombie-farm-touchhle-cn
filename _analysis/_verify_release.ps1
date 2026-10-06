@@ -74,9 +74,11 @@ $ipas = @(Get-ChildItem -LiteralPath $ipaDir -Filter '*.ipa' -File)
 Write-Host "  IPAs: $($ipas.Count) -- $(($ipas | ForEach-Object { $_.Name }) -join ', ')"
 if ($ipas.Count -lt 1) { $ok = $false }
 
-# The starting save.
+# The release sandbox must be empty so each player starts a fresh profile.
 $save = Join-Path $hleDir 'touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGame.bin2'
-Write-Host ("  starting save: " + $(if (Test-Path -LiteralPath $save) { "$((Get-Item -LiteralPath $save).Length) B" } else { 'none (game will create one)' }))
+$sandboxFiles = @(Get-ChildItem -LiteralPath (Join-Path $hleDir 'touchHLE_sandbox') -Recurse -File -ErrorAction SilentlyContinue)
+Write-Host ("  sandbox files: {0} -- {1}" -f $sandboxFiles.Count, $(if ($sandboxFiles.Count -eq 0) { 'clean install profile' } else { 'FAIL: packaged files detected' }))
+if ($sandboxFiles.Count -gt 0 -or (Test-Path -LiteralPath $save)) { $ok = $false }
 
 # --- 2. actually run it -----------------------------------------------------
 Write-Host ''

@@ -30,6 +30,11 @@ try {
         if ($null -eq $pair.Entry) { throw "APK is missing $($pair.Name)." }
     }
 
+    $saveEntries = @($archive.Entries | Where-Object { $_.FullName -match '(?i)(^|/)(touchHLE_sandbox|sandbox/)|saveGame\.bin2' })
+    if ($saveEntries.Count -gt 0) {
+        throw "APK must not bundle player sandbox data: $(($saveEntries | ForEach-Object { $_.FullName }) -join ', ')"
+    }
+
     $ipaStream = $ipaEntry.Open()
     $sha = [Security.Cryptography.SHA256]::Create()
     try { $packagedHash = ([BitConverter]::ToString($sha.ComputeHash($ipaStream))).Replace('-', '') }
@@ -60,6 +65,11 @@ try {
     if (-not $options.Contains($expectedOptions)) { throw 'Android default options do not enable the expected ZFR fixes.' }
     if ($options.Contains('--zf-wheel-zoom-step=') -or $options.Contains('--scale-hack=')) {
         throw 'Android defaults must use touch pinch zoom and native iPhone scale.'
+    }
+
+    $managerSource = Join-Path $root 'touchHLE\touchHLE-fork\android\app\src\main\java\org\touchhle\android\ManagerActivity.java'
+    if (-not [IO.File]::ReadAllText($managerSource).Contains('getBoolean("night_mode", true)')) {
+        throw 'Android manager must default to night mode on first launch.'
     }
 
     Write-Host "APK: $((Resolve-Path -LiteralPath $ApkPath).Path)"

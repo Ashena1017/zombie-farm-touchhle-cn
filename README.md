@@ -9,8 +9,9 @@
 项目包含针对 Zombie Farm 修复的 [touchHLE](https://touchhle.org/) 模拟器、Windows 与 Android 管理器，
 以及对游戏 IPA 的**等宽原地二进制补丁**（修崩溃、统一界面字号、修复中文本地化、修正排版）。
 
-> 游戏本体是 2011 年前后的 iPhone 老游戏，当年只有 480×320。本项目把「能跑」推进到
-> 「能舒服地玩」：60 帧、1536×1152 窗口、界面文字统一放大、中文不再缺字或乱码。
+> 游戏本体是 2011 年前后的 iPhone 老游戏。**iPhone 原生分辨率是 480×320**；iPad 原生分辨率
+> 是 **1024×768**，选择 iPad 并使用 ×1.5 倍率时，才会渲染为 **1536×1152**。此外还有 60 帧、
+> 界面文字统一放大、中文不再缺字或乱码等修复。
 >
 > **想玩「现代化重制版」的话，那不是这个项目** —— 见下面的
 > [想玩原版还是重制版](#想玩原版还是重制版)。
@@ -28,15 +29,16 @@
 
 两份附件和版本说明也可在[跨平台 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-platforms)查看。
 Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows 包面向 Windows 10/11 x64。
-Android 默认按 iPhone 原生画面运行并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
+两个版本首次启动管理器时都默认使用夜间模式。Android 默认按 iPhone 原生画面运行并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
+交付包不包含任何玩家 sandbox 存档；首次进入游戏后会为玩家创建新存档。
 
 <p align="center">
   <img src="docs/images/windows-manager-night.png" alt="Windows 游戏管理器" width="72%">
   <br><sub>Windows：版本、显示与存档设置集中管理</sub>
 </p>
 <p align="center">
-  <img src="docs/images/android-manager.png" alt="Android ZF游戏管理首页" width="34%">
-  <br><sub>Android：安装后进入 ZF游戏管理，选择并启动游戏</sub>
+  <img src="docs/images/android-manager.png" alt="Android ZF游戏管理夜间模式" width="34%">
+  <br><sub>Android：ZF游戏管理夜间模式，选择并启动游戏</sub>
 </p>
 
 ---
