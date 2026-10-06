@@ -1,36 +1,23 @@
 ---
 name: git-pr
-description: 用脚本向 Gitee 或 GitHub 提交 Pull Request（推送分支、创建 PR、回读校验），令牌通过 Git credential helper 读取，不需要粘贴到会话。当需要推送分支、创建 PR，或排查 403 / Committer identity unknown / 重复 PR 时使用。
-whenToUse: 用户要求提交代码、推送分支、开 PR、发起合并请求；或 git push 返回 403、git commit 报身份未知、Gitee/GitHub 返回「已存在相同源分支、目标分支的 Pull Request」时。
+description: 用脚本从已提交分支安全推送并创建 GitHub/Gitee Pull Request；用户要求开 PR 或仓库贡献流程要求 PR 时使用。单纯 commit 或直接推送不使用此 skill。
+whenToUse: 用户明确要求创建 PR，或目标仓库的贡献说明要求 PR；也用于排查 PR 脚本的凭据、推送权限和重复 PR 问题。
 ---
 
-# 用 `git-pr.mjs` 提交 PR（Gitee / GitHub 通用）
+# 用 `git-pr.mjs` 创建 PR（Gitee / GitHub 通用）
 
 本 skill 的执行脚本 `git-pr.mjs` 与本文件同目录。脚本使用 Node.js 18+ 内置模块，零第三方依赖。
 
-## 一、前置：先确认 git 身份
+## 一、先确认工作流与提交
 
-新克隆的仓库通常没有**仓库级**身份配置，但可能继承 global/system 配置或模板配置。
-先查 Git 实际解析到的值与来源：
+先读仓库贡献说明和当前任务要求，确认目标确实是 PR。用户明确要求直接推送，或仓库说明规定维护者直接推送时，不要用本脚本；它会创建 PR，不能当作通用 `git push` 包装器。
 
-```powershell
-git config --show-origin --get-regexp '^(user\.name|user\.email)$'
-```
+`git-pr.mjs` 只推送**已有 commit**并创建 PR，不会 `git add`、`git commit` 或包含未提交改动。先检查工作区与目标提交范围，完成需要的 commit 后再运行。若需要创建 commit，身份缺失时只在目标仓库设置 `user.name` / `user.email`，不要用 `--global`。
 
-如果 name 或 email 仍缺失，再在**该仓库**设置（不要用 `--global`，避免影响其它身份）：
+## 二、预演与执行
 
 ```powershell
-git config user.name  "<Git author name>"
-git config user.email "<Git author email>"
-```
-
-⚠️ `git commit --author` 只指定 author，不能补齐缺失的 committer 身份。
-`git -c user.name=...` 只对单次命令有效，容易漏配或与 email 不一致；优先设置仓库级身份。
-
-## 二、提 PR：默认预演，`--apply` 才动手
-
-```powershell
-# 1) 预演：只检查权限与分支，不做任何改动
+# 1) 预演：检查身份、权限、目标分支和当前分支，不推送或创建 PR
 $gitPr = Join-Path (Get-Location) '.agents\skills\git-pr\git-pr.mjs'
 node $gitPr --repo <仓库路径> --branch <分支> --title "<标题>"
 
@@ -46,16 +33,14 @@ node $gitPr --repo <仓库路径> --branch <分支> `
 | `--title` | PR 标题（必填） |
 | `--body-file` | PR 正文 md（可选，按 UTF-8 读） |
 | `--upstream` | 上游 `owner/repo`，默认从 origin 推导 |
-| `--base` | 目标分支，**默认 `master`** |
+| `--base` | 目标分支，默认使用上游仓库的默认分支 |
 | `--apply` | 真正执行；不加则只预演 |
 | `--dry-run` | 显式预演（与不加 `--apply` 等价） |
 | `--help` | 打印脚本自带帮助 |
 
-⚠️ **`--base` 默认值是 `master`，而 GitHub 仓库大多是 `main`** —— 不传就会以
-`master` 为目标分支去建 PR，在只有 `main` 的仓库上**必然失败**（base 不存在，
-GitHub 会拒绝建 PR；脚本会把它作为 `HTTP 4xx` 抛出）。
-本机新建的 GitHub 仓库默认就是 `main`，因此 **GitHub 上务必显式传 `--base main`**。
-目标分支不确定时先查：
+脚本会从上游仓库读取默认分支，并在推送前验证目标分支存在；特殊工作流可用 `--base` 覆盖。预演仍会读取平台 API 和 Git 凭据，但不添加 remote、不推送、不创建 PR。
+
+若 GitHub CLI 报 base 分支不存在，先确认项目真实目标分支；不要假设所有 GitHub 仓库都用 `main` 或 `master`：
 
 ```powershell
 git -C <仓库> remote show origin | Select-String 'HEAD branch'
@@ -69,7 +54,7 @@ git -C <仓库> remote show origin | Select-String 'HEAD branch'
 按实际推送仓库确定 PR head、检查重复 PR 并回读文件清单。指定 `--body-file` 但文件不存在时会立即报错。
 API 请求最长等待 30 秒；超时会报出对应请求路径。
 
-## 三、五个已踩过的坑（脚本已处理；手写时务必注意）
+## 三、权限与重复 PR
 
 ### 1. 403 的根因通常是「推错了仓库」，不是令牌无效
 
@@ -125,7 +110,19 @@ git config --show-origin --get-all credential.helper
 再重跑预演。不要把令牌粘贴到会话、命令行或文件中；`git credential fill` 会输出明文凭据，
 检查时不要回显它的结果。
 
-## 五、推之前值得做的检查
+## 五、网络故障排查
+
+先区分 DNS/TLS 连接失败与 HTTP 403/权限拒绝。若 `api.github.com` 可访问但 Git 报 `Could not resolve host: github.com`，不要改 remote、关闭 TLS 验证或把令牌塞进 URL。检查当前 Git 的 SSL backend；如果它指向此安装不支持的 backend，可临时用 Windows Schannel，并通过 `http.curloptResolve` 给 GitHub HTTPS 主机指定一个当前可达且证书有效的 IP：
+
+```powershell
+git -c http.sslBackend=schannel `
+  -c http.curloptResolve=github.com:443:<已验证的 GitHub HTTPS IP> `
+  ls-remote origin HEAD
+```
+
+先让 `ls-remote` 成功，再对同一命令加对应 `git -c` 参数执行 push；或通过 `GIT_CONFIG_COUNT` 环境项仅对脚本子进程传入这两个临时配置。不要写入 `--global` 配置，也不要长期复用未经重新验证的 IP。DNS/SSL workaround 只解决 Git 传输连接，不会改变仓库权限。
+
+## 六、推之前值得做的检查
 
 - **基线**：分支是否基于**当前上游默认分支的 HEAD**？先用 `git fetch` 确认
   （Gitee 多为 `master`，GitHub 多为 `main`）。
@@ -133,8 +130,10 @@ git config --show-origin --get-all credential.helper
 - **目标 remote**：脚本可能推有权限的上游，也可能推个人 fork；预演输出的目标仓库应与本次意图一致。不要只凭 remote 名称 `origin` / `fork` 判断目的地。
 - **改动范围**：`git diff --stat <base>..HEAD` 是否只有预期文件。
 
-## 六、安全红线
+## 七、安全红线
 
 - **绝不打印**凭据文件内容、令牌、AK/SK。
 - 令牌不写入任何文件、不 `echo`、不贴进会话。
 - 读取系统凭据只在必要时执行，且输出中不得回显凭据内容。
+
+GitHub REST 请求应带 `User-Agent`；脚本已统一添加，避免受限网络策略返回误导性的 403。

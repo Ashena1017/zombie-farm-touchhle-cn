@@ -74,7 +74,7 @@ if (flag('help')) {
   --title <标题>       PR 标题（必填）
   --body-file <md>     PR 正文文件（可选，按 UTF-8 读取）
   --upstream <o/r>     上游仓库，默认从 origin 推导
-  --base <分支>        目标分支，默认 master
+  --base <分支>        目标分支，默认使用上游仓库默认分支
   --apply              真正执行（不加则只预演，不做任何改动）
   --dry-run            显式预演（与不加 --apply 等价）
   --help               显示本帮助
@@ -87,8 +87,12 @@ const repo = opt('repo')
 const branch = opt('branch')
 const title = opt('title')
 const bodyFile = opt('body-file')
-const base = opt('base', 'master')
+const requestedBase = opt('base')
 // 默认预演；`--apply` 才真正执行。`--dry-run` 是显式别名。
+if (flag('apply') && flag('dry-run')) {
+  console.error('--apply 与 --dry-run 不能同时使用')
+  process.exit(1)
+}
 const apply = flag('apply') && !flag('dry-run')
 
 if (!repo || !branch || !title) {
@@ -189,7 +193,11 @@ const run = async () => {
     try {
       res = await fetch(`${platform.apiBase}${path}`, {
         ...init,
-        headers: { ...platform.authHeader(token), ...(init.headers ?? {}) },
+        headers: {
+          ...platform.authHeader(token),
+          'User-Agent': 'git-pr.mjs',
+          ...(init.headers ?? {}),
+        },
         signal: controller.signal,
       })
       text = await res.text()
@@ -210,7 +218,7 @@ const run = async () => {
 
   const { user, pass } = readToken(host)
   console.log(`平台      : ${platform.label} (${host})`)
-  console.log(`凭据用户名: ${user}（令牌长度 ${pass.length}，未打印内容）`)
+  console.log(`凭据用户名: ${user}（令牌未打印）`)
 
   // 1) 令牌身份
   const me = await api('/user', {}, pass)
@@ -224,6 +232,13 @@ const run = async () => {
   console.log(`上游仓库  : ${upstream}`)
 
   const up = await api(`/repos/${upstream}`, {}, pass)
+  const base = requestedBase ?? up.default_branch
+  if (!base) throw new Error(`无法确定 ${upstream} 的默认分支；请显式传入 --base`)
+  try {
+    await api(`/repos/${upstream}/branches/${encodeURIComponent(base)}`, {}, pass)
+  } catch (error) {
+    throw new Error(`目标分支 ${upstream}:${base} 不存在或不可读取；推送前检查失败。\n  ${error.message}`)
+  }
   const canPushUpstream = platform.pushFlag(up)
   const pushRepoFull = canPushUpstream
     ? upstream
