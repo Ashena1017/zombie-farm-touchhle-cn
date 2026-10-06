@@ -695,3 +695,8 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 1. Android 桌面应用标签、管理器标题栏和首页标题统一为「Zombie Farm 游戏管理」。首页标题字号调整为 20sp，给右侧状态标记留出空间。Windows 版名称不变。
 2. APK 重建并通过 `_analysis\_verify_android_package.ps1`；AAPT 从正式 APK manifest 回读的标签为 `Zombie Farm 游戏管理`。APK 为 `97,302,247 B` / SHA-256 `1FDCAD2AE4F0474EB14A86E24202E19851E317F4DD176CC40872D0F76773160F`；内置 IPA 仍为 `59,564,493 B` / SHA-256 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，静态包校验通过，无 sandbox 存档。
 3. README 与 `RELEASE_NOTES_v29fix-platforms.md` 已更新应用名称及 Android 附件校验信息；源码和 APK 随后同步到 GitHub `master` 与既有 `v29fix-platforms` Release，并按线上资产 SHA-256 回读校验。MuMu 未启动，本轮未做设备 UI 实测，也未访问或写入 Android sandbox。
+
+## 30. 交接后追加（2026-10-07，Android 首页状态标记布局）
+
+1. 主人反馈应用改名后首页「准备就绪」胶囊看起来偏斜。根因是状态标记绝对定位在右上角，而长标题占满整行并从其下方穿过。现将胶囊放在标题和副标题之后的纵向内容流中，取消右上角绝对定位；主题按钮仍在右侧独立定位。标题长度变化不再改变状态胶囊的排版或与其重叠。
+2. `_analysis\_build_android_local.ps1` Release 构建成功，内置 IPA 校验仍为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，APK 静态校验 PASS。新 APK `97,302,304 B` / SHA-256 `99F896A3E157E4BAD8C099FF8DE825EC9A97AC09E9F3EDB374D53968B932ABB8`。未启动 MuMu、游戏或触碰任何 sandbox；尚未发布 GitHub，线上 Release 仍是 §29 版本。
