@@ -4,6 +4,8 @@
 
 > **2026-10-07 Windows 日夜图标视觉居中追加（#31）**：主人指出仅设置按钮文字 MiddleCenter 后，日间太阳字形仍看起来偏位。改为空按钮文字，在 Paint 中以 TextRenderer `HorizontalCenter | VerticalCenter | NoPadding | SingleLine` 按客户区居中绘制太阳/月亮，主题切换时显式 Invalidate。日间真实窗口截图 `_analysis\dumps\windows-day-icon-centered-review.png` 目视确认，GUI 控件回归与 Release standalone launch 45 秒通过；主题偏好测试前后字节恢复。Windows ZIP 仍为 42 文件、sandbox/save 条目为 0，已替换 GitHub 同名附件并通过 Assets API 下载回读哈希相同。新 ZIP `95,056,542 B` / `92C6D2B2D541B3C332DA1427DF4D8A447B89309B481A0446F5726A91D7F4D477`。详见 `HANDOVER.md` §27。
 
+> **2026-10-07 日夜图标光学中心复核（#32）**：主人指出月亮观感仍偏。路径轮廓居中后，对实窗截图中的可见字形采样：太阳色心偏差 `(-0.01,-0.02) px`；月牙色心原偏 `(1.66,1.22) px`。为月牙按 DPI 加光学偏移，最终夜间截图色心偏差 `(0.10,-0.14) px`；当前可见轮廓边距左/右 `8/11 px` 是月牙轮廓非对称，色心则已在中心。最终逻辑位于 `_analysis\dumps\windows-night-icon-optically-centered.png`；SELFTEST、控件回归、空 sandbox Release 45 秒独立运行均 PASS。42 文件 Windows ZIP 无 sandbox/save，更新包 `95,057,453 B` / `84DE88543BF3D302657E6681F72E28D77F7E3EA5063995A1ECDBCB30B72F4461`，已替换同名 GitHub 附件，Assets API 下载回读哈希一致；源码同步待完成。
+
 > **2026-10-07 Windows 系统标题栏配色**：DWM 标题栏现在跟随管理器日夜模式；夜间采用深色背景/浅色文字，日间恢复系统默认浅色标题栏。Windows 11 23H2 两种主题均已实窗截图确认；日夜切换控件回归与 Release 独立启动验证通过。旧 Windows 对自定义 caption color 的支持依系统版本而定。详见 `HANDOVER.md` §25。
 
 > **2026-10-07 夜间模式控件收尾**：设置页组合框系统边框与箭头分隔线改为主题绘制，消除实测单像素纯白线；存档列表末列铺满宽度，清除右侧系统白块，夜间分隔线同步压暗。开发版三页实窗核验、控件回归与 Release 包验证通过，Release 已重建同步；未写入真实存档。详见 `HANDOVER.md` §24。

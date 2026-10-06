@@ -2037,14 +2037,36 @@ $btnTheme.Font = New-Object System.Drawing.Font('Segoe MDL2 Assets', 13)
 $btnTheme.AccessibleName = '日夜模式切换'
 $btnTheme.Add_Paint({
     param($sender, $eventArgs)
-    if ($btnTheme.Tag) {
-        $flags = [System.Windows.Forms.TextFormatFlags]::HorizontalCenter -bor
-            [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor
-            [System.Windows.Forms.TextFormatFlags]::NoPadding -bor
-            [System.Windows.Forms.TextFormatFlags]::SingleLine
-        [System.Windows.Forms.TextRenderer]::DrawText(
-            $eventArgs.Graphics, [string]$btnTheme.Tag, $btnTheme.Font,
-            $btnTheme.ClientRectangle, $btnTheme.ForeColor, $flags)
+    $glyph = [string]$sender.Tag
+    if (-not $glyph) { return }
+
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $brush = New-Object System.Drawing.SolidBrush($sender.ForeColor)
+    $format = [System.Drawing.StringFormat]::GenericTypographic.Clone()
+    $transform = New-Object System.Drawing.Drawing2D.Matrix
+    try {
+        $emSize = [single]($sender.Font.SizeInPoints * $eventArgs.Graphics.DpiY / 72.0)
+        $path.AddString(
+            $glyph, $sender.Font.FontFamily, [int]$sender.Font.Style, $emSize,
+            [System.Drawing.PointF]::new(0, 0), $format)
+        $ink = $path.GetBounds()
+        $client = $sender.ClientRectangle
+        $x = $client.Left + (($client.Width - $ink.Width) / 2) - $ink.Left
+        $y = $client.Top + (($client.Height - $ink.Height) / 2) - $ink.Top
+        $opticalX = 0.0
+        $opticalY = 0.0
+        if ($glyph -eq [string][char]0xE708) {
+            # The crescent's visible ink centroid sits right and low of its path bounds.
+            $dpiScale = $eventArgs.Graphics.DpiY / 96.0
+            $opticalX = -1.65 * $dpiScale
+            $opticalY = -1.20 * $dpiScale
+        }
+        $transform.Translate([single]($x + $opticalX), [single]($y + $opticalY))
+        $path.Transform($transform)
+        $eventArgs.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $eventArgs.Graphics.FillPath($brush, $path)
+    } finally {
+        $path.Dispose(); $brush.Dispose(); $format.Dispose(); $transform.Dispose()
     }
 })
 $form.Controls.Add($btnTheme)
