@@ -699,4 +699,4 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 ## 30. 交接后追加（2026-10-07，Android 首页状态标记布局）
 
 1. 主人反馈应用改名后首页「准备就绪」胶囊看起来偏斜。根因是状态标记绝对定位在右上角，而长标题占满整行并从其下方穿过。现将胶囊放在标题和副标题之后的纵向内容流中，取消右上角绝对定位；主题按钮仍在右侧独立定位。标题长度变化不再改变状态胶囊的排版或与其重叠。
-2. `_analysis\_build_android_local.ps1` Release 构建成功，内置 IPA 校验仍为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，APK 静态校验 PASS。新 APK `97,302,304 B` / SHA-256 `99F896A3E157E4BAD8C099FF8DE825EC9A97AC09E9F3EDB374D53968B932ABB8`。未启动 MuMu、游戏或触碰任何 sandbox；尚未发布 GitHub，线上 Release 仍是 §29 版本。
+2. `_analysis\_build_android_local.ps1` Release 构建成功，内置 IPA 校验仍为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，APK 静态校验 PASS。新 APK `97,302,304 B` / SHA-256 `99F896A3E157E4BAD8C099FF8DE825EC9A97AC09E9F3EDB374D53968B932ABB8`。源码提交 `7e8922914eb79710e8b32b5c9e2e1acb615be389` 已推送 `master`；`v29fix-platforms` 的 Android 附件已替换，API 下载回读大小与 SHA-256 一致，Release 正文与本地说明逐字符一致。新附件 asset id `616716673`。未启动 MuMu、游戏或触碰任何 sandbox。
