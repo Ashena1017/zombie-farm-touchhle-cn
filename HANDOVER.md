@@ -685,4 +685,4 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 1. 主人指出之前的 `TextAlign=MiddleCenter` 并未让 Segoe MDL2 Assets 太阳字形视觉居中。现清空按钮文字，`Paint` 事件用 `TextRenderer.DrawText` 配合 `HorizontalCenter | VerticalCenter | NoPadding | SingleLine` 在 `ClientRectangle` 画 Tag 中的太阳/月亮字形；换主题后显式 `Invalidate()`。不要恢复为 Button.Text 绘制。
 2. 日间窗口实拍 `_analysis\dumps\windows-day-icon-centered-review.png`，图标在边框客户区内目视居中。`GameManager.ps1 -SelfTest` 与 `_analysis\_gui_controls_test.ps1` PASS；重建 Release 后 `_analysis\_verify_release.ps1` 运行 45 秒通过，布局匹配 PASS。截图前将 `launcher_night_mode.txt` 字节快照，临时日间取图后原字节写回。
 3. Windows ZIP 重建后 42 个文件且不含 sandbox/save，`95,056,542 B`，SHA-256 `92C6D2B2D541B3C332DA1427DF4D8A447B89309B481A0446F5726A91D7F4D477`。已替换 `v29fix-platforms` 的 Windows 附件并更新 Release body 哈希；GitHub Assets API 下载回读大小和哈希完全匹配。Android 附件未改。
-4. 本节代码及当前 Windows ZIP 哈希尚待提交同步到远端 `master`；`process.md` 最新 #31。真实游戏 sandbox 未读写。
+4. 本节代码、说明及 Windows ZIP 已同步到 GitHub：`master` 已包含按钮绘制修复，`v29fix-platforms` 使用上述新 ZIP；`process.md` 最新 #31。真实游戏 sandbox 未读写。
