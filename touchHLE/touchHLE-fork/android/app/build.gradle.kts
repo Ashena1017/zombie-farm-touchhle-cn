@@ -85,8 +85,8 @@ android {
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }
-        resValue("string", "app_name", join("ZF游戏管理", " ", branding))
-        buildConfigField("String", "APP_NAME", "\"${join("ZF游戏管理", " ", branding)}\"")
+        resValue("string", "app_name", join("Zombie Farm 游戏管理", " ", branding))
+        buildConfigField("String", "APP_NAME", "\"${join("Zombie Farm 游戏管理", " ", branding)}\"")
         manifestPlaceholders["icon"] = "@drawable/zombie_farm_icon"
         buildConfigField("int", "APP_ICON", "org.touchhle.android.R.drawable.zombie_farm_icon")
         versionName = join(getTouchHLEVersionName(), " ", branding)

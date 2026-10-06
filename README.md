@@ -25,7 +25,7 @@
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
 | **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-windows-x64-v29fix.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-android-arm64-v29fix.apk) | 安装后打开「ZF游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-android-arm64-v29fix.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
 两份附件和版本说明也可在[跨平台 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-platforms)查看。
 Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows 包面向 Windows 10/11 x64。
@@ -37,8 +37,8 @@ Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows �
   <br><sub>Windows：版本、显示与存档设置集中管理</sub>
 </p>
 <p align="center">
-  <img src="docs/images/android-manager.png" alt="Android ZF游戏管理夜间模式" width="34%">
-  <br><sub>Android：ZF游戏管理夜间模式，选择并启动游戏</sub>
+  <img src="docs/images/android-manager.png" alt="Android Zombie Farm 游戏管理夜间模式" width="34%">
+  <br><sub>Android：Zombie Farm 游戏管理夜间模式，选择并启动游戏</sub>
 </p>
 
 ---
@@ -177,7 +177,7 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 ### Android
 
 1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-android-arm64-v29fix.apk)；
-2. 打开应用 **「ZF游戏管理」**；
+2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。最新 v29fix IPA 已内置，首次启动自动校验安装，不需要手动复制 `data` 文件。
 
 Android 管理器还支持按需从系统文件选择器导入 IPA、iPhone/iPad 画面、帧率与修复选项、跳过时间、金币/脑子和存档管理。触屏缩放直接使用游戏的两指捏合手势；默认横屏、iPhone 原生画面与 60 FPS。

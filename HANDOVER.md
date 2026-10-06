@@ -16,7 +16,7 @@
 2. 去掉界面上所有 `?` 按钮（说明搬进 `使用说明.html`）、倍率预置改成小数 ×1.25 / ×1.5 / ×1.75；
 3. 清理了 126 MB 过往会话记录与过程性产物，并重写了文档。
 
-**Windows 版本没有未完成的阻塞项，正在等主人实机反馈。** 2026-10-06 Windows 存档备份已扩展为同时恢复累计跳过时间，旧备份兼容性保留；Android ARM64 已完成 MuMu 黑屏、形象页裁剪、沉浸式全屏修复，并新增「ZF游戏管理」原生管理器。Windows 备份细节见 §20；Android 管理器最终 APK、MuMu 启动/存档复原结果与验证边界见 §19。
+**Windows 版本没有未完成的阻塞项，正在等主人实机反馈。** 2026-10-06 Windows 存档备份已扩展为同时恢复累计跳过时间，旧备份兼容性保留；Android ARM64 已完成 MuMu 黑屏、形象页裁剪、沉浸式全屏修复，并新增「Zombie Farm 游戏管理」原生管理器。Windows 备份细节见 §20；Android 管理器最终 APK、MuMu 启动/存档复原结果与验证边界见 §19。
 
 ---
 
@@ -689,3 +689,9 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 2. 只对月牙 glyph (`U+E708`) 按 `Graphics.DpiY / 96` 应用 `(-1.65,-1.20)` px 光学补偿。新截图 `_analysis\dumps\windows-night-icon-optically-centered.png` 的月牙色心为 `(927.10,61.36)`，距离中心 `(0.10,-0.14) px`；可见轮廓边距左/右为 `8/11 px`，由于月牙开口形状不对称，判断以色心而非包围框为准。日间太阳继续保持边距 `9/9 px`、色心偏差 `(-0.01,-0.02) px`。
 3. `_analysis\_ensure_bom.ps1`、`GameManager.ps1 -SelfTest`、`_analysis\_gui_controls_test.ps1`、`_analysis\_build_release.ps1`、`_analysis\_verify_release.ps1`、`_analysis\_verify_layout_match.ps1` 均通过；空 sandbox、Release 45 秒 standalone 正常。重新打 Windows ZIP 42 个文件，无 sandbox/save；最终 `95,057,453 B` / SHA-256 `84DE88543BF3D302657E6681F72E28D77F7E3EA5063995A1ECDBCB30B72F4461`，应替换 §27 记载的旧 ZIP。
 4. 最终 ZIP 已替换 `v29fix-platforms` 同名附件：`95,057,453 B` / SHA-256 `84DE88543BF3D302657E6681F72E28D77F7E3EA5063995A1ECDBCB30B72F4461`；Assets API 下载回读字节与本地一致。源码已同步 GitHub `master`；`process.md` 最新 #32。真实游戏 sandbox 未读写。
+
+## 29. 交接后追加（2026-10-07，Android 应用名称）
+
+1. Android 桌面应用标签、管理器标题栏和首页标题统一为「Zombie Farm 游戏管理」。首页标题字号调整为 20sp，给右侧状态标记留出空间。Windows 版名称不变。
+2. APK 重建并通过 `_analysis\_verify_android_package.ps1`；AAPT 从正式 APK manifest 回读的标签为 `Zombie Farm 游戏管理`。APK 为 `97,302,247 B` / SHA-256 `1FDCAD2AE4F0474EB14A86E24202E19851E317F4DD176CC40872D0F76773160F`；内置 IPA 仍为 `59,564,493 B` / SHA-256 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，静态包校验通过，无 sandbox 存档。
+3. README 与 `RELEASE_NOTES_v29fix-platforms.md` 已更新应用名称及 Android 附件校验信息；源码和 APK 随后同步到 GitHub `master` 与既有 `v29fix-platforms` Release，并按线上资产 SHA-256 回读校验。MuMu 未启动，本轮未做设备 UI 实测，也未访问或写入 Android sandbox。

@@ -64,7 +64,7 @@ public class ManagerActivity extends Activity {
         applyPalette();
         try { storage = new ZfStorage(this); }
         catch (Exception e) { error(e); return; }
-        setTitle("ZF游戏管理"); render();
+        setTitle("Zombie Farm 游戏管理"); render();
     }
     @Override protected void onResume() {
         super.onResume(); if (storage != null && !busy) refresh(true);
@@ -186,7 +186,7 @@ public class ManagerActivity extends Activity {
         shell = vertical(); shell.setBackgroundColor(BACKGROUND); shell.setPadding(dp(14), dp(12), dp(14), 0);
         FrameLayout hero = new FrameLayout(this); hero.setBackground(shape(SOFT, 8)); hero.setClipToOutline(true);
         LinearLayout titles = vertical(); titles.setPadding(dp(17), dp(17), 0, 0);
-        titles.addView(text("ZF游戏管理", 24, INK, true));
+        titles.addView(text("Zombie Farm 游戏管理", 20, INK, true));
         titles.addView(text("僵尸农场 · 中文版", 12, MUTED, false));
         FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(-1, -1, Gravity.TOP | Gravity.LEFT);
         hero.addView(titles, titleParams);
