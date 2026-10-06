@@ -38,7 +38,7 @@ fn main() {
         if os.eq_ignore_ascii_case("android") {
             let _ = std::fs::remove_dir_all(&out_dir);
         }
-        build.out_dir(out_dir);
+        build.out_dir(&out_dir);
 
         build.define("LIBTYPE", "STATIC");
 
@@ -47,6 +47,19 @@ fn main() {
         build.define("ALSOFT_UTILS", "OFF");
         build.define("ALSOFT_NO_CONFIG_UTIL", "ON");
         build.define("ALSOFT_EXAMPLES", "OFF");
+
+        // Android's NDK libc++ does not make <compare> transitively available
+        // from <string_view>, while OpenAL's alstring.h uses std::weak_ordering
+        // in its public declarations. Force-include it for the Android build.
+        if os.eq_ignore_ascii_case("android") {
+            build.define("CMAKE_CXX_FLAGS", "-include compare");
+            build.define("CMAKE_CXX_SCAN_FOR_MODULES", "OFF");
+            // OpenAL Soft enables C++20 modules on CMake 3.28+ with Clang,
+            // but the Android SDK's bundled Ninja is too old to scan them.
+            // Disable the OpenAL feature itself; the CMake scan toggle alone
+            // does not prevent HAVE_CXXMODULES from being selected.
+            build.define("ALSOFT_ENABLE_MODULES", "OFF");
+        }
 
         let openal_soft_out = build.build();
 

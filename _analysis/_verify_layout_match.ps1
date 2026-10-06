@@ -31,16 +31,16 @@ $devNames = Get-Names $Root
 $relNames = Get-Names $release
 
 # Present in the development tree but intentionally not shipped.
-# launcher_selected_ipa.txt / launcher_skip_memory.txt are RUNTIME STATE written
+# launcher_selected_ipa.txt / launcher_skip_memory.txt / launcher_night_mode.txt are RUNTIME STATE written
 # by the manager on use (which IPA is picked, last skip-ahead duration), not
 # source; they appear only after someone runs the manager.
 $devOnly = @(
     'TECHNICAL.md', 'process.md', 'HANDOVER.md', '交接提示词.md', 'README.md',
-    'launcher_selected_ipa.txt', 'launcher_skip_memory.txt',
+    'launcher_selected_ipa.txt', 'launcher_skip_memory.txt', 'launcher_night_mode.txt',
     'StartZombieFarmNextHour.ps1', 'RestoreTestSave.ps1', 'SetZombieFarmCurrency.ps1',
     '运行游戏.bat', '选择跳过时间并启动.bat', '使用教程.txt',
     'StartZombieFarmNextHour.ps1.backup-20260919-204040',
-    'tools', '_analysis', 'Release'
+    'tools', '_analysis', 'Release', 'touchHLE-zombiefarm-android-arm64'
 )
 
 # Present in the bundle but generated at build time (so not a source file).
@@ -87,7 +87,11 @@ foreach ($n in $devNames) {
 # 3. Nothing emulator-shaped may sit in EITHER root.
 foreach ($pair in @(@{ Tree = 'dev'; Dir = $Root }, @{ Tree = 'Release'; Dir = $release })) {
     $stray = @(Get-ChildItem -LiteralPath $pair.Dir -Force |
-        Where-Object { $_.Name -match '^touchHLE|^zfr|^_build_tools' -and $_.Name -ne 'touchHLE' })
+        Where-Object {
+            $_.Name -match '^touchHLE|^zfr|^_build_tools' -and
+            $_.Name -ne 'touchHLE' -and
+            $_.Name -ne 'touchHLE-zombiefarm-android-arm64'
+        })
     foreach ($s in $stray) {
         Write-Host "  STRAY in $($pair.Tree) root: $($s.Name)"
         $fail++

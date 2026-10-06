@@ -7,10 +7,11 @@
 # Pure ASCII (see _analysis/_ensure_bom.ps1 for why).
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
-    [string]$OutFile = "$root\_analysis\gui.png",
+    [string]$OutFile = (Join-Path $Root '_analysis\gui.png'),
+    [ValidateRange(0, 2)][int]$TabIndex = 0,
     [int]$TimeoutSeconds = 40
 )
-$root = (Split-Path -Parent $PSScriptRoot)
+$root = (Resolve-Path -LiteralPath $Root).Path
 
 $ErrorActionPreference = 'Continue'
 
@@ -26,6 +27,9 @@ public class WinCap {
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr p);
+    [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc cb, IntPtr p);
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassNameW(IntPtr h, System.Text.StringBuilder s, int n);
+    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr h, System.Text.StringBuilder s, int n);
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
     public delegate bool EnumProc(IntPtr h, IntPtr p);
@@ -49,6 +53,17 @@ public class WinCap {
             return true;
         }, IntPtr.Zero);
         return best;
+    }
+
+    public static IntPtr FindChildClass(IntPtr parent, string fragment) {
+        IntPtr found = IntPtr.Zero;
+        EnumChildWindows(parent, delegate(IntPtr h, IntPtr p) {
+            var sb = new System.Text.StringBuilder(256);
+            GetClassNameW(h, sb, 256);
+            if (sb.ToString().Contains(fragment)) { found = h; return false; }
+            return true;
+        }, IntPtr.Zero);
+        return found;
     }
 }
 '@
@@ -93,6 +108,16 @@ Write-Host "  window : '$($sb.ToString())'  hwnd=$hwnd"
 
 # Settle: the Shown handler loads settings and refreshes currency.
 Start-Sleep -Seconds 3
+
+if ($TabIndex -gt 0) {
+    $tabControl = [WinCap]::FindChildClass($hwnd, 'SysTabControl32')
+    if ($tabControl -eq [IntPtr]::Zero) { throw 'TabControl not found' }
+    $x = if ($TabIndex -eq 1) { 90 } else { 150 }
+    $lp = [IntPtr]((12 -shl 16) -bor $x)
+    [void][WinCap]::PostMessage($tabControl, 0x0201, [IntPtr]1, $lp)
+    [void][WinCap]::PostMessage($tabControl, 0x0202, [IntPtr]0, $lp)
+    Start-Sleep -Seconds 1
+}
 
 $r = New-Object WinCap+RECT
 [void][WinCap]::GetWindowRect($hwnd, [ref]$r)

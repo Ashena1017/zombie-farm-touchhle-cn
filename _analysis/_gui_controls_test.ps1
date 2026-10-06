@@ -75,6 +75,19 @@ public class UiProbe {
         return list.ToArray();
     }
 
+    public static IntPtr FindOtherTopLevel(uint pid, IntPtr exclude, string titlePart) {
+        IntPtr found = IntPtr.Zero;
+        EnumWindows(delegate(IntPtr h, IntPtr p) {
+            uint wpid; GetWindowThreadProcessId(h, out wpid);
+            if (h != exclude && wpid == pid && IsWindowVisible(h) && Text(h).Contains(titlePart)) {
+                found = h;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
     public static string[] ComboItems(IntPtr combo) {
         int n = (int)SendMessage(combo, 0x0146, IntPtr.Zero, IntPtr.Zero);
         var items = new List<string>();
@@ -160,6 +173,23 @@ if ($hwnd -eq [IntPtr]::Zero) { Write-Host '  FAIL: no window'; exit 1 }
 Start-Sleep -Seconds 3
 
 $ok = $true
+$tabs = [UiProbe]::Descendants($hwnd, 'SysTabControl32')
+$pageHeights = @{}
+if ($tabs.Count -gt 0) {
+    # Visit settings and game once so both pages create their native control handles.
+    foreach ($x in @(90, 30)) {
+        $lp = [IntPtr]((12 -shl 16) -bor $x)
+        [void][UiProbe]::PostMessage($tabs[0], 0x0201, [IntPtr]1, $lp)
+        [void][UiProbe]::PostMessage($tabs[0], 0x0202, [IntPtr]0, $lp)
+        Start-Sleep -Milliseconds 700
+        $r = New-Object UiProbe+RECT
+        [void][UiProbe]::GetWindowRect($hwnd, [ref]$r)
+        $pageHeights[$x] = $r.Bottom - $r.Top
+    }
+} else {
+    Write-Host '  FAIL: manager tab control not found'
+    $ok = $false
+}
 
 # --- 1. fps presets --------------------------------------------------------
 $combos = [UiProbe]::Descendants($hwnd, 'COMBOBOX')
@@ -194,12 +224,17 @@ $edits = [UiProbe]::Descendants($hwnd, 'EDIT')
 $values = @($edits | ForEach-Object { [UiProbe]::Text($_) })
 Write-Host "  edit boxes: $($edits.Count)  values: $($values -join ', ')"
 
-# The EDITs are, in creation order: custom fps, custom wheel zoom, custom scale,
-# gold, brains. Gold and brains are also small integers, so a loose numeric match
-# would pick the wrong one -- take the FIRST match, which is the custom fps box.
+# Find the custom fps editor by its position on the same row and to the right of
+# the fps dropdown. The game tab now owns the currency editors, so child-window
+# creation order no longer identifies the fps editor reliably.
 $customEdit = $null
+$fpsRect = New-Object UiProbe+RECT
+[void][UiProbe]::GetWindowRect($fpsCombo, [ref]$fpsRect)
 foreach ($e in $edits) {
-    if ([UiProbe]::Text($e) -match '^\d{1,4}$') { $customEdit = $e; break }
+    $r = New-Object UiProbe+RECT
+    [void][UiProbe]::GetWindowRect($e, [ref]$r)
+    $sameRow = ($r.Top -lt $fpsRect.Bottom) -and ($r.Bottom -gt $fpsRect.Top)
+    if ($sameRow -and $r.Left -ge $fpsRect.Right) { $customEdit = $e; break }
 }
 
 if ($null -eq $customEdit) {
@@ -451,18 +486,21 @@ if ($sclCombo -ne [IntPtr]::Zero) {
 }
 
 # --- 3. the save list must be populated ------------------------------------
-# The ListView lives in the second tab page and WinForms does not create the
+# The ListView lives in the third tab page and WinForms does not create the
 # handle of a control in a tab that has never been shown, so it does not exist in
 # the window tree until the tab is opened. Click the tab header for real (mouse
 # messages) rather than trying to fake a tab change.
 $tabs = [UiProbe]::Descendants($hwnd, 'SysTabControl32')
 Write-Host "  tab controls: $($tabs.Count)"
 if ($tabs.Count -gt 0) {
-    # Second tab header sits roughly 90px in, ~12px down, in tab-control coords.
-    $lp = [IntPtr]((12 -shl 16) -bor 90)
+    # Third tab header sits roughly 150px in, ~12px down, in tab-control coords.
+    $lp = [IntPtr]((12 -shl 16) -bor 150)
     [void][UiProbe]::PostMessage($tabs[0], 0x0201, [IntPtr]1, $lp)   # WM_LBUTTONDOWN
     [void][UiProbe]::PostMessage($tabs[0], 0x0202, [IntPtr]0, $lp)   # WM_LBUTTONUP
     Start-Sleep -Seconds 3
+    $r = New-Object UiProbe+RECT
+    [void][UiProbe]::GetWindowRect($hwnd, [ref]$r)
+    $pageHeights[150] = $r.Bottom - $r.Top
 }
 
 $lists = [UiProbe]::Descendants($hwnd, 'SysListView32')
@@ -485,6 +523,46 @@ if ($lists.Count -eq 0) {
     Write-Host "  rows listed: $count"
     if ($count -eq $expect) { Write-Host '  save list matches the save folder: PASS' }
     else { Write-Host "  FAIL: expected $expect rows (live save + backups)"; $ok = $false }
+}
+
+$heightOk = ($pageHeights[90] -lt $pageHeights[30]) -and
+            ($pageHeights[30] -lt $pageHeights[150])
+Write-Host ("  content-fit window heights (settings/game/saves): {0}/{1}/{2} -> {3}" -f `
+    $pageHeights[90], $pageHeights[30], $pageHeights[150],
+    $(if ($heightOk) { 'PASS' } else { 'FAIL' }))
+if (-not $heightOk) { $ok = $false }
+
+# Exercise the day/night button itself. Its theme update touches native handles,
+# so a normal launch and the settings-control checks above do not cover this path.
+$formRect = New-Object UiProbe+RECT
+[void][UiProbe]::GetWindowRect($hwnd, [ref]$formRect)
+$themeButton = [IntPtr]::Zero
+foreach ($button in [UiProbe]::Descendants($hwnd, 'BUTTON')) {
+    $buttonRect = New-Object UiProbe+RECT
+    [void][UiProbe]::GetWindowRect($button, [ref]$buttonRect)
+    if ($buttonRect.Left -ge ($formRect.Right - 80) -and
+        $buttonRect.Top -le ($formRect.Top + 80)) {
+        $themeButton = $button
+        break
+    }
+}
+if ($themeButton -eq [IntPtr]::Zero) {
+    Write-Host '  FAIL: day/night button not found'
+    $ok = $false
+} else {
+    $themeFailure = $false
+    for ($i = 0; $i -lt 2; $i++) {
+        [void][UiProbe]::SendMessage($themeButton, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
+        Start-Sleep -Milliseconds 500
+        $dialog = [UiProbe]::FindOtherTopLevel([uint32]$proc.Id, $hwnd, 'Zombie Farm')
+        if ($dialog -ne [IntPtr]::Zero) {
+            Write-Host "  FAIL: theme click opened a dialog: $([UiProbe]::Text($dialog))"
+            $themeFailure = $true
+            $ok = $false
+            break
+        }
+    }
+    if (-not $themeFailure) { Write-Host '  day/night button toggled twice without an exception dialog: PASS' }
 }
 
 Write-Host ''

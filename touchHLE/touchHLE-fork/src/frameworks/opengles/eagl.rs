@@ -510,6 +510,29 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
     // state changes we make.
     let old_framebuffer: GLuint = get_int(gles, gles11::FRAMEBUFFER_BINDING_OES) as _;
 
+    if cfg!(target_os = "android") && old_framebuffer == 0 {
+        // Android's SDL window framebuffer contains the app's rendered output;
+        // the EAGL drawable renderbuffer can remain empty on this surface.
+        let size = (width as usize)
+            .checked_mul(height as usize)
+            .unwrap()
+            .checked_mul(4)
+            .unwrap();
+        pixel_buffer.clear();
+        pixel_buffer.reserve_exact(size);
+        gles.ReadPixels(
+            0,
+            0,
+            width,
+            height,
+            gles11::RGBA,
+            gles11::UNSIGNED_BYTE,
+            pixel_buffer.as_mut_ptr().cast(),
+        );
+        pixel_buffer.set_len(size);
+        return (pixel_buffer, width_u32, height_u32);
+    }
+
     // Create a framebuffer we can use to read from the renderbuffer
     let mut src_framebuffer = 0;
     gles.GenFramebuffersOES(1, &mut src_framebuffer);
@@ -546,7 +569,6 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
         Instant::now().saturating_duration_since(before)
     );
     pixel_buffer.set_len(size);
-
     // Clean up the framebuffer object since we no longer need it.
     gles.DeleteFramebuffersOES(1, &src_framebuffer);
 
@@ -712,20 +734,24 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
 
     // Restore all the state saved before rendering
     for (&is_enabled, info) in old_arrays.iter().zip(gles1_on_gl2::ARRAYS.iter()) {
-        match is_enabled {
-            gles11::TRUE => gles.EnableClientState(info.name),
-            gles11::FALSE => gles.DisableClientState(info.name),
-            _ => unreachable!(),
+        if is_enabled == gles11::FALSE {
+            gles.DisableClientState(info.name);
+        } else {
+            // Some Android GLES implementations return an arbitrary nonzero
+            // byte for GLboolean state queries instead of exactly GL_TRUE.
+            gles.EnableClientState(info.name);
         }
     }
     for (&is_enabled, &name) in old_capabilities
         .iter()
         .zip(gles1_on_gl2::CAPABILITIES.iter())
     {
-        match is_enabled {
-            gles11::TRUE => gles.Enable(name),
-            gles11::FALSE => gles.Disable(name),
-            _ => unreachable!(),
+        if is_enabled == gles11::FALSE {
+            gles.Disable(name);
+        } else {
+            // Treat GLboolean as a truth value; Android drivers are allowed
+            // to use any nonzero representation for true.
+            gles.Enable(name);
         }
     }
     for mode in [gles11::MODELVIEW, gles11::PROJECTION, gles11::TEXTURE] {

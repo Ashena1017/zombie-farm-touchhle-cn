@@ -69,8 +69,8 @@ pub use touchHLE_version::*;
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "C" fn SDL_main(
-    _argc: std::ffi::c_int,
-    _argv: *const *const std::ffi::c_char,
+    argc: std::ffi::c_int,
+    argv: *const *const std::ffi::c_char,
 ) -> std::ffi::c_int {
     // Rust's default panic handler prints to stderr, but on Android that just
     // gets discarded, so we set a custom hook to make debugging easier.
@@ -89,8 +89,20 @@ pub extern "C" fn SDL_main(
         }
     }));
 
-    // Empty args: brings up app picker.
-    match main([String::new()].into_iter()) {
+    // SDLActivity supplies the selected IPA and manager settings as argv.
+    let mut args: Vec<String> = if argc > 1 && !argv.is_null() {
+        unsafe { std::slice::from_raw_parts(argv, argc as usize) }
+            .iter()
+            .map(|arg| unsafe { std::ffi::CStr::from_ptr(*arg) }.to_string_lossy().into_owned())
+            .collect()
+    } else {
+        vec![String::new()]
+    };
+    if args.len() == 1 {
+        args.push(paths::user_data_base_path().join(paths::APPS_DIR)
+            .join("Zombie_Farm_v29fix.ipa").to_string_lossy().into_owned());
+    }
+    match main(args.into_iter()) {
         Ok(_) => echo!("touchHLE finished"),
         Err(e) => echo!("touchHLE errored: {e:?}"),
     }
@@ -323,6 +335,16 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
         Ok(mut file) => apply_options(file.get(), default_options_path, &mut options, app_id)?,
         Err(err) => echo!("Warning: Could not open {}: {}", default_options_path, err),
     }
+    #[cfg(target_os = "android")]
+    {
+        const ZFR_DEFAULT_OPTIONS_FILE: &str = "touchHLE_zombiefarm_options.txt";
+        match paths::ResourceFile::open(ZFR_DEFAULT_OPTIONS_FILE) {
+            Ok(mut file) => {
+                apply_options(file.get(), ZFR_DEFAULT_OPTIONS_FILE, &mut options, app_id)?
+            }
+            Err(err) => echo!("Warning: Could not open {}: {}", ZFR_DEFAULT_OPTIONS_FILE, err),
+        }
+    }
     let user_options_path = paths::user_data_base_path().join(paths::USER_OPTIONS_FILE);
     match std::fs::File::open(&user_options_path) {
         Ok(file) => apply_options(file, user_options_path.display(), &mut options, app_id)?,
@@ -339,6 +361,17 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
         let parse_result = options.parse_argument(&option_arg);
         assert!(parse_result == Ok(true));
     }
+    #[cfg(target_os = "android")]
+    if let Ok(value) = std::env::var("TOUCHHLE_ANDROID_RUN_LOOP_FIX") {
+        options.non_blocking_zero_timeout_run_loop = value != "0";
+    }
+    #[cfg(target_os = "android")]
+    echo!(
+        "Android manager options: device={:?}, scale={}/{}, fps={:?}, run_loop_fix={}, time_offset={}",
+        options.device_family, options.scale_hack, options.scale_hack_den, options.fps_limit,
+        options.non_blocking_zero_timeout_run_loop,
+        std::env::var("TOUCHHLE_TIME_OFFSET_SECONDS").unwrap_or_else(|_| "0".to_string())
+    );
     zfr_profile::init(
         options.zfr_profile
             && (app_id.starts_with("com.playforge.ZombieFarm")

@@ -1,5 +1,18 @@
 # 待办清单（用户反馈批次 2）
 
+> **2026-10-07 Windows 系统标题栏配色**：DWM 标题栏现在跟随管理器日夜模式；夜间采用深色背景/浅色文字，日间恢复系统默认浅色标题栏。Windows 11 23H2 两种主题均已实窗截图确认；日夜切换控件回归与 Release 独立启动验证通过。旧 Windows 对自定义 caption color 的支持依系统版本而定。详见 `HANDOVER.md` §25。
+
+> **2026-10-07 夜间模式控件收尾**：设置页组合框系统边框与箭头分隔线改为主题绘制，消除实测单像素纯白线；存档列表末列铺满宽度，清除右侧系统白块，夜间分隔线同步压暗。开发版三页实窗核验、控件回归与 Release 包验证通过，Release 已重建同步；未写入真实存档。详见 `HANDOVER.md` §24。
+
+> **2026-10-07 Windows 启动异常复核**：截图报 `Visual Style handle creation operation did not succeed`，未展开 `Details`，没有调用栈。开发版与 Release 的 exe 均能打开界面，日夜按钮自动来回切换未复现；已发现并修正 Release 脚本落后开发版 4,336 B，重建后包内运行验证通过。根因仍未证实；若新版仍报错需展开 `Details`。详见 `HANDOVER.md` §23。
+> **2026-10-07 Windows 管理器重构追加**：主人反馈旧版只是把设置移到右边；现为「游戏 / 设置 / 存档」三个独立页面，窗口按页面内容收缩，银白/灰紫/夜蓝/古金配色。游戏页实窗截图 `_analysis/dumps/windows-manager-redesign.png`（976 × 467）；`GameManager.ps1 -SelfTest`、布局/分辨率检查及控件回归通过。真实存档仅读取。详见 `HANDOVER.md` §22。此前 Windows 双栏与酒红版、Android 首轮主题记录见 §21，最终颜色和 Windows 结构按 §22。
+
+> **2026-10-06 Android 全屏追加已完成**：顶部状态栏常驻的运行窗口为 `FORCE_NOT_FULLSCREEN`；Android `MainActivity` 在启动、恢复焦点和 SDL 重设窗口时保持沉浸式全屏，API 30+ 使用 `WindowInsetsController`，旧版保留 immersive-sticky 兼容。MuMu API 35 实测开始菜单/选择形象页顶部游戏像素由 `y=72` 变为 `y=0`，切桌面返回仍隐藏状态栏，边缘滑动可临时显示并自动收起；存档快照还原后 4 个文件哈希一致。APK `97270814` B / SHA-256 `00122762D11ADE481550E95953CAB836B594867D5B4B7349FC71F07457697A67`，内置 IPA 未变；详细证据、当前包与固定环境见 `HANDOVER.md` §18。
+
+> **2026-10-06 Android 管理器追加已完成**：启动首页现为「ZF游戏管理」，内置 v29fix；其余 IPA 可通过系统文件选择器按需导入。版本/设备/倍率/FPS/帧率修复/跳过时间/货币/存档管理均进入原生管理页。隔离 instrumentation 30 项全过；MuMu API 35 最终包进入游戏开始菜单、完整备份并恢复，sandbox 四文件 SHA-256 与测试前快照相同。最终 APK `97298603` B / SHA-256 `CAE397A0901A1DCAE069834E6421D856819DAF84995298FFE0F8D9E61DBB7167`，内置 IPA `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`；固定工具路径及未测边界见 `HANDOVER.md` §19。
+
+> **2026-10-06 Windows 备份恢复累计时间已修**：每个新 `saveGame.bin2.bak*` 备份有隐藏 `.zf-offset` 伴随元数据；恢复会回写备份时累计秒数，并先把当前存档与当前时间一起存成 `pre-restore`。旧备份没有元数据时只恢复存档、保留当前时间。删除/批量删除同时清理 sidecar。隔离自检覆盖往返恢复、旧备份兼容、损坏元数据拒绝及 sidecar 删除；全套 `GameManager.ps1 -SelfTest` PASS，真实 sandbox 5 个文件与 `%TEMP%` 快照逐字节一致。Release 已按构建脚本同步说明；细节见 `HANDOVER.md` §20。
+
 > 基线：`fixed-fonts-v14fix.ipa`（sha256 `216A3339…9C51`），已验证可行 —— 图1/图2 确认
 > 技能名已是中文，说明 Arial TTF 可用、CJK 分支生效。
 > 本文件按顺序记录每一项的「现象 → 根因 → 修法 → 站点 → 验证」，做完一项标一项。
@@ -48,6 +61,18 @@
 
 ---
 
+# Android ARM64（同步 Windows 修复 + 内置 v29fix IPA）
+
+**需求**：将 Windows touchHLE fork 已启用的 Zombie Farm 修复同步到 Android ARM64 APK，并让 APK 自带当前 v29fix IPA，用户无需手动操作 `data` 文件。
+
+**实现**：① Android Gradle 构建从 `zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa` 生成 APK asset，并同时生成 SHA-256 标记；② Android 启动时将 asset 原子安装到 `touchHLE_apps\Zombie_Farm_v29fix.ipa`，按哈希标记跳过未变化的 IPA，升级时自动更新；③ Android 专用默认 options 采用触屏配置：`--landscape-right --fps-limit=60 --device-family=iphone --non-blocking-zero-timeout-run-loop`，不设滚轮步进或 scale-hack（保留 iPhone 原生倍率），使用游戏已有的两指捏合输入；选项加载顺序保持通用默认 → ZFR Android 默认 → 用户 options；④ Android application id 改为 `org.touchhle.zombiefarm`、version code 为 2，避免未知签名下与旧安装冲突；文档提供构建及 APK 静态校验脚本。
+
+**验证边界（后续实测追加）**：Windows 管理器、设置、布局与 Release 基线全绿。原始 APK（36,121,590 B）保留不覆盖；fixed APK 已成功构建并通过 `_analysis\_verify_android_package.ps1`：内置 IPA `59,564,493 B`，SHA-256 为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，默认选项与 arm64 native library 均通过核验。已安装到 MuMu `127.0.0.1:5557` 并启动：中文开始菜单可见，点击「开始游戏」后进程仍运行且游戏逻辑/存档继续，但游戏场景画面变黑；未见 `FATAL EXCEPTION`、`SIGSEGV`、`Panic` 或 `touchHLE crashed!`。因此当前是**切场景后的 Core Animation/GLES 合成输出待修**，不是 APK 闪退，静态结果也不能替代游戏内效果确认。证据与明日检查点已写入 `HANDOVER.md` §12。
+
+**2026-10-06 实测追加**：保留 Android 默认 framebuffer 读回修复并清除临时诊断探针后，重建 APK SHA-256 `152B4E8F59CC136C12269C71A2B6A010728307983417928D0D4C3ED8297037D3`，静态包校验 PASS。MuMu 已可从开始菜单进入欢迎教程与形象选择页，黑屏现象未再出现；形象页头像列表上有稳定的棕色遮挡带，未完成对 Windows 的同 IPA 对照。初步指向 touchHLE Core Animation/UIScrollView 合成，而不是 IPA 缺少头像资源；`composition.rs` 有 `clipping/masksToBounds` 未实现 TODO，根因仍待复现/修复验证。短时取样未捕获闪黑，不代表所有进场时序都已证明稳定。测试后 MuMu force-stop 并干净重装 fixed APK，恢复测试前外部目录；`saveGame.bin2` 870 B 的 SHA-256 `05BD833C4A952C3A38BBFFB78D4071E775EBEB1F49BB326101FE81CA82086BAB` 与快照逐字节一致，应用已停止、无需 root。截图与详细边界见 `HANDOVER.md` §13。
+
+
+**2026-10-06 形象页修复完成**：稳定页逐 draw 抓帧定位到 `GL_CLIP_PLANE0..3`；MuMu native `glClipPlanef` 存储原方程而未按 modelview 旋转/平移变换，误将列表裁成屏幕右侧约 100px。Android native GLES 现先求逆转置 eye-space plane，再在 identity modelview 下提交并恢复矩阵/mode；同时处理 fixed-point 入口，非 Android 原行为保留。撤销所有无效 offset/z-order/背景隐藏/depth/stencil 实验，删除活源码探针。无探针正式 APK 冷启动和头像列表左右滑动已在 MuMu 实测正常，3 项几何测试、构建/静态包核验 PASS。APK 97,270,439 B / SHA-256 `FAE0C10DBDB71FFCF075030CCEBC759CA35520BC81CF98461E968F457493F9AE`，与设备安装包一致；IPA 哈希未变。`AndroidEnterAvatar.exe` 已修复无控制台输入时的等待按键异常。证据及固定环境补充见 `HANDOVER.md` §16～§17；Windows 未改、未确认形象，真实手机与其它页面尚未覆盖。
 # 目录重构（2026-09-20）
 
 **要求**（主人原话）：

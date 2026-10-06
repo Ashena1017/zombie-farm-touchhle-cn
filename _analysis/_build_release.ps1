@@ -342,6 +342,7 @@ $readme = @'
 
 <h2>四、想跳过游戏时间</h2>
 <p>在管理器里点「启动并跳过时间…」，填 <code>HH:MM</code>（例如 <code>6:15</code> 就是快进 6 小时 15 分）。时间会累加，下次启动继续往后走。</p>
+<p>「新增备份」会同时记录当时的游戏存档和累计跳过时间；恢复备份后，两者都会回到备份时的状态。旧版管理器创建的备份没有时间记录，恢复时只还原存档，并保留当前累计时间。</p>
 
 <h2>五、存档在哪</h2>
 <p><code>touchHLE\touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGame.bin2</code></p>

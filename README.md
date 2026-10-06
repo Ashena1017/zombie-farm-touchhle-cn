@@ -1,14 +1,13 @@
-# touchHLE-zombiefarm
+# Zombie Farm 中文版 · Windows / Android
 
-**在 PC 上玩到《僵尸农场》（Zombie Farm）中文版 —— 一个把老 iPhone 游戏修好、翻好、放大到能用大屏玩的项目。**
+**在 Windows PC 或 Android ARM64 设备上，运行修复并完整中文化的原版《僵尸农场》（Zombie Farm）。**
 
 > **本文档（以及本仓库的多数文档）由 AI 生成**：内容是在实机取证、逐项验证的基础上写的，
 > 但行文由 AI 整理，可能存在表述偏差或滞后。**技术结论以仓库里的脚本、报告与实测为准**；
 > 发现与事实不符的地方，欢迎提 Issue 指正。
 
-本项目由三部分组成：一个针对该游戏打过补丁的 [touchHLE](https://touchhle.org/) 模拟器 fork、
-一个图形化管理器，以及一系列对游戏 IPA 的**等宽原地二进制补丁**
-（修崩溃、统一界面字号、修复中文本地化、修正排版）。
+项目包含针对 Zombie Farm 修复的 [touchHLE](https://touchhle.org/) 模拟器、Windows 与 Android 管理器，
+以及对游戏 IPA 的**等宽原地二进制补丁**（修崩溃、统一界面字号、修复中文本地化、修正排版）。
 
 > 游戏本体是 2011 年前后的 iPhone 老游戏，当年只有 480×320。本项目把「能跑」推进到
 > 「能舒服地玩」：60 帧、1536×1152 窗口、界面文字统一放大、中文不再缺字或乱码。
@@ -18,14 +17,37 @@
 > 重制版（Reforged）原生是英文，**想玩中文的话，配我写的
 > [汉化脚本](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn)**。
 
+## 下载与版本
+
+两个版本使用同一份修复版游戏内容，按设备选择下载：
+
+| 版本 | 下载 | 适用设备与特点 |
+|---|---|---|
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-windows-x64-v29fix.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-android-arm64-v29fix.apk) | 安装后打开「ZF游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+
+两份附件和版本说明也可在[跨平台 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-platforms)查看。
+Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows 包面向 Windows 10/11 x64。
+Android 默认按 iPhone 原生画面运行并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
+
+<p align="center">
+  <img src="docs/images/windows-manager-night.png" alt="Windows 游戏管理器" width="72%">
+  <br><sub>Windows：版本、显示与存档设置集中管理</sub>
+</p>
+<p align="center">
+  <img src="docs/images/android-manager.png" alt="Android ZF游戏管理首页" width="34%">
+  <br><sub>Android：安装后进入 ZF游戏管理，选择并启动游戏</sub>
+</p>
+
 ---
 
 ## 目录
 
+- [下载与版本](#下载与版本)
 - [想玩原版还是重制版](#想玩原版还是重制版)
   - [汉化脚本：让 Reforged 显示中文](#汉化脚本让-reforged-显示中文)
-- [这个项目解决了什么](#这个项目解决了什么)
 - [快速开始](#快速开始)
+- [这个项目解决了什么](#这个项目解决了什么)
 - [仓库里有什么](#仓库里有什么)
 - [模拟器 fork 的扩展](#模拟器-fork-的扩展)
 - [游戏 IPA 补丁谱系](#游戏-ipa-补丁谱系)
@@ -65,7 +87,7 @@
   一个是调用默认浏览器打开的启动器，都免安装、免管理员权限。
 
 > 两个项目是**互补**的，不是竞争关系：
-> 本项目的目标是「**让原版能在 PC 上舒服地玩**」—— 玩法、数值、美术一律保持原样，
+> 本项目的目标是「**让原版能在电脑和 Android 设备上舒服地玩**」—— 玩法、数值、美术一律保持原样，
 > 只修崩溃、修中文、放大界面；Reforged（对面那个）的目标是「**把这游戏重做成一个现代游戏**」——
 > 重写引擎、加入联机与社交，所以画面与手感会和原版不同。
 > 而原版的素材本来就可以直接复用（见 [技术难点](#技术难点与结论) ⑤），
@@ -142,45 +164,26 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ## 快速开始
 
-### 方式一：用 Release（推荐）
+### Windows
 
-1. 到 [Releases](../../releases) 下载最新的 `touchHLE-zombiefarm-v29fix.zip` 并解压；
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-windows-x64-v29fix.zip) 并解压；
 2. 双击 **`游戏管理.exe`**；
-3. 在界面里选好版本与窗口大小，点「启动游戏」。
+3. 选择游戏版本和显示设置，点击「启动游戏」。
 
-界面长这样：
+Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时间、金币/脑子和存档管理。新建的备份会同时保存存档与累计跳过时间；旧备份恢复时保留当前累计时间。
 
-```
-┌─ Zombie Farm 游戏管理 ─────────────────────────────────┐
-│ 游戏 │ 存档管理                                          │
-│ ┌────────────────────────────────────────────────────┐ │
-│ │ 游戏版本 (IPA)                                       │ │
-│ │   [Zombie Farm ZFR ... v29fix.ipa         ▾] [浏览…] │ │
-│ │   app id: com.playforge.ZombieFarm.ZFR               │ │
-│ │                                                    │ │
-│ │ [启动游戏]  [启动并跳过时间…]                         │ │
-│ │                                                    │ │
-│ │ 设置                                                │ │
-│ │   游戏帧率        60 帧        自定义帧率 [75] 帧      │ │
-│ │   滚轮缩放倍率     ×1.1（默认）  自定义倍率 [1.10]     │ │
-│ │   窗口大小/分辨率  iPad（平板）▾ ×1.5 ▾  窗口 1536×1152│ │
-│ │   显示模式        窗口模式                           │ │
-│ │   高速帧率修复     开启                              │ │
-│ │                                                    │ │
-│ │ 金币与脑子  金币 [______] 脑子 [______] [写入存档]    │ │
-│ └────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────┘
-```
+### Android
 
-管理器能做的事：切换游戏版本、调帧率、调窗口大小与滚轮缩放倍率、
-快进游戏时间、备份/还原/批量删除存档、读写金币与脑子。
-**改动立即生效**，没有「确定/应用」按钮。界面里没有任何 `?` 按钮 ——
-全部说明都在包内的 **`使用说明.html`**。
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-android-arm64-v29fix.apk)；
+2. 打开应用 **「ZF游戏管理」**；
+3. 选择版本并启动。最新 v29fix IPA 已内置，首次启动自动校验安装，不需要手动复制 `data` 文件。
 
-### 方式二：从源码
+Android 管理器还支持按需从系统文件选择器导入 IPA、iPhone/iPad 画面、帧率与修复选项、跳过时间、金币/脑子和存档管理。触屏缩放直接使用游戏的两指捏合手势；默认横屏、iPhone 原生画面与 60 FPS。
+
+### 从源码构建
 
 见 [从源码构建](#从源码构建)。注意本仓库**不含**编译好的 `touchHLE.exe` 与游戏 IPA，
-需要自己编译，或从 Releases 取。
+Windows 运行包与 Android 安装包请从 Releases 下载；从源码构建需准备相应平台工具链和游戏 IPA。
 
 ---
 
@@ -193,6 +196,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 │   │   ├── src/                15 个文件相对上游有改动（见下节）
 │   │   └── .git-upstream-fa3d095/  上游浅克隆被改名保留下来的信息 + UPSTREAM-COMMIT.txt
 │   └── LICENSE                 touchHLE 的 MIT 许可
+├── touchHLE-zombiefarm-android-arm64/  Android APK 交付物（不入库）
 ├── tools/                      ★ 补丁工具链（50 个 Python 模块）
 │   ├── audit_zfr_ipa.py        解析 Mach-O、导出方法表/CFString/导出符号
 │   ├── _dis.py / value_xref.py 反汇编与「索引式文字池」交叉引用
@@ -267,6 +271,7 @@ commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*），
 - Windows x64
 - Rust（含 MSVC toolchain）、CMake、Visual Studio Build Tools
 - 约 5 GB 磁盘（依赖与编译产物）
+- Android 构建另需 JDK 17、Android SDK/NDK 27.2.12479018、Gradle 8.11.1
 
 ### 步骤
 
@@ -305,6 +310,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps
 
 > ⚠️ 这些脚本默认按**本仓库的目录结构**工作（用 `$PSScriptRoot` 推导根目录），
 > 并且 `_verify_release.ps1` 需要先有 `Release/` 交付包（由 `_analysis/_build_release.ps1` 生成）。
+
+Android ARM64 APK 的源码构建命令为：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_local.ps1
+```
+
+快捷脚本使用仓库交接文档记录的本机 Android 工具链；通用构建入口仍为 `_analysis\_build_android.ps1`。
+脚本输出 `touchHLE-zombiefarm-android-arm64\touchHLE-zombiefarm-android-arm64-fixed.apk`，
+并通过 `_analysis\_verify_android_package.ps1` 检查内置 IPA 哈希、Android 默认设置与 arm64 native library。
 
 ---
 

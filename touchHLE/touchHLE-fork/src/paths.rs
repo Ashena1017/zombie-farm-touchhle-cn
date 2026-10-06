@@ -155,7 +155,7 @@ pub fn url_for_opening_user_data_dir() -> Result<String, String> {
         // See DocumentsProvider.kt, app/build.gradle and AndroidManifest.xml
         let brand = crate::branding();
         Ok(format!(
-            "content://org.touchhle.android{}{}.provider/root/root",
+            "content://org.touchhle.zombiefarm{}{}.provider/root/root",
             if brand.is_empty() { "" } else { "." },
             brand.to_lowercase()
         ))
@@ -202,6 +202,9 @@ pub fn prepopulate_user_data_dir() {
         }
     }
 
+    #[cfg(target_os = "android")]
+    install_bundled_zfr_ipa(&apps_dir);
+
     fn create_file(path: &Path, content: &str) {
         match std::fs::write(path, content) {
             Ok(()) => {
@@ -231,5 +234,47 @@ pub fn prepopulate_user_data_dir() {
     let options_help = base_path.join("OPTIONS_HELP.txt");
     if !options_help.is_file() {
         create_file(&options_help, crate::options::OPTIONS_HELP);
+    }
+}
+
+#[cfg(target_os = "android")]
+fn install_bundled_zfr_ipa(apps_dir: &Path) {
+    const ASSET_NAME: &str = "Zombie_Farm_v29fix.ipa";
+    const HASH_ASSET_NAME: &str = "touchHLE_zombiefarm_ipa.sha256";
+    let destination = apps_dir.join(ASSET_NAME);
+    let temporary = apps_dir.join(format!("{ASSET_NAME}.tmp"));
+    let installed_hash = apps_dir.join(format!("{ASSET_NAME}.sha256"));
+
+    let result: Result<bool, String> = (|| {
+        let mut hash_asset = ResourceFile::open(HASH_ASSET_NAME)?;
+        let mut expected_hash = String::new();
+        hash_asset
+            .get()
+            .read_to_string(&mut expected_hash)
+            .map_err(|e| e.to_string())?;
+        let expected_hash = expected_hash.trim();
+        if destination.is_file()
+            && std::fs::read_to_string(&installed_hash)
+                .is_ok_and(|hash| hash.trim() == expected_hash)
+        {
+            return Ok(false);
+        }
+
+        let mut asset = ResourceFile::open(ASSET_NAME)?;
+        let mut file = std::fs::File::create(&temporary).map_err(|e| e.to_string())?;
+        std::io::copy(asset.get(), &mut file).map_err(|e| e.to_string())?;
+        file.sync_all().map_err(|e| e.to_string())?;
+        std::fs::rename(&temporary, &destination).map_err(|e| e.to_string())?;
+        std::fs::write(&installed_hash, expected_hash).map_err(|e| e.to_string())?;
+        Ok(true)
+    })();
+
+    match result {
+        Ok(true) => log!("Installed bundled Zombie Farm IPA: {}", destination.display()),
+        Ok(false) => (),
+        Err(e) => {
+            let _ = std::fs::remove_file(&temporary);
+            log!("Warning: Couldn't install bundled Zombie Farm IPA: {e}");
+        }
     }
 }

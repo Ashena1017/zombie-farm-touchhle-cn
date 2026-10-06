@@ -49,7 +49,11 @@ foreach ($c in $checks) {
 Write-Host ''
 Write-Host '--- root must be free of emulator files ---'
 $stray = @(Get-ChildItem -LiteralPath $root -Force |
-    Where-Object { $_.Name -match '^touchHLE|^zfr|^_build_tools' -and $_.Name -ne 'touchHLE' })
+    Where-Object {
+        $_.Name -match '^touchHLE|^zfr|^_build_tools' -and
+        $_.Name -ne 'touchHLE' -and
+        $_.Name -ne 'touchHLE-zombiefarm-android-arm64'
+    })
 if ($stray.Count) {
     $fail++
     foreach ($s in $stray) { Write-Host "  STRAY: $($s.Name)" }

@@ -13,7 +13,7 @@ param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$TimeoutSeconds = 40
 )
-$root = (Split-Path -Parent $PSScriptRoot)
+$root = (Resolve-Path -LiteralPath $Root).Path
 
 $ErrorActionPreference = 'Continue'
 
@@ -75,8 +75,13 @@ Write-Host "  launcher: $([System.IO.Path]::GetFileName($exe))  ($((Get-Item -Li
 $before = Count-Consoles
 Write-Host "  console windows before : $before"
 
-# Launch it the way a double-click does (ShellExecute through Start-Process).
-$proc = Start-Process -FilePath $exe -PassThru
+# Launch the GUI executable without Start-Process, which fails in this session
+# when the inherited NO_PROXY variables contain duplicate keys.
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = $exe
+$psi.WorkingDirectory = $Root
+$psi.UseShellExecute = $false
+$proc = [System.Diagnostics.Process]::Start($psi)
 Write-Host "  launched pid=$($proc.Id)"
 
 # Poll for the manager window.

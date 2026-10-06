@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ZfManagerTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#2D6557</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#2D6557</item>
+        <item name="android:navigationBarColor">#245347</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#F3F6F4</item>
+    </style>
+</resources>

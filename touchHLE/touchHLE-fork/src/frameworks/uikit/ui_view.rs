@@ -1131,9 +1131,7 @@ fn dump_view_tree_inner(
 }
 
 pub fn dump_debug_inspector(env: &mut Environment) {
-    let path = std::env::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."))
-        .join("zombie_farm_inspector.txt");
+    let path = crate::paths::user_data_base_path().join("zombie_farm_inspector.txt");
 
     let result = (|| -> std::io::Result<()> {
         let mut file = std::fs::File::create(&path)?;

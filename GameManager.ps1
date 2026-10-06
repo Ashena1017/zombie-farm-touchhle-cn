@@ -64,6 +64,9 @@ $script:SelectionFile = Join-Path $script:Root 'launcher_selected_ipa.txt'
 # 启动并跳过时间 dialog, so the next launch pre-fills it. Same reasoning as
 # SelectionFile: manager state, top level, tiny plain-text file.
 $script:SkipMemoryFile = Join-Path $script:Root 'launcher_skip_memory.txt'
+$script:NightModeFile = Join-Path $script:Root 'launcher_night_mode.txt'
+$script:NightMode = (Test-Path -LiteralPath $script:NightModeFile -PathType Leaf) -and
+    ([System.IO.File]::ReadAllText($script:NightModeFile).Trim() -eq '1')
 
 # NOTE: this manager is self-contained. It does NOT call
 # StartZombieFarmNextHour.ps1 or SetZombieFarmCurrency.ps1 -- the launching and
@@ -79,10 +82,11 @@ $script:AppId = 'com.playforge.ZombieFarm.ZFR'      # placeholder until then
 $script:SaveDir = ''
 $script:LiveSave = ''
 
-# Everything matching "<BackupPrefix>*" is treated as a backup. The reference save
-# that RestoreTestSave.ps1 uses (saveGame.bin2.bak) is deliberately NOT special:
-# it is only relevant while fixing bugs, so the UI shows it as an ordinary backup.
+# Everything matching "<BackupPrefix>*" is treated as a backup, except the
+# per-backup .zf-offset companion file. The reference save that RestoreTestSave.ps1
+# uses (saveGame.bin2.bak) remains an ordinary, legacy backup.
 $script:BackupPrefix = 'saveGame.bin2.bak'
+$script:BackupOffsetSuffix = '.zf-offset'
 
 # Read Info.plist out of an IPA without extracting it.
 #
@@ -808,8 +812,8 @@ function Get-LaunchPaths {
 # Save management (backup / restore / delete)
 # ---------------------------------------------------------------------------
 #
-# Everything matching saveGame.bin2.bak* is listed. Restoring archives the current
-# live save first, so no state is ever lost by a restore.
+# Everything matching saveGame.bin2.bak* is listed, except its hidden .zf-offset
+# companion file. Restoring archives both the current save and its time offset.
 
 function Get-BackupFiles {
     param([string]$Directory = $script:SaveDir)
@@ -817,8 +821,79 @@ function Get-BackupFiles {
     if (-not (Test-Path -LiteralPath $Directory)) { return @() }
     $prefix = $script:BackupPrefix
     return @(Get-ChildItem -LiteralPath $Directory -File |
-        Where-Object { $_.Name -like "$prefix*" } |
+        Where-Object {
+            $_.Name -like "$prefix*" -and
+            -not $_.Name.EndsWith($script:BackupOffsetSuffix, [System.StringComparison]::OrdinalIgnoreCase)
+        } |
         Sort-Object LastWriteTime -Descending)
+}
+
+function Get-BackupOffsetPath {
+    param([Parameter(Mandatory = $true)][string]$BackupPath)
+    return "$BackupPath$($script:BackupOffsetSuffix)"
+}
+
+function Read-TimeOffset {
+    param([string]$Path = (Get-LaunchPaths).OffsetFile)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return [int64]0 }
+    $text = [System.IO.File]::ReadAllText($Path).Trim()
+    if (-not $text) { return [int64]0 }
+    [int64]$value = 0
+    if (-not [int64]::TryParse($text, [ref]$value) -or $value -lt 0) {
+        throw "累计时间偏移文件内容无效：$Path"
+    }
+    return $value
+}
+
+function Write-TimeOffset {
+    param(
+        [Parameter(Mandatory = $true)][int64]$Value,
+        [string]$Path = (Get-LaunchPaths).OffsetFile
+    )
+
+    if ($Value -lt 0) { throw '累计时间偏移不能为负数。' }
+    $directory = Split-Path -Parent $Path
+    if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
+    $temp = Join-Path $directory ('.time-offset-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
+    $replaced = "$Path.bak-$([Guid]::NewGuid().ToString('N'))"
+    try {
+        [System.IO.File]::WriteAllText($temp, [string]$Value, [System.Text.Encoding]::ASCII)
+        if (Test-Path -LiteralPath $Path -PathType Leaf) {
+            [System.IO.File]::Replace($temp, $Path, $replaced)
+            Remove-Item -LiteralPath $replaced -Force -ErrorAction SilentlyContinue
+        } else {
+            [System.IO.File]::Move($temp, $Path)
+        }
+    } finally {
+        if (Test-Path -LiteralPath $temp) {
+            Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path -LiteralPath $replaced) {
+            Remove-Item -LiteralPath $replaced -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Write-BackupOffset {
+    param(
+        [Parameter(Mandatory = $true)][string]$BackupPath,
+        [Parameter(Mandatory = $true)][int64]$Value
+    )
+
+    $metadataPath = Get-BackupOffsetPath -BackupPath $BackupPath
+    $temp = Join-Path (Split-Path -Parent $BackupPath) ('.zf-offset-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
+    try {
+        [System.IO.File]::WriteAllText($temp, [string]$Value, [System.Text.Encoding]::ASCII)
+        [System.IO.File]::Move($temp, $metadataPath)
+        [System.IO.File]::SetAttributes($metadataPath, [System.IO.FileAttributes]::Hidden)
+    } finally {
+        if (Test-Path -LiteralPath $temp) {
+            Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 # Short label for a backup row: the label the backup was made with (e.g. manual,
@@ -838,7 +913,8 @@ function New-SaveBackup {
     param(
         [string]$Directory = $script:SaveDir,
         [string]$Label = 'manual',
-        [string]$SourcePath
+        [string]$SourcePath,
+        [string]$OffsetFile = (Get-LaunchPaths).OffsetFile
     )
 
     if (-not $SourcePath) { $SourcePath = Join-Path $Directory 'saveGame.bin2' }
@@ -846,32 +922,58 @@ function New-SaveBackup {
         throw '找不到当前存档，无法备份。'
     }
 
+    $offset = Read-TimeOffset -Path $OffsetFile
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $target = Join-Path $Directory ("{0}-{1}-{2}" -f $script:BackupPrefix, $stamp, $Label)
     $suffix = 1
-    while (Test-Path -LiteralPath $target) {
+    while ((Test-Path -LiteralPath $target) -or (Test-Path -LiteralPath (Get-BackupOffsetPath -BackupPath $target))) {
         $target = Join-Path $Directory ("{0}-{1}-{2}-{3}" -f $script:BackupPrefix, $stamp, $Label, $suffix)
         $suffix++
     }
 
     Copy-Item -LiteralPath $SourcePath -Destination $target
+    try {
+        Write-BackupOffset -BackupPath $target -Value $offset
+    } catch {
+        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Get-BackupOffsetPath -BackupPath $target) -Force -ErrorAction SilentlyContinue
+        throw
+    }
     return $target
 }
 
 function Restore-SaveBackup {
     param(
         [Parameter(Mandatory = $true)][string]$BackupPath,
-        [string]$Directory = $script:SaveDir
+        [string]$Directory = $script:SaveDir,
+        [string]$OffsetFile = (Get-LaunchPaths).OffsetFile
     )
 
     if (-not (Test-Path -LiteralPath $BackupPath)) { throw "备份不存在：$BackupPath" }
 
+    $metadataPath = Get-BackupOffsetPath -BackupPath $BackupPath
+    $restoreOffset = $null
+    if (Test-Path -LiteralPath $metadataPath -PathType Leaf) {
+        $restoreOffset = Read-TimeOffset -Path $metadataPath
+    }
+
     $live = Join-Path $Directory 'saveGame.bin2'
     # Archive the current save first so a restore is itself undoable.
+    $preRestore = $null
     if (Test-Path -LiteralPath $live) {
-        [void](New-SaveBackup -Directory $Directory -Label 'pre-restore' -SourcePath $live)
+        $preRestore = New-SaveBackup -Directory $Directory -Label 'pre-restore' -SourcePath $live -OffsetFile $OffsetFile
     }
-    Copy-Item -LiteralPath $BackupPath -Destination $live -Force
+    try {
+        Copy-Item -LiteralPath $BackupPath -Destination $live -Force
+        if ($null -ne $restoreOffset) {
+            Write-TimeOffset -Value $restoreOffset -Path $OffsetFile
+        }
+    } catch {
+        if ($preRestore -and (Test-Path -LiteralPath $preRestore)) {
+            Copy-Item -LiteralPath $preRestore -Destination $live -Force
+        }
+        throw
+    }
     return $live
 }
 
@@ -892,6 +994,10 @@ function Remove-SaveBackup {
 
     $item = Get-Item -LiteralPath $BackupPath
     Remove-Item -LiteralPath $BackupPath -Force
+    $metadataPath = Get-BackupOffsetPath -BackupPath $BackupPath
+    if (Test-Path -LiteralPath $metadataPath) {
+        Remove-Item -LiteralPath $metadataPath -Force
+    }
     return $item.Name
 }
 
@@ -1001,7 +1107,8 @@ function Set-Currency {
     param(
         [Parameter(Mandatory = $true)][int]$Gold,
         [Parameter(Mandatory = $true)][int]$Brains,
-        [string]$SavePath = $script:LiveSave
+        [string]$SavePath = $script:LiveSave,
+        [string]$OffsetFile = (Get-LaunchPaths).OffsetFile
     )
 
     if ($Gold -lt 0 -or $Brains -lt 0) { throw '金币和脑子不能是负数。' }
@@ -1023,10 +1130,11 @@ function Set-Currency {
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
     $backupPath = "$SavePath.bak-$stamp"
     $suffix = 1
-    while (Test-Path -LiteralPath $backupPath) {
+    while ((Test-Path -LiteralPath $backupPath) -or (Test-Path -LiteralPath (Get-BackupOffsetPath -BackupPath $backupPath))) {
         $backupPath = "$SavePath.bak-$stamp-$suffix"
         $suffix++
     }
+    $offset = Read-TimeOffset -Path $OffsetFile
 
     $tempPath = Join-Path $dir ('.{0}.tmp-{1}' -f $name, [Guid]::NewGuid().ToString('N'))
     try {
@@ -1042,6 +1150,7 @@ function Set-Currency {
             throw '写入校验失败，原存档未被修改。'
         }
 
+        Write-BackupOffset -BackupPath $backupPath -Value $offset
         [System.IO.File]::Replace($tempPath, $SavePath, $backupPath)
         $tempPath = $null
 
@@ -1056,6 +1165,11 @@ function Set-Currency {
             Copy-Item -LiteralPath $backupPath -Destination $SavePath -Force
             throw '写入后校验失败，已自动从备份还原。'
         }
+    } catch {
+        if (-not (Test-Path -LiteralPath $backupPath)) {
+            Remove-Item -LiteralPath (Get-BackupOffsetPath -BackupPath $backupPath) -Force -ErrorAction SilentlyContinue
+        }
+        throw
     } finally {
         if ($null -ne $tempPath -and (Test-Path -LiteralPath $tempPath)) {
             Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue
@@ -1158,6 +1272,7 @@ if ($SelfTest) {
     # Save-management tests run against a throwaway directory so the real saves
     # are never touched by a test.
     $sandbox = Join-Path $env:TEMP ('zfr_savetest_' + [Guid]::NewGuid().ToString('N'))
+    $offsetFixture = Join-Path $sandbox 'touchHLE_time_offset_seconds.txt'
 
     try {
         Write-Host "--- IPA selection ---"
@@ -1419,6 +1534,7 @@ if ($SelfTest) {
         Write-Host ''
         Write-Host '--- save management (sandboxed) ---'
         New-Item -ItemType Directory -Force -Path $sandbox | Out-Null
+        [System.IO.File]::WriteAllText($offsetFixture, '7200', [System.Text.Encoding]::ASCII)
 
         # Build a live save plus one pre-existing backup.
         $live = Join-Path $sandbox 'saveGame.bin2'
@@ -1429,32 +1545,64 @@ if ($SelfTest) {
         Write-Host ("  initial backups      : {0}" -f $count0)
 
         # 1. new backup
-        $made = New-SaveBackup -Directory $sandbox -Label 'manual'
+        $made = New-SaveBackup -Directory $sandbox -Label 'manual' -OffsetFile $offsetFixture
         $count1 = (Get-BackupFiles -Directory $sandbox).Count
         $sizeOk = (Get-Item -LiteralPath $made).Length -eq 40
+        $savedOffset = Read-TimeOffset -Path (Get-BackupOffsetPath -BackupPath $made)
+        $sidecarsHiddenFromList = @((Get-BackupFiles -Directory $sandbox | Where-Object { $_.Name.EndsWith($script:BackupOffsetSuffix) })).Count -eq 0
         Write-Host ("  after 新增备份        : {0}  (+{1})  content={2}" -f `
             $count1, ($count1 - $count0), $(if ($sizeOk) { 'ok' } else { 'FAIL' }))
         if ($count1 -ne ($count0 + 1) -or -not $sizeOk) { $ok = $false }
+        Write-Host ("  backup time offset   : {0} sec  {1}" -f $savedOffset, $(if ($savedOffset -eq 7200 -and $sidecarsHiddenFromList) { 'PASS' } else { 'FAIL' }))
+        if ($savedOffset -ne 7200 -or -not $sidecarsHiddenFromList) { $ok = $false }
 
         # 2. restore: live is overwritten with the backup's content, and the old
         #    live save is archived first.
         [System.IO.File]::WriteAllBytes($live, [byte[]](9..30))
-        [void](Restore-SaveBackup -BackupPath $made -Directory $sandbox)
+        [System.IO.File]::WriteAllText($offsetFixture, '9999', [System.Text.Encoding]::ASCII)
+        [void](Restore-SaveBackup -BackupPath $made -Directory $sandbox -OffsetFile $offsetFixture)
         $restored = [System.IO.File]::ReadAllBytes($live)
         $restoreOk = $restored.Length -eq 40 -and $restored[0] -eq 1 -and $restored[39] -eq 40
+        $restoredOffset = Read-TimeOffset -Path $offsetFixture
         $count2 = (Get-BackupFiles -Directory $sandbox).Count
         Write-Host ("  after 还原备份        : content={0}  backups={1} (archived first)" -f `
             $(if ($restoreOk) { 'ok' } else { 'FAIL' }), $count2)
         if (-not $restoreOk) { $ok = $false }
+        Write-Host ("  restored time offset : {0} sec  {1}" -f $restoredOffset, $(if ($restoredOffset -eq 7200) { 'PASS' } else { 'FAIL' }))
+        if ($restoredOffset -ne 7200) { $ok = $false }
         if ($count2 -ne ($count1 + 1)) { Write-Host '  FAIL: pre-restore archive missing'; $ok = $false }
 
         # 3. delete
         $removed = Remove-SaveBackup -BackupPath $made
         $count3 = (Get-BackupFiles -Directory $sandbox).Count
         $gone = -not (Test-Path -LiteralPath $made)
+        $metadataGone = -not (Test-Path -LiteralPath (Get-BackupOffsetPath -BackupPath $made))
         Write-Host ("  after 删除备份        : {0}  removed={1}  gone={2}" -f `
             $count3, $(if ($removed) { 'ok' } else { 'FAIL' }), $(if ($gone) { 'ok' } else { 'FAIL' }))
-        if ($count3 -ne ($count2 - 1) -or -not $gone) { $ok = $false }
+        Write-Host ("  offset metadata removed: {0}" -f $(if ($metadataGone) { 'PASS' } else { 'FAIL' }))
+        if ($count3 -ne ($count2 - 1) -or -not $gone -or -not $metadataGone) { $ok = $false }
+
+        # A legacy backup has no offset metadata. Keep the current cumulative
+        # value rather than guessing that the older backup represented time zero.
+        $legacyBackup = Join-Path $sandbox 'saveGame.bin2.bak'
+        [System.IO.File]::WriteAllText($offsetFixture, '12345', [System.Text.Encoding]::ASCII)
+        [void](Restore-SaveBackup -BackupPath $legacyBackup -Directory $sandbox -OffsetFile $offsetFixture)
+        $legacyOffsetOk = (Read-TimeOffset -Path $offsetFixture) -eq 12345
+        Write-Host ("  legacy backup offset : {0}" -f $(if ($legacyOffsetOk) { 'preserved (PASS)' } else { 'changed (FAIL)' }))
+        if (-not $legacyOffsetOk) { $ok = $false }
+
+        # Invalid metadata is rejected before either live state is changed.
+        $badOffsetBackup = Join-Path $sandbox 'saveGame.bin2.bak-invalid-offset'
+        [System.IO.File]::WriteAllBytes($badOffsetBackup, [byte[]](21..30))
+        [System.IO.File]::WriteAllText((Get-BackupOffsetPath -BackupPath $badOffsetBackup), 'not-a-number', [System.Text.Encoding]::ASCII)
+        $beforeBadRestore = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($live))
+        $badRefused = $false
+        try { [void](Restore-SaveBackup -BackupPath $badOffsetBackup -Directory $sandbox -OffsetFile $offsetFixture) } catch { $badRefused = $true }
+        $badRestoreUntouched = ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($live)) -eq $beforeBadRestore) -and
+            ((Read-TimeOffset -Path $offsetFixture) -eq 12345)
+        [void](Remove-SaveBackup -BackupPath $badOffsetBackup)
+        Write-Host ("  invalid offset refused: {0}, untouched={1}" -f $(if ($badRefused) { 'PASS' } else { 'FAIL' }), $(if ($badRestoreUntouched) { 'PASS' } else { 'FAIL' }))
+        if (-not $badRefused -or -not $badRestoreUntouched) { $ok = $false }
 
         # The live save must never be deletable through this path.
         $guarded = $false
@@ -1529,7 +1677,7 @@ if ($SelfTest) {
         Copy-Item -LiteralPath $script:LiveSave -Destination $copy -Force
         $orig = Get-Currency -SavePath $copy
 
-        $writtenBackup = Set-Currency -Gold 123456 -Brains 654321 -SavePath $copy
+        $writtenBackup = Set-Currency -Gold 123456 -Brains 654321 -SavePath $copy -OffsetFile $offsetFixture
         $after = Get-Currency -SavePath $copy
         $writeOk = $after -and $after.Gold -eq 123456 -and $after.Brains -eq 654321
         Write-Host ("  {0} / {1} -> {2} / {3}  {4}" -f `
@@ -1548,6 +1696,10 @@ if ($SelfTest) {
         $bakExists = Test-Path -LiteralPath $writtenBackup
         Write-Host ("  backup written       : " + $(if ($bakExists) { 'PASS' } else { 'FAIL' }))
         if (-not $bakExists) { $ok = $false }
+        $currencyBackupOffset = Read-TimeOffset -Path (Get-BackupOffsetPath -BackupPath $writtenBackup)
+        $currencyBackupOffsetOk = $currencyBackupOffset -eq 12345
+        Write-Host ("  currency backup offset: {0} sec  {1}" -f $currencyBackupOffset, $(if ($currencyBackupOffsetOk) { 'PASS' } else { 'FAIL' }))
+        if (-not $currencyBackupOffsetOk) { $ok = $false }
 
         # Restoring that backup must bring the old values back.
         Copy-Item -LiteralPath $writtenBackup -Destination $copy -Force
@@ -1613,30 +1765,254 @@ if ($SelfTest) {
 [System.Windows.Forms.Application]::EnableVisualStyles()
 [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
 
+Add-Type -ReferencedAssemblies @(
+    [System.Windows.Forms.TabControl].Assembly.Location,
+    [System.Drawing.Color].Assembly.Location
+) -TypeDefinition @'
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+public sealed class PaletteTabControl : TabControl
+{
+    private Color stripColor = SystemColors.Control;
+    private Color borderColor = SystemColors.ControlDark;
+    private Color tabColor = SystemColors.Control;
+    private Color selectedTabColor = SystemColors.Highlight;
+    private Color tabTextColor = SystemColors.ControlText;
+    private Color selectedTabTextColor = SystemColors.HighlightText;
+
+    public Color StripColor
+    {
+        get { return stripColor; }
+        set { stripColor = value; Invalidate(); }
+    }
+
+    public Color BorderColor
+    {
+        get { return borderColor; }
+        set { borderColor = value; Invalidate(); }
+    }
+
+    public Color TabColor { get { return tabColor; } set { tabColor = value; Invalidate(); } }
+    public Color SelectedTabColor { get { return selectedTabColor; } set { selectedTabColor = value; Invalidate(); } }
+    public Color TabTextColor { get { return tabTextColor; } set { tabTextColor = value; Invalidate(); } }
+    public Color SelectedTabTextColor { get { return selectedTabTextColor; } set { selectedTabTextColor = value; Invalidate(); } }
+
+    protected override void WndProc(ref Message message)
+    {
+        base.WndProc(ref message);
+        if (message.Msg != 0x000F || !IsHandleCreated || TabCount == 0) return;
+
+        int stripHeight = Math.Max(0, DisplayRectangle.Top);
+        if (stripHeight == 0) return;
+
+        using (var graphics = Graphics.FromHwnd(Handle))
+        using (var brush = new SolidBrush(stripColor))
+        using (var tabBrush = new SolidBrush(tabColor))
+        using (var selectedBrush = new SolidBrush(selectedTabColor))
+        using (var borderPen = new Pen(borderColor, 2.0f))
+        {
+            using (var uncovered = new Region(new Rectangle(0, 0, ClientSize.Width, stripHeight)))
+            {
+                for (int index = 0; index < TabCount; index++)
+                    uncovered.Exclude(GetTabRect(index));
+                graphics.FillRegion(brush, uncovered);
+            }
+
+            for (int index = 0; index < TabCount; index++)
+            {
+                Rectangle tab = GetTabRect(index);
+                bool selected = index == SelectedIndex;
+                graphics.FillRectangle(selected ? selectedBrush : tabBrush, tab);
+                graphics.DrawRectangle(borderPen, tab.X, tab.Y, tab.Width - 1, tab.Height - 1);
+                TextRenderer.DrawText(graphics, TabPages[index].Text.Trim(), Font, tab,
+                    selected ? selectedTabTextColor : tabTextColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                    TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            }
+
+            Rectangle page = DisplayRectangle;
+            page.Inflate(1, 1);
+            graphics.DrawRectangle(borderPen, page);
+            Rectangle frame = ClientRectangle;
+            frame.Inflate(-1, -1);
+            graphics.DrawRectangle(borderPen, frame);
+        }
+    }
+}
+
+public sealed class PaletteComboBox : ComboBox
+{
+    private Color arrowColor;
+    private Color arrowBorderColor;
+    private Color arrowGlyphColor;
+
+    public PaletteComboBox()
+    {
+        arrowColor = SystemColors.Control;
+        arrowBorderColor = SystemColors.ControlDark;
+        arrowGlyphColor = SystemColors.ControlText;
+    }
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams parameters = base.CreateParams;
+            parameters.ExStyle &= ~0x00000200; // WS_EX_CLIENTEDGE
+            parameters.Style &= ~0x00800000;   // WS_BORDER
+            return parameters;
+        }
+    }
+
+    public Color ArrowColor { get { return arrowColor; } set { arrowColor = value; Invalidate(); } }
+    public Color ArrowBorderColor { get { return arrowBorderColor; } set { arrowBorderColor = value; Invalidate(); } }
+    public Color ArrowGlyphColor { get { return arrowGlyphColor; } set { arrowGlyphColor = value; Invalidate(); } }
+
+    protected override void WndProc(ref Message message)
+    {
+        base.WndProc(ref message);
+        if (message.Msg != 0x000F || !IsHandleCreated || ClientSize.Width == 0) return;
+
+        int arrowWidth = Math.Min(SystemInformation.VerticalScrollBarWidth, ClientSize.Width);
+        Rectangle arrow = new Rectangle(ClientSize.Width - arrowWidth, 0, arrowWidth, ClientSize.Height);
+        using (var graphics = Graphics.FromHwnd(Handle))
+        using (var background = new SolidBrush(ArrowColor))
+        using (var border = new Pen(ArrowBorderColor))
+        using (var glyph = new SolidBrush(ArrowGlyphColor))
+        {
+            // The themed combo arrow leaves a one-pixel white seam before its
+            // client area; overlap that pixel so the palette owns the separator.
+            graphics.FillRectangle(background, arrow.Left - 1, 0, arrow.Width + 1, arrow.Height);
+            graphics.DrawLine(border, arrow.Left, 2, arrow.Left, arrow.Bottom - 3);
+            int cx = arrow.Left + arrow.Width / 2;
+            int cy = arrow.Top + arrow.Height / 2;
+            graphics.FillPolygon(glyph, new[] {
+                new Point(cx - 4, cy - 2), new Point(cx + 4, cy - 2), new Point(cx, cy + 3)
+            });
+            graphics.DrawRectangle(border, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
+        }
+    }
+}
+
+public sealed class PaletteGroupBox : GroupBox
+{
+    private Color borderColor;
+
+    public PaletteGroupBox() { borderColor = SystemColors.ControlDark; }
+
+    public Color BorderColor { get { return borderColor; } set { borderColor = value; Invalidate(); } }
+
+    protected override void WndProc(ref Message message)
+    {
+        base.WndProc(ref message);
+        if (message.Msg != 0x000F || !IsHandleCreated || Width < 8 || Height < 8) return;
+
+        int y = Math.Max(5, Font.Height / 2);
+        int gapStart = 8;
+        int gapEnd = gapStart + (Text.Length == 0 ? 0 : TextRenderer.MeasureText(Text, Font).Width) + 8;
+        using (var graphics = Graphics.FromHwnd(Handle))
+        using (var border = new Pen(BorderColor, 2.0f))
+        {
+            graphics.DrawLine(border, 0, y, gapStart, y);
+            graphics.DrawLine(border, gapEnd, y, Width - 1, y);
+            graphics.DrawLine(border, 0, y, 0, Height - 1);
+            graphics.DrawLine(border, Width - 1, y, Width - 1, Height - 1);
+            graphics.DrawLine(border, 0, Height - 1, Width - 1, Height - 1);
+        }
+    }
+}
+
+public static class WindowChrome
+{
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y,
+        int width, int height, uint flags);
+
+    public static int PackColor(Color color)
+    {
+        return color.R | (color.G << 8) | (color.B << 16);
+    }
+
+    public static void Apply(IntPtr hwnd, bool night, int caption, int text, int border)
+    {
+        int dark = night ? 1 : 0;
+        int result = DwmSetWindowAttribute(hwnd, 20, ref dark, sizeof(int));
+        if (result != 0) DwmSetWindowAttribute(hwnd, 19, ref dark, sizeof(int));
+
+        DwmSetWindowAttribute(hwnd, 35, ref caption, sizeof(int));
+        DwmSetWindowAttribute(hwnd, 36, ref text, sizeof(int));
+        DwmSetWindowAttribute(hwnd, 34, ref border, sizeof(int));
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0027);
+    }
+}
+'@
+
 $font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9.5)
 $fontBold = New-Object System.Drawing.Font('Microsoft YaHei UI', 10.5, [System.Drawing.FontStyle]::Bold)
 $fontTitle = New-Object System.Drawing.Font('Microsoft YaHei UI', 15, [System.Drawing.FontStyle]::Bold)
 $fontSmall = New-Object System.Drawing.Font('Microsoft YaHei UI', 8.5)
-$grey = [System.Drawing.Color]::FromArgb(110, 110, 110)
-$red = [System.Drawing.Color]::FromArgb(180, 40, 40)
-$green = [System.Drawing.Color]::FromArgb(30, 120, 60)
-$amber = [System.Drawing.Color]::FromArgb(170, 110, 10)
+if ($script:NightMode) {
+    $ink = [System.Drawing.Color]::FromArgb(232, 237, 234)
+    $grey = [System.Drawing.Color]::FromArgb(165, 179, 173)
+    $red = [System.Drawing.Color]::FromArgb(224, 126, 116)
+    $forest = [System.Drawing.Color]::FromArgb(76, 139, 111)
+    $sage = [System.Drawing.Color]::FromArgb(126, 177, 146)
+    $amber = [System.Drawing.Color]::FromArgb(214, 168, 99)
+    $paper = [System.Drawing.Color]::FromArgb(29, 35, 38)
+    $surface = [System.Drawing.Color]::FromArgb(38, 46, 48)
+    $softGreen = [System.Drawing.Color]::FromArgb(48, 65, 56)
+    $line = [System.Drawing.Color]::FromArgb(49, 59, 56)
+} else {
+    $ink = [System.Drawing.Color]::FromArgb(38, 52, 58)
+    $grey = [System.Drawing.Color]::FromArgb(105, 122, 120)
+    $red = [System.Drawing.Color]::FromArgb(184, 78, 74)
+    $forest = [System.Drawing.Color]::FromArgb(45, 101, 87)
+    $sage = [System.Drawing.Color]::FromArgb(111, 148, 127)
+    $amber = [System.Drawing.Color]::FromArgb(214, 160, 82)
+    $paper = [System.Drawing.Color]::FromArgb(243, 246, 244)
+    $surface = [System.Drawing.Color]::White
+    $softGreen = [System.Drawing.Color]::FromArgb(228, 236, 231)
+    $line = [System.Drawing.Color]::FromArgb(220, 228, 223)
+}
+
+$script:PaletteComboDraw = {
+    param($sender, $eventArgs)
+    $label = if ($eventArgs.Index -ge 0) { [string]$sender.Items[$eventArgs.Index] } else { [string]$sender.Text }
+    $selected = ($eventArgs.State -band [System.Windows.Forms.DrawItemState]::Selected) -ne 0
+    $background = if ($selected) { $script:Forest } else { $script:Surface }
+    $foreground = if ($selected) { [System.Drawing.Color]::White } else { $script:Ink }
+    $fill = New-Object System.Drawing.SolidBrush($background)
+    $textBrush = New-Object System.Drawing.SolidBrush($foreground)
+    try {
+        $eventArgs.Graphics.FillRectangle($fill, $eventArgs.Bounds)
+        $size = $eventArgs.Graphics.MeasureString($label, $sender.Font)
+        $x = $eventArgs.Bounds.Left + 4
+        $y = $eventArgs.Bounds.Top + (($eventArgs.Bounds.Height - $size.Height) / 2)
+        $eventArgs.Graphics.DrawString($label, $sender.Font, $textBrush, [single]$x, [single]$y)
+    } finally { $fill.Dispose(); $textBrush.Dispose() }
+}
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Zombie Farm 游戏管理'
 # Height is sized to the content (see the tab height below) rather than padded out,
 # so there is no dead space at the bottom of either tab.
-$form.ClientSize = New-Object System.Drawing.Size(700, 574)
+$form.ClientSize = New-Object System.Drawing.Size(960, 574)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedDialog'
 $form.MaximizeBox = $false
 $form.Font = $font
-$form.BackColor = [System.Drawing.Color]::FromArgb(248, 249, 250)
+$form.BackColor = $paper
+$form.ForeColor = $ink
 
 $title = New-Object System.Windows.Forms.Label
 $title.Text = 'Zombie Farm 游戏管理'
 $title.Font = $fontTitle
-$title.ForeColor = [System.Drawing.Color]::FromArgb(30, 70, 45)
+$title.ForeColor = $ink
 $title.Location = New-Object System.Drawing.Point(22, 12)
 $title.AutoSize = $true
 $form.Controls.Add($title)
@@ -1649,26 +2025,51 @@ $subtitle.Location = New-Object System.Drawing.Point(24, 44)
 $subtitle.AutoSize = $true
 $form.Controls.Add($subtitle)
 
-# No ToolTip component: setting explanations are shown in a dialog via the "?"
-# button, because a tooltip is a single unwrapped line and the longer entries ran
-# off the screen.
-$tabs = New-Object System.Windows.Forms.TabControl
-$tabs.Location = New-Object System.Drawing.Point(20, 68)
+$btnTheme = New-Object System.Windows.Forms.Button
+$btnTheme.Location = New-Object System.Drawing.Point(900, 11)
+$btnTheme.Size = New-Object System.Drawing.Size(38, 38)
+$btnTheme.FlatStyle = 'Flat'
+$btnTheme.FlatAppearance.BorderSize = 1
+$btnTheme.UseVisualStyleBackColor = $false
+$btnTheme.Font = New-Object System.Drawing.Font('Segoe MDL2 Assets', 13)
+$btnTheme.AccessibleName = '日夜模式切换'
+$form.Controls.Add($btnTheme)
+$themeTip = New-Object System.Windows.Forms.ToolTip
+
+# A restrained gold rule separates the app heading from the page navigation.
+$headerRule = New-Object System.Windows.Forms.Panel
+$headerRule.Location = New-Object System.Drawing.Point(22, 63)
+$headerRule.Size = New-Object System.Drawing.Size(916, 2)
+$headerRule.BackColor = $amber
+$form.Controls.Add($headerRule)
+
+$tabs = New-Object PaletteTabControl
+$tabs.Location = New-Object System.Drawing.Point(20, 72)
 # Height is set at the bottom of this file, once every tab's contents exist, so it
 # always matches the taller tab. Hardcoding it meant the game tab (which grew when
 # the IPA picker was added) ended up flush against the tab's bottom edge.
-$tabs.Size = New-Object System.Drawing.Size(660, 100)
+$tabs.Size = New-Object System.Drawing.Size(920, 100)
 $tabs.Font = $font
+$tabs.DrawMode = [System.Windows.Forms.TabDrawMode]::OwnerDrawFixed
+$tabs.Appearance = [System.Windows.Forms.TabAppearance]::FlatButtons
 $form.Controls.Add($tabs)
 
 $tabGame = New-Object System.Windows.Forms.TabPage
 $tabGame.Text = '  游戏  '
-$tabGame.BackColor = [System.Drawing.Color]::FromArgb(248, 249, 250)
+$tabGame.UseVisualStyleBackColor = $false
+$tabGame.BackColor = $paper
 $tabs.Controls.Add($tabGame)
 
+$tabSettings = New-Object System.Windows.Forms.TabPage
+$tabSettings.Text = '  设置  '
+$tabSettings.UseVisualStyleBackColor = $false
+$tabSettings.BackColor = $paper
+$tabs.Controls.Add($tabSettings)
+
 $tabSave = New-Object System.Windows.Forms.TabPage
-$tabSave.Text = '  存档管理  '
-$tabSave.BackColor = [System.Drawing.Color]::FromArgb(248, 249, 250)
+$tabSave.Text = '  存档  '
+$tabSave.UseVisualStyleBackColor = $false
+$tabSave.BackColor = $paper
 $tabs.Controls.Add($tabSave)
 
 # --- game tab: IPA selection ------------------------------------------------
@@ -1678,23 +2079,27 @@ $tabs.Controls.Add($tabSave)
 # switching IPA also switches which settings line applies and which saves are
 # visible -- the label under the dropdown spells that out.
 
-$grpIpa = New-Object System.Windows.Forms.GroupBox
+$grpIpa = New-Object PaletteGroupBox
 $grpIpa.Text = '游戏版本 (IPA)'
 $grpIpa.Location = New-Object System.Drawing.Point(14, 8)
-$grpIpa.Size = New-Object System.Drawing.Size(626, 74)
+$grpIpa.Size = New-Object System.Drawing.Size(892, 74)
 $grpIpa.Font = $font
 $tabGame.Controls.Add($grpIpa)
 
-$cmbIpa = New-Object System.Windows.Forms.ComboBox
+$cmbIpa = New-Object PaletteComboBox
 $cmbIpa.Location = New-Object System.Drawing.Point(14, 26)
-$cmbIpa.Size = New-Object System.Drawing.Size(516, 24)
+$cmbIpa.Size = New-Object System.Drawing.Size(778, 24)
 $cmbIpa.DropDownStyle = 'DropDownList'
+$cmbIpa.DrawMode = 'OwnerDrawFixed'
+$cmbIpa.ItemHeight = 20
+$cmbIpa.FlatStyle = 'Flat'
+$cmbIpa.Add_DrawItem($script:PaletteComboDraw)
 $cmbIpa.Font = $font
 $grpIpa.Controls.Add($cmbIpa)
 
 $btnIpaBrowse = New-Object System.Windows.Forms.Button
 $btnIpaBrowse.Text = '浏览…'
-$btnIpaBrowse.Location = New-Object System.Drawing.Point(536, 25)
+$btnIpaBrowse.Location = New-Object System.Drawing.Point(800, 25)
 $btnIpaBrowse.Size = New-Object System.Drawing.Size(76, 26)
 $btnIpaBrowse.FlatStyle = 'Flat'
 $grpIpa.Controls.Add($btnIpaBrowse)
@@ -1702,7 +2107,7 @@ $grpIpa.Controls.Add($btnIpaBrowse)
 $lblIpaInfo = New-Object System.Windows.Forms.Label
 $lblIpaInfo.Text = ''
 $lblIpaInfo.Location = New-Object System.Drawing.Point(14, 52)
-$lblIpaInfo.Size = New-Object System.Drawing.Size(600, 18)
+$lblIpaInfo.Size = New-Object System.Drawing.Size(860, 18)
 $lblIpaInfo.Font = $fontSmall
 $lblIpaInfo.ForeColor = $grey
 $grpIpa.Controls.Add($lblIpaInfo)
@@ -1712,9 +2117,9 @@ $grpIpa.Controls.Add($lblIpaInfo)
 $btnStart = New-Object System.Windows.Forms.Button
 $btnStart.Text = '启动游戏'
 $btnStart.Location = New-Object System.Drawing.Point(16, 92)
-$btnStart.Size = New-Object System.Drawing.Size(240, 46)
+$btnStart.Size = New-Object System.Drawing.Size(430, 52)
 $btnStart.Font = $fontBold
-$btnStart.BackColor = [System.Drawing.Color]::FromArgb(46, 125, 70)
+$btnStart.BackColor = $forest
 $btnStart.ForeColor = [System.Drawing.Color]::White
 $btnStart.FlatStyle = 'Flat'
 $btnStart.FlatAppearance.BorderSize = 0
@@ -1722,17 +2127,18 @@ $tabGame.Controls.Add($btnStart)
 
 $btnStartSkip = New-Object System.Windows.Forms.Button
 $btnStartSkip.Text = '启动并跳过时间…'
-$btnStartSkip.Location = New-Object System.Drawing.Point(268, 92)
-$btnStartSkip.Size = New-Object System.Drawing.Size(240, 46)
+$btnStartSkip.Location = New-Object System.Drawing.Point(456, 92)
+$btnStartSkip.Size = New-Object System.Drawing.Size(430, 52)
 $btnStartSkip.FlatStyle = 'Flat'
+$btnStartSkip.BackColor = $softGreen
+$btnStartSkip.ForeColor = $forest
 $tabGame.Controls.Add($btnStartSkip)
 
-# --- game tab: settings ----------------------------------------------------
+# --- settings tab ---------------------------------------------------------
 
 # Rows are laid out at a fixed pitch and the group box height is derived from the
 # number of ROWS, so adding or removing a setting cannot leave a blank gap or clip
-# the last row. Rows are single-height now that the explanatory text moved into
-# the "?" dialog and the one-line help label under each dropdown is gone.
+# the last row. Longer explanations live in 使用说明.html.
 #
 # A setting may share a row with another by naming the same `Row`; window_family
 # and window_scale do, because the user asked for them side by side ("左边可以选
@@ -1747,12 +2153,12 @@ foreach ($key in $script:SettingDefs.Keys) {
     if ($script:RowNames -notcontains $row) { $script:RowNames += $row }
 }
 
-$grpSettings = New-Object System.Windows.Forms.GroupBox
+$grpSettings = New-Object PaletteGroupBox
 $grpSettings.Text = '设置'
-$grpSettings.Location = New-Object System.Drawing.Point(14, 150)
+$grpSettings.Location = New-Object System.Drawing.Point(147, 10)
 $grpSettings.Height = ($script:RowNames.Count * $script:RowPitch) + 26
 $grpSettings.Width = 626
-$tabGame.Controls.Add($grpSettings)
+$tabSettings.Controls.Add($grpSettings)
 
 $script:Controls = @{}
 # Per-setting numeric/text editor for the 自定义 entry, plus its label and unit,
@@ -1786,10 +2192,14 @@ foreach ($key in $script:SettingDefs.Keys) {
     $comboX = if ($def.ContainsKey('ComboX')) { $def.ComboX } else { 170 }
     $comboW = if ($def.ContainsKey('ComboW')) { $def.ComboW } else { 200 }
 
-    $combo = New-Object System.Windows.Forms.ComboBox
+    $combo = New-Object PaletteComboBox
     $combo.Location = New-Object System.Drawing.Point($comboX, $rowY)
     $combo.Size = New-Object System.Drawing.Size($comboW, 24)
     $combo.DropDownStyle = 'DropDownList'
+    $combo.DrawMode = 'OwnerDrawFixed'
+    $combo.ItemHeight = 20
+    $combo.FlatStyle = 'Flat'
+    $combo.Add_DrawItem($script:PaletteComboDraw)
     $combo.Tag = $key
     # Plain values only: long "value — explanation" strings overflowed the control.
     # The explanation lives in 使用说明.html (shipped beside the manager).
@@ -1833,22 +2243,19 @@ foreach ($key in $script:SettingDefs.Keys) {
             # overwrites this with the stored value when there is one.
             $editor.Text = if ($def.ContainsKey('CustomInitial')) { [string]$def.CustomInitial } else { [string]$def.Default }
         } else {
-            $editor = New-Object System.Windows.Forms.NumericUpDown
+            $editor = New-Object System.Windows.Forms.TextBox
             # DecimalPlaces must be set BEFORE Minimum/Maximum: the bounds are
             # coerced to the current precision when assigned, so setting 1.01 as a
             # minimum while DecimalPlaces is still 0 would silently store 1.
             $decimals = if ($def.ContainsKey('CustomDecimals')) { [int]$def.CustomDecimals } else { 0 }
             $step = if ($def.ContainsKey('CustomStep')) { [decimal]$def.CustomStep } else { [decimal]1 }
-            $editor.DecimalPlaces = $decimals
-            $editor.Increment = $step
-            $editor.Minimum = [decimal]$def.CustomMin
-            $editor.Maximum = [decimal]$def.CustomMax
             # Start at a sensible value rather than at Minimum: selecting 自定义
             # would otherwise immediately mean 1 fps (or a 1.01 zoom step), and
             # the user would have to correct it before the setting was usable.
             $initial = if ($def.ContainsKey('CustomInitial')) { [decimal]$def.CustomInitial } else { [decimal]$def.CustomMin }
-            $editor.Value = [Math]::Min([Math]::Max($initial, [decimal]$def.CustomMin), [decimal]$def.CustomMax)
             $editor.TextAlign = 'Center'
+            $editor.MaxLength = 12
+            $editor.Text = [string][Math]::Min([Math]::Max($initial, [decimal]$def.CustomMin), [decimal]$def.CustomMax)
         }
         $editor.Location = New-Object System.Drawing.Point($editorX, $rowY)
         $editor.Size = New-Object System.Drawing.Size($editorW, 24)
@@ -1882,56 +2289,58 @@ foreach ($key in $script:SettingDefs.Keys) {
         $script:LblWindowSize.Location = New-Object System.Drawing.Point(452, ($rowY + 5))
         $script:LblWindowSize.Size = New-Object System.Drawing.Size(164, 22)
         $script:LblWindowSize.Font = $fontSmall
-        $script:LblWindowSize.ForeColor = $green
+        $script:LblWindowSize.ForeColor = $sage
         $grpSettings.Controls.Add($script:LblWindowSize)
     }
 }
 
 # --- game tab: currency ----------------------------------------------------
 
-$grpCurrency = New-Object System.Windows.Forms.GroupBox
+$grpCurrency = New-Object PaletteGroupBox
 $grpCurrency.Text = '金币与脑子'
-$grpCurrency.Location = New-Object System.Drawing.Point(14, ($grpSettings.Top + $grpSettings.Height + 8))
-$grpCurrency.Size = New-Object System.Drawing.Size(626, 82)
+$grpCurrency.Location = New-Object System.Drawing.Point(14, 158)
+$grpCurrency.Size = New-Object System.Drawing.Size(892, 112)
 $tabGame.Controls.Add($grpCurrency)
 
 $lblGold = New-Object System.Windows.Forms.Label
 $lblGold.Text = '金币'
-$lblGold.Location = New-Object System.Drawing.Point(14, 32)
-$lblGold.Size = New-Object System.Drawing.Size(44, 22)
+$lblGold.Location = New-Object System.Drawing.Point(20, 34)
+$lblGold.Size = New-Object System.Drawing.Size(50, 22)
 $grpCurrency.Controls.Add($lblGold)
 
-$numGold = New-Object System.Windows.Forms.NumericUpDown
-$numGold.Location = New-Object System.Drawing.Point(60, 30)
-$numGold.Size = New-Object System.Drawing.Size(150, 24)
-$numGold.Maximum = [decimal]2147483647
-$numGold.Minimum = [decimal]0
+$numGold = New-Object System.Windows.Forms.TextBox
+$numGold.Location = New-Object System.Drawing.Point(75, 31)
+$numGold.Size = New-Object System.Drawing.Size(240, 24)
+$numGold.MaxLength = 10
+$numGold.TextAlign = 'Center'
+$numGold.Text = '0'
 $grpCurrency.Controls.Add($numGold)
 
 $lblBrains = New-Object System.Windows.Forms.Label
 $lblBrains.Text = '脑子'
-$lblBrains.Location = New-Object System.Drawing.Point(226, 32)
-$lblBrains.Size = New-Object System.Drawing.Size(44, 22)
+$lblBrains.Location = New-Object System.Drawing.Point(350, 34)
+$lblBrains.Size = New-Object System.Drawing.Size(50, 22)
 $grpCurrency.Controls.Add($lblBrains)
 
-$numBrains = New-Object System.Windows.Forms.NumericUpDown
-$numBrains.Location = New-Object System.Drawing.Point(272, 30)
-$numBrains.Size = New-Object System.Drawing.Size(150, 24)
-$numBrains.Maximum = [decimal]2147483647
-$numBrains.Minimum = [decimal]0
+$numBrains = New-Object System.Windows.Forms.TextBox
+$numBrains.Location = New-Object System.Drawing.Point(405, 31)
+$numBrains.Size = New-Object System.Drawing.Size(240, 24)
+$numBrains.MaxLength = 10
+$numBrains.TextAlign = 'Center'
+$numBrains.Text = '0'
 $grpCurrency.Controls.Add($numBrains)
 
 $btnApplyCurrency = New-Object System.Windows.Forms.Button
 $btnApplyCurrency.Text = '写入存档'
-$btnApplyCurrency.Location = New-Object System.Drawing.Point(450, 28)
-$btnApplyCurrency.Size = New-Object System.Drawing.Size(160, 30)
+$btnApplyCurrency.Location = New-Object System.Drawing.Point(665, 28)
+$btnApplyCurrency.Size = New-Object System.Drawing.Size(210, 30)
 $btnApplyCurrency.FlatStyle = 'Flat'
 $grpCurrency.Controls.Add($btnApplyCurrency)
 
 $lblCurrencyState = New-Object System.Windows.Forms.Label
 $lblCurrencyState.Text = ''
-$lblCurrencyState.Location = New-Object System.Drawing.Point(14, 56)
-$lblCurrencyState.Size = New-Object System.Drawing.Size(600, 18)
+$lblCurrencyState.Location = New-Object System.Drawing.Point(20, 69)
+$lblCurrencyState.Size = New-Object System.Drawing.Size(850, 24)
 $lblCurrencyState.Font = $fontSmall
 $lblCurrencyState.ForeColor = $grey
 $grpCurrency.Controls.Add($lblCurrencyState)
@@ -1941,7 +2350,7 @@ $grpCurrency.Controls.Add($lblCurrencyState)
 $lblSaveInfo = New-Object System.Windows.Forms.Label
 $lblSaveInfo.Text = ''
 $lblSaveInfo.Location = New-Object System.Drawing.Point(14, 14)
-$lblSaveInfo.Size = New-Object System.Drawing.Size(626, 22)
+$lblSaveInfo.Size = New-Object System.Drawing.Size(892, 22)
 $lblSaveInfo.Font = $fontSmall
 $lblSaveInfo.ForeColor = $grey
 $tabSave.Controls.Add($lblSaveInfo)
@@ -1949,47 +2358,122 @@ $tabSave.Controls.Add($lblSaveInfo)
 $btnBackup = New-Object System.Windows.Forms.Button
 $btnBackup.Text = '新增备份'
 $btnBackup.Location = New-Object System.Drawing.Point(14, 42)
-$btnBackup.Size = New-Object System.Drawing.Size(150, 36)
+$btnBackup.Size = New-Object System.Drawing.Size(180, 36)
 $btnBackup.FlatStyle = 'Flat'
 $tabSave.Controls.Add($btnBackup)
 
 $btnRestore = New-Object System.Windows.Forms.Button
 $btnRestore.Text = '还原所选备份'
-$btnRestore.Location = New-Object System.Drawing.Point(172, 42)
-$btnRestore.Size = New-Object System.Drawing.Size(150, 36)
+$btnRestore.Location = New-Object System.Drawing.Point(238, 42)
+$btnRestore.Size = New-Object System.Drawing.Size(210, 36)
 $btnRestore.FlatStyle = 'Flat'
 $tabSave.Controls.Add($btnRestore)
 
 $btnDelete = New-Object System.Windows.Forms.Button
 $btnDelete.Text = '删除所选'
-$btnDelete.Location = New-Object System.Drawing.Point(330, 42)
-$btnDelete.Size = New-Object System.Drawing.Size(150, 36)
+$btnDelete.Location = New-Object System.Drawing.Point(462, 42)
+$btnDelete.Size = New-Object System.Drawing.Size(210, 36)
 $btnDelete.FlatStyle = 'Flat'
-$btnDelete.ForeColor = $red
+$btnDelete.ForeColor = $forest
 $tabSave.Controls.Add($btnDelete)
 
 $btnRefresh = New-Object System.Windows.Forms.Button
 $btnRefresh.Text = '刷新'
-$btnRefresh.Location = New-Object System.Drawing.Point(488, 42)
-$btnRefresh.Size = New-Object System.Drawing.Size(150, 36)
+$btnRefresh.Location = New-Object System.Drawing.Point(686, 42)
+$btnRefresh.Size = New-Object System.Drawing.Size(210, 36)
 $btnRefresh.FlatStyle = 'Flat'
 $tabSave.Controls.Add($btnRefresh)
 
 $listSaves = New-Object System.Windows.Forms.ListView
 $listSaves.Location = New-Object System.Drawing.Point(14, 90)
-$listSaves.Size = New-Object System.Drawing.Size(626, 272)
+$listSaves.Size = New-Object System.Drawing.Size(892, 272)
 $listSaves.View = 'Details'
 $listSaves.FullRowSelect = $true
 # Multi-select so several backups can be deleted at once. Restore stays
 # single-selection: restoring two saves at the same time is meaningless.
 $listSaves.MultiSelect = $true
 $listSaves.HideSelection = $false
-$listSaves.GridLines = $true
+$listSaves.GridLines = $false
+$listSaves.OwnerDraw = $true
+$listSaves.BorderStyle = 'None'
 $listSaves.Font = $fontSmall
 [void]$listSaves.Columns.Add('类型', 100)
-[void]$listSaves.Columns.Add('备份文件', 340)
+[void]$listSaves.Columns.Add('备份文件', 560)
 [void]$listSaves.Columns.Add('大小', 80, 'Right')
 [void]$listSaves.Columns.Add('时间', 100)
+$resizeSaveColumns = {
+    param($sender, $eventArgs)
+    $fixedWidth = $sender.Columns[0].Width + $sender.Columns[1].Width + $sender.Columns[2].Width
+    $sender.Columns[3].Width = [Math]::Max(100, ($sender.ClientSize.Width - $fixedWidth))
+}
+$listSaves.Add_Resize($resizeSaveColumns)
+$resizeSaveColumns.Invoke($listSaves, [EventArgs]::Empty)
+$listSaves.Add_DrawColumnHeader({
+    param($sender, $eventArgs)
+    $background = New-Object System.Drawing.SolidBrush($script:Surface)
+    $linePen = New-Object System.Drawing.Pen($script:Line)
+    try {
+        $eventArgs.Graphics.FillRectangle($background, $eventArgs.Bounds)
+        $flags = [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor
+            [System.Windows.Forms.TextFormatFlags]::EndEllipsis -bor
+            [System.Windows.Forms.TextFormatFlags]::NoPrefix
+        switch ($eventArgs.Header.TextAlign) {
+            'Right'  { $flags = $flags -bor [System.Windows.Forms.TextFormatFlags]::Right }
+            'Center' { $flags = $flags -bor [System.Windows.Forms.TextFormatFlags]::HorizontalCenter }
+            default  { $flags = $flags -bor [System.Windows.Forms.TextFormatFlags]::Left }
+        }
+        $bounds = $eventArgs.Bounds
+        $bounds.Inflate(-6, 0)
+        [System.Windows.Forms.TextRenderer]::DrawText(
+            $eventArgs.Graphics, $eventArgs.Header.Text, $eventArgs.Font,
+            $bounds, $script:Ink, $flags)
+        $eventArgs.Graphics.DrawLine($linePen, $eventArgs.Bounds.Left,
+            $eventArgs.Bounds.Bottom - 1, $eventArgs.Bounds.Right - 1,
+            $eventArgs.Bounds.Bottom - 1)
+        $eventArgs.Graphics.DrawLine($linePen, $eventArgs.Bounds.Right - 1,
+            $eventArgs.Bounds.Top, $eventArgs.Bounds.Right - 1,
+            $eventArgs.Bounds.Bottom - 1)
+    } finally {
+        $background.Dispose(); $linePen.Dispose()
+    }
+})
+$listSaves.Add_DrawItem({
+    param($sender, $eventArgs)
+    if ($sender.View -ne [System.Windows.Forms.View]::Details) { $eventArgs.DrawDefault() }
+})
+$listSaves.Add_DrawSubItem({
+    param($sender, $eventArgs)
+    $selected = ($eventArgs.ItemState -band [System.Windows.Forms.ListViewItemStates]::Selected) -ne 0
+    $background = if ($selected) { $script:SoftGreen } else { $script:Surface }
+    $foreground = if ($selected) { $script:Ink } else { $eventArgs.Item.ForeColor }
+    if ($foreground.IsEmpty -or $foreground -eq [System.Drawing.Color]::Empty) {
+        $foreground = $script:Ink
+    }
+    $fill = New-Object System.Drawing.SolidBrush($background)
+    $linePen = New-Object System.Drawing.Pen($script:Line)
+    try {
+        $eventArgs.Graphics.FillRectangle($fill, $eventArgs.Bounds)
+        $flags = [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor
+            [System.Windows.Forms.TextFormatFlags]::EndEllipsis -bor
+            [System.Windows.Forms.TextFormatFlags]::NoPrefix
+        switch ($eventArgs.Header.TextAlign) {
+            'Right'  { $flags = $flags -bor [System.Windows.Forms.TextFormatFlags]::Right }
+            'Center' { $flags = $flags -bor [System.Windows.Forms.TextFormatFlags]::HorizontalCenter }
+            default  { $flags = $flags -bor [System.Windows.Forms.TextFormatFlags]::Left }
+        }
+        $bounds = $eventArgs.Bounds
+        $bounds.Inflate(-6, 0)
+        [System.Windows.Forms.TextRenderer]::DrawText(
+            $eventArgs.Graphics, $eventArgs.SubItem.Text, $eventArgs.SubItem.Font,
+            $bounds, $foreground, $flags)
+        $eventArgs.Graphics.DrawLine($linePen, $eventArgs.Bounds.Left,
+            $eventArgs.Bounds.Bottom - 1, $eventArgs.Bounds.Right - 1,
+            $eventArgs.Bounds.Bottom - 1)
+        $eventArgs.Graphics.DrawLine($linePen, $eventArgs.Bounds.Right - 1,
+            $eventArgs.Bounds.Top, $eventArgs.Bounds.Right - 1,
+            $eventArgs.Bounds.Bottom - 1)
+    } finally { $fill.Dispose(); $linePen.Dispose() }
+})
 $tabSave.Controls.Add($listSaves)
 
 # Select-all / invert helpers: clicking through dozens of rows one at a time to
@@ -2018,7 +2502,7 @@ $tabSave.Controls.Add($btnSelectInvert)
 $lblSaveHint = New-Object System.Windows.Forms.Label
 $lblSaveHint.Text = ''
 $lblSaveHint.Location = New-Object System.Drawing.Point(400, 374)
-$lblSaveHint.Size = New-Object System.Drawing.Size(240, 20)
+$lblSaveHint.Size = New-Object System.Drawing.Size(500, 20)
 $lblSaveHint.Font = $fontSmall
 $lblSaveHint.ForeColor = $grey
 $tabSave.Controls.Add($lblSaveHint)
@@ -2027,7 +2511,7 @@ $tabSave.Controls.Add($lblSaveHint)
 
 $status = New-Object System.Windows.Forms.Label
 $status.Location = New-Object System.Drawing.Point(24, ($tabs.Top + $tabs.Height + 6))
-$status.Size = New-Object System.Drawing.Size(656, 26)
+$status.Size = New-Object System.Drawing.Size(916, 26)
 $status.ForeColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
 $form.Controls.Add($status)
 
@@ -2040,10 +2524,10 @@ function Update-Status {
 
     $status.Text = $Message
     switch ($Kind) {
-        'ok'   { $status.ForeColor = $green }
+        'ok'   { $status.ForeColor = $sage }
         'err'  { $status.ForeColor = $red }
         'busy' { $status.ForeColor = $amber }
-        default { $status.ForeColor = [System.Drawing.Color]::FromArgb(60, 60, 60) }
+        default { $status.ForeColor = $script:Grey }
     }
     $status.Refresh()
 }
@@ -2054,8 +2538,7 @@ function Get-CustomEditorText {
 
     $entry = $script:CustomEditors[$Key]
     if (-not $entry) { return '' }
-    if ($entry.Kind -eq 'scale') { return $entry.Editor.Text.Trim() }
-    return [string]$entry.Editor.Value
+    return $entry.Editor.Text.Trim()
 }
 
 # Select the 自定义 entry of `key`'s dropdown, if it has one.
@@ -2122,7 +2605,7 @@ function Update-WindowSizeLabel {
         $wa = [System.Windows.Forms.Screen]::FromControl($form).WorkingArea
         $fits = ([int]$Matches[1] -le $wa.Width) -and ([int]$Matches[2] -le $wa.Height)
     }
-    $script:LblWindowSize.ForeColor = if ($fits) { $green } else { $amber }
+    $script:LblWindowSize.ForeColor = if ($fits) { $sage } else { $amber }
 }
 
 # Periodic resync for state that SelectedIndexChanged cannot be trusted to report.
@@ -2189,11 +2672,7 @@ function Load-SettingsIntoUi {
             # select the 自定义 entry.
             $entry = $script:CustomEditors[$key]
             if ($entry) {
-                if ($entry.Kind -eq 'scale') { $entry.Editor.Text = $value }
-                else {
-                    $n = ConvertTo-Number -Value $value
-                    if ($null -ne $n) { $entry.Editor.Value = [decimal]$n }
-                }
+                $entry.Editor.Text = $value
             }
             for ($i = 0; $i -lt $def.Choices.Count; $i++) {
                 if ($def.Choices[$i].Value -eq 'custom') { $index = $i; break }
@@ -2229,8 +2708,8 @@ function Save-SettingsFromUi {
 function Refresh-Currency {
     $c = Get-Currency
     if ($c) {
-        $numGold.Value = [decimal][Math]::Min([int64]$c.Gold, [int64]2147483647)
-        $numBrains.Value = [decimal][Math]::Min([int64]$c.Brains, [int64]2147483647)
+        $numGold.Text = [string][Math]::Min([int64]$c.Gold, [int64]2147483647)
+        $numBrains.Text = [string][Math]::Min([int64]$c.Brains, [int64]2147483647)
         $lblCurrencyState.Text = "当前存档：金币 $($c.Gold)　脑子 $($c.Brains)"
         $lblCurrencyState.ForeColor = $grey
         $btnApplyCurrency.Enabled = $true
@@ -2266,7 +2745,7 @@ function Update-SaveTab {
         [void]$item.SubItems.Add([string]$live.Length)
         [void]$item.SubItems.Add($live.LastWriteTime.ToString('MM-dd HH:mm'))
         $item.Tag = $live.FullName
-        $item.ForeColor = [System.Drawing.Color]::FromArgb(20, 110, 45)
+        $item.ForeColor = $script:Sage
         $item.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 8.5, [System.Drawing.FontStyle]::Bold)
         [void]$listSaves.Items.Add($item)
     }
@@ -2418,12 +2897,8 @@ foreach ($key in $script:SettingDefs.Keys) {
 }
 foreach ($key in $script:CustomEditors.Keys) {
     $entry = $script:CustomEditors[$key]
-    if ($entry.Kind -eq 'scale') {
-        # TextChanged: see the note above on why intermediate text is not saved.
-        $entry.Editor.Add_TextChanged($onCustomEditorChanged)
-    } else {
-        $entry.Editor.Add_ValueChanged($onCustomEditorChanged)
-    }
+    # Intermediate numeric text is validated before it is written.
+    $entry.Editor.Add_TextChanged($onCustomEditorChanged)
 }
 
 # --- launching -------------------------------------------------------------
@@ -2571,42 +3046,50 @@ $btnStartSkip.Add_Click({
     $dlg.MaximizeBox = $false
     $dlg.MinimizeBox = $false
     $dlg.Font = $font
+    $dlg.BackColor = $script:Paper
+    $dlg.ForeColor = $script:Ink
 
     $l1 = New-Object System.Windows.Forms.Label
     $l1.Text = '快进多久？（只填数字）'
     $l1.Location = New-Object System.Drawing.Point(18, 16)
     $l1.AutoSize = $true
+    $l1.ForeColor = $script:Ink
     $dlg.Controls.Add($l1)
 
-    # NumericUpDown enforces digits-only and gives up/down arrows for free.
-    $numH = New-Object System.Windows.Forms.NumericUpDown
+    $numH = New-Object System.Windows.Forms.TextBox
     $numH.Location = New-Object System.Drawing.Point(20, 46)
     $numH.Size = New-Object System.Drawing.Size(96, 24)
-    $numH.Minimum = 0
-    $numH.Maximum = 9999
-    $numH.Value = [Math]::Min($defH, 9999)
+    $numH.MaxLength = 4
+    $numH.Text = [string][Math]::Min($defH, 9999)
     $numH.TextAlign = 'Center'
+    $numH.BackColor = $script:Surface
+    $numH.ForeColor = $script:Ink
     $dlg.Controls.Add($numH)
+    $numH.Add_KeyPress({ if (-not [char]::IsControl($_.KeyChar) -and -not [char]::IsDigit($_.KeyChar)) { $_.Handled = $true } })
 
     $lH = New-Object System.Windows.Forms.Label
     $lH.Text = '小时'
     $lH.Location = New-Object System.Drawing.Point(122, 49)
     $lH.AutoSize = $true
+    $lH.ForeColor = $script:Ink
     $dlg.Controls.Add($lH)
 
-    $numM = New-Object System.Windows.Forms.NumericUpDown
+    $numM = New-Object System.Windows.Forms.TextBox
     $numM.Location = New-Object System.Drawing.Point(180, 46)
     $numM.Size = New-Object System.Drawing.Size(80, 24)
-    $numM.Minimum = 0
-    $numM.Maximum = 59
-    $numM.Value = $defM
+    $numM.MaxLength = 2
+    $numM.Text = [string]$defM
     $numM.TextAlign = 'Center'
+    $numM.BackColor = $script:Surface
+    $numM.ForeColor = $script:Ink
     $dlg.Controls.Add($numM)
+    $numM.Add_KeyPress({ if (-not [char]::IsControl($_.KeyChar) -and -not [char]::IsDigit($_.KeyChar)) { $_.Handled = $true } })
 
     $lM = New-Object System.Windows.Forms.Label
     $lM.Text = '分钟'
     $lM.Location = New-Object System.Drawing.Point(266, 49)
     $lM.AutoSize = $true
+    $lM.ForeColor = $script:Ink
     $dlg.Controls.Add($lM)
 
     $okBtn = New-Object System.Windows.Forms.Button
@@ -2614,6 +3097,10 @@ $btnStartSkip.Add_Click({
     $okBtn.Location = New-Object System.Drawing.Point(142, 100)
     $okBtn.Size = New-Object System.Drawing.Size(86, 30)
     $okBtn.DialogResult = 'OK'
+    $okBtn.FlatStyle = 'Flat'
+    $okBtn.BackColor = $script:Forest
+    $okBtn.ForeColor = [System.Drawing.Color]::White
+    $okBtn.FlatAppearance.BorderSize = 0
     $dlg.Controls.Add($okBtn)
 
     $cancelBtn = New-Object System.Windows.Forms.Button
@@ -2621,16 +3108,31 @@ $btnStartSkip.Add_Click({
     $cancelBtn.Location = New-Object System.Drawing.Point(238, 100)
     $cancelBtn.Size = New-Object System.Drawing.Size(86, 30)
     $cancelBtn.DialogResult = 'Cancel'
+    $cancelBtn.FlatStyle = 'Flat'
+    $cancelBtn.BackColor = $script:SoftGreen
+    $cancelBtn.ForeColor = $script:Forest
+    $cancelBtn.FlatAppearance.BorderSize = 0
     $dlg.Controls.Add($cancelBtn)
 
     $dlg.AcceptButton = $okBtn
     $dlg.CancelButton = $cancelBtn
 
     $result = $dlg.ShowDialog($form)
-    $hours = [int]$numH.Value
-    $minutes = [int]$numM.Value
+    $hoursText = $numH.Text.Trim()
+    $minutesText = $numM.Text.Trim()
     $dlg.Dispose()
     if ($result -ne 'OK') { return }
+
+    if ($hoursText -notmatch '^[0-9]{1,4}$' -or $minutesText -notmatch '^[0-9]{1,2}$') {
+        [void][System.Windows.Forms.MessageBox]::Show('请输入有效的小时和分钟。', '跳过时间', 'OK', 'Warning')
+        return
+    }
+    $hours = [int]$hoursText
+    $minutes = [int]$minutesText
+    if ($minutes -gt 59) {
+        [void][System.Windows.Forms.MessageBox]::Show('分钟必须在 0～59 之间。', '跳过时间', 'OK', 'Warning')
+        return
+    }
 
     if ($hours -le 0 -and $minutes -le 0) {
         [void][System.Windows.Forms.MessageBox]::Show(
@@ -2790,8 +3292,20 @@ $btnApplyCurrency.Add_Click({
         return
     }
 
-    $gold = [int]$numGold.Value
-    $brains = [int]$numBrains.Value
+    $goldText = $numGold.Text.Trim()
+    $brainsText = $numBrains.Text.Trim()
+    if ($goldText -notmatch '^[0-9]{1,10}$' -or $brainsText -notmatch '^[0-9]{1,10}$') {
+        Update-Status '金币和脑子必须是 0～2147483647 的整数。' 'err'
+        return
+    }
+    $gold64 = [int64]$goldText
+    $brains64 = [int64]$brainsText
+    if ($gold64 -gt 2147483647 -or $brains64 -gt 2147483647) {
+        Update-Status '金币和脑子不能超过 2147483647。' 'err'
+        return
+    }
+    $gold = [int]$gold64
+    $brains = [int]$brains64
 
     $answer = [System.Windows.Forms.MessageBox]::Show(
         ("将把存档改为：`n`n金币 $gold`n脑子 $brains`n`n原存档会自动备份。继续吗？"),
@@ -2957,6 +3471,7 @@ $form.Add_Shown({
     Update-SaveTab
     $script:UiReady = $true
     Update-Status '就绪。改动会立即保存。' 'info'
+    Set-ManagerPalette -Night $script:NightMode
 })
 
 $form.Add_FormClosing({
@@ -2966,6 +3481,150 @@ $form.Add_FormClosing({
             '确认', 'YesNo', 'Question')
         if ($answer -ne 'Yes') { $_.Cancel = $true }
     }
+})
+
+function Set-ManagerPalette {
+    param([bool]$Night)
+
+    if ($Night) {
+        $script:Ink = [System.Drawing.Color]::FromArgb(232, 237, 234)
+        $script:Grey = [System.Drawing.Color]::FromArgb(165, 179, 173)
+        $script:Red = [System.Drawing.Color]::FromArgb(224, 126, 116)
+        $script:Forest = [System.Drawing.Color]::FromArgb(76, 139, 111)
+        $script:Sage = [System.Drawing.Color]::FromArgb(126, 177, 146)
+        $script:Amber = [System.Drawing.Color]::FromArgb(214, 168, 99)
+        $script:Paper = [System.Drawing.Color]::FromArgb(29, 35, 38)
+        $script:Surface = [System.Drawing.Color]::FromArgb(38, 46, 48)
+        $script:SoftGreen = [System.Drawing.Color]::FromArgb(48, 65, 56)
+        $script:Line = [System.Drawing.Color]::FromArgb(49, 59, 56)
+        $hover = [System.Drawing.Color]::FromArgb(88, 151, 122)
+        $pressed = [System.Drawing.Color]::FromArgb(61, 119, 96)
+    } else {
+        $script:Ink = [System.Drawing.Color]::FromArgb(38, 52, 58)
+        $script:Grey = [System.Drawing.Color]::FromArgb(105, 122, 120)
+        $script:Red = [System.Drawing.Color]::FromArgb(184, 78, 74)
+        $script:Forest = [System.Drawing.Color]::FromArgb(45, 101, 87)
+        $script:Sage = [System.Drawing.Color]::FromArgb(111, 148, 127)
+        $script:Amber = [System.Drawing.Color]::FromArgb(214, 160, 82)
+        $script:Paper = [System.Drawing.Color]::FromArgb(243, 246, 244)
+        $script:Surface = [System.Drawing.Color]::White
+        $script:SoftGreen = [System.Drawing.Color]::FromArgb(228, 236, 231)
+        $script:Line = [System.Drawing.Color]::FromArgb(220, 228, 223)
+        $hover = [System.Drawing.Color]::FromArgb(36, 83, 71)
+        $pressed = [System.Drawing.Color]::FromArgb(39, 89, 75)
+    }
+
+    function Set-ControlColors($control) {
+        if ($control -is [System.Windows.Forms.Label]) { $control.ForeColor = $script:Ink }
+        elseif ($control -is [PaletteGroupBox]) {
+            $control.BorderColor = $script:Line
+            $control.ForeColor = $script:Ink; $control.BackColor = $script:Paper
+        }
+        elseif ($control -is [System.Windows.Forms.TabPage]) {
+            $control.UseVisualStyleBackColor = $false
+            $control.ForeColor = $script:Ink; $control.BackColor = $script:Paper
+        }
+        elseif ($control -is [System.Windows.Forms.TabControl]) {
+            $control.ForeColor = $script:Ink; $control.BackColor = $script:Paper
+        }
+        elseif ($control -is [PaletteComboBox]) {
+            $control.ForeColor = $script:Ink; $control.BackColor = $script:Surface
+            $control.ArrowColor = $script:Surface
+            $control.ArrowBorderColor = $script:Line
+            $control.ArrowGlyphColor = $script:Grey
+        }
+        elseif ($control -is [System.Windows.Forms.TextBox]) {
+            $control.ForeColor = $script:Ink; $control.BackColor = $script:Surface
+            $control.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+        }
+        elseif ($control -is [System.Windows.Forms.NumericUpDown] -or
+                $control -is [System.Windows.Forms.ListView]) {
+            $control.ForeColor = $script:Ink; $control.BackColor = $script:Surface
+        }
+        elseif ($control -is [System.Windows.Forms.CheckBox]) {
+            $control.ForeColor = $script:Ink; $control.BackColor = $script:Paper
+        }
+        foreach ($child in $control.Controls) { Set-ControlColors $child }
+    }
+
+    $form.BackColor = $script:Paper; $form.ForeColor = $script:Ink
+    foreach ($control in $form.Controls) { Set-ControlColors $control }
+    $tabs.StripColor = $script:Paper
+    $tabs.BorderColor = $script:Line
+    $tabs.TabColor = $script:Surface
+    $tabs.SelectedTabColor = $script:Forest
+    $tabs.TabTextColor = if ($Night) { $script:Grey } else { $script:Ink }
+    $tabs.SelectedTabTextColor = [System.Drawing.Color]::White
+    $title.ForeColor = $script:Ink
+    $subtitle.ForeColor = $script:Grey
+    $btnTheme.Text = if ($Night) { [char]0xE708 } else { [char]0xE706 }
+    $btnTheme.BackColor = $script:Surface
+    $btnTheme.ForeColor = $script:Forest
+    $btnTheme.FlatAppearance.BorderColor = $script:Line
+    $themeTip.SetToolTip($btnTheme, $(if ($Night) { '切换到日间模式' } else { '切换到夜间模式' }))
+    $headerRule.BackColor = $script:Amber
+    $lblIpaInfo.ForeColor = $script:Grey
+    $lblCurrencyState.ForeColor = $script:Grey
+    $lblSaveInfo.ForeColor = $script:Grey
+    $lblSaveHint.ForeColor = $script:Grey
+    $status.ForeColor = $script:Grey
+
+    foreach ($button in @(
+        $btnIpaBrowse, $btnStartSkip, $btnApplyCurrency, $btnBackup, $btnRestore,
+        $btnRefresh, $btnSelectAll, $btnSelectNone, $btnSelectInvert, $btnDelete
+    )) {
+        $button.BackColor = $script:SoftGreen
+        $button.ForeColor = if ($Night) { $script:Sage } else { $script:Forest }
+        $button.FlatStyle = 'Flat'
+        $button.FlatAppearance.BorderColor = $script:Line
+    }
+    $btnStart.BackColor = $script:Forest
+    $btnStart.ForeColor = [System.Drawing.Color]::White
+    $btnStart.FlatAppearance.MouseOverBackColor = $hover
+    $btnStart.FlatAppearance.MouseDownBackColor = $pressed
+    if ($script:LblWindowSize) { $script:LblWindowSize.ForeColor = $script:Sage }
+    if ($form.IsHandleCreated) {
+        $captionColor = if ($Night) { [WindowChrome]::PackColor($script:Paper) } else { -1 }
+        $captionTextColor = if ($Night) { [WindowChrome]::PackColor($script:Ink) } else { -1 }
+        $captionBorderColor = if ($Night) { [WindowChrome]::PackColor($script:Line) } else { -1 }
+        [WindowChrome]::Apply(
+            $form.Handle, $Night, [int]$captionColor,
+            [int]$captionTextColor, [int]$captionBorderColor)
+    }
+    $tabs.Invalidate()
+}
+
+$tabs.Add_DrawItem({
+    param($sender, $eventArgs)
+    $selected = $eventArgs.Index -eq $sender.SelectedIndex
+    $background = if ($selected) { $script:Forest } else { $script:Surface }
+    $foreground = if ($selected) { [System.Drawing.Color]::White } elseif ($script:NightMode) { $script:Grey } else { $script:Ink }
+    $fill = New-Object System.Drawing.SolidBrush($background)
+    $textBrush = New-Object System.Drawing.SolidBrush($foreground)
+    $format = New-Object System.Drawing.StringFormat
+    $format.Alignment = [System.Drawing.StringAlignment]::Center
+    $format.LineAlignment = [System.Drawing.StringAlignment]::Center
+    try {
+        $eventArgs.Graphics.FillRectangle($fill, $eventArgs.Bounds)
+        $bounds = $eventArgs.Bounds
+        $text = $sender.TabPages[$eventArgs.Index].Text.Trim()
+        $size = $eventArgs.Graphics.MeasureString($text, $sender.Font)
+        $x = $bounds.Left + (($bounds.Width - $size.Width) / 2)
+        $y = $bounds.Top + (($bounds.Height - $size.Height) / 2)
+        $eventArgs.Graphics.DrawString($text, $sender.Font, $textBrush, [single]$x, [single]$y)
+    } finally {
+        $fill.Dispose(); $textBrush.Dispose(); $format.Dispose()
+    }
+})
+
+Set-ManagerPalette -Night $script:NightMode
+$btnTheme.Add_Click({
+    $script:NightMode = -not $script:NightMode
+    [System.IO.File]::WriteAllText(
+        $script:NightModeFile,
+        $(if ($script:NightMode) { '1' } else { '0' }),
+        [System.Text.Encoding]::ASCII)
+    Set-ManagerPalette -Night $script:NightMode
 })
 
 # --- size the window to its content ----------------------------------------
@@ -2978,35 +3637,51 @@ $form.Add_FormClosing({
 #   * the window had a large blank area below the tabs when a tab was shortened
 #
 # The tab's usable height is its total height minus the row of tab headers, which
-# is what the "+tabHeaderAllowance" accounts for. The extra margin at the bottom
-# keeps the last group box off the border.
+# is what the "+tabHeaderAllowance" accounts for. The window follows the selected
+# page so compact pages do not inherit a blank area from the save list.
 
 $tabHeaderAllowance = 26
 $bottomMargin = 18
 
-$gameNeeded = $grpCurrency.Top + $grpCurrency.Height
+$gameNeeded = [Math]::Max(
+    ($grpCurrency.Top + $grpCurrency.Height),
+    ($btnStartSkip.Top + $btnStartSkip.Height))
+$settingsNeeded = $grpSettings.Top + $grpSettings.Height
 $saveNeeded = $lblSaveHint.Top + $lblSaveHint.Height
 
-$contentHeight = [Math]::Max($gameNeeded, $saveNeeded) + $bottomMargin
-$tabs.Height = $contentHeight + $tabHeaderAllowance
+$script:GameContentHeight = $gameNeeded + $bottomMargin
+$script:SettingsContentHeight = $settingsNeeded + $bottomMargin
+$script:SaveContentHeight = $saveNeeded + $bottomMargin
+$contentHeight = [Math]::Max(
+    [Math]::Max($script:GameContentHeight, $script:SettingsContentHeight),
+    $script:SaveContentHeight)
 
 # Give any leftover height to the save list, so the shorter tab fills the space
 # instead of showing a gap. The list is the only element there that benefits from
 # being taller.
-$slack = ($contentHeight - $bottomMargin) - $saveNeeded
+$slack = $contentHeight - $script:SaveContentHeight
 if ($slack -gt 0) {
     $listSaves.Height = $listSaves.Height + $slack
     $btnSelectAll.Top = $btnSelectAll.Top + $slack
     $btnSelectNone.Top = $btnSelectNone.Top + $slack
     $btnSelectInvert.Top = $btnSelectInvert.Top + $slack
     $lblSaveHint.Top = $lblSaveHint.Top + $slack
+    $script:SaveContentHeight += $slack
 }
 
-# The status line sits under the tabs, and the window wraps the status line.
-$status.Top = $tabs.Top + $tabs.Height + 6
-$form.ClientSize = New-Object System.Drawing.Size(
-    $form.ClientSize.Width,
-    ($status.Top + $status.Height + 10))
+function Update-WindowForSelectedTab {
+    if ($tabs.SelectedIndex -eq 2) { $pageHeight = $script:SaveContentHeight }
+    elseif ($tabs.SelectedIndex -eq 1) { $pageHeight = $script:SettingsContentHeight }
+    else { $pageHeight = $script:GameContentHeight }
+    $tabs.Height = $pageHeight + $tabHeaderAllowance
+    $status.Top = $tabs.Top + $tabs.Height + 6
+    $form.ClientSize = [System.Drawing.Size]::new(
+        $form.ClientSize.Width,
+        [int]($status.Top + $status.Height + 10))
+}
+
+$tabs.Add_SelectedIndexChanged({ Update-WindowForSelectedTab })
+Update-WindowForSelectedTab
 
 [void]$form.ShowDialog()
 $form.Dispose()

@@ -15,7 +15,7 @@
 use super::gles11_raw as gles11;
 use super::gles11_raw::types::*;
 use super::gles_generic::GLES;
-use super::util::{try_decode_pvrtc, PalettedTextureFormat};
+use super::util::{fixed_to_float, try_decode_pvrtc, PalettedTextureFormat};
 use super::GLESContext;
 use crate::window::{GLContext, GLVersion, Window};
 use std::ffi::CStr;
@@ -79,6 +79,71 @@ impl GLESContext for GLES1NativeContext {
 
 pub struct GLES1Native<'gl_ctx> {
     _gl_lifetime: PhantomData<&'gl_ctx ()>,
+}
+
+/// Solve M^T * eye_plane = object_plane for the column-major modelview M.
+/// Clip plane equations, unlike points, transform by the inverse transpose.
+fn clip_plane_in_eye_space(matrix: [f32; 16], plane: [f32; 4]) -> Option<[f32; 4]> {
+    let mut rows = [[0.0f64; 5]; 4];
+    for row in 0..4 {
+        for column in 0..4 {
+            rows[row][column] = matrix[row * 4 + column] as f64;
+        }
+        rows[row][4] = plane[row] as f64;
+    }
+    for column in 0..4 {
+        let pivot = (column..4)
+            .max_by(|&a, &b| rows[a][column].abs().total_cmp(&rows[b][column].abs()))?;
+        if rows[pivot][column] == 0.0 {
+            return None;
+        }
+        rows.swap(column, pivot);
+        let divisor = rows[column][column];
+        for cell in &mut rows[column][column..] {
+            *cell /= divisor;
+        }
+        for row in 0..4 {
+            if row == column {
+                continue;
+            }
+            let factor = rows[row][column];
+            for cell in column..5 {
+                rows[row][cell] -= factor * rows[column][cell];
+            }
+        }
+    }
+    Some(std::array::from_fn(|row| rows[row][4] as f32))
+}
+
+#[cfg(test)]
+mod clip_plane_tests {
+    use super::clip_plane_in_eye_space;
+
+    fn assert_plane(actual: [f32; 4], expected: [f32; 4]) {
+        for index in 0..4 {
+            assert!((actual[index] - expected[index]).abs() < 0.0001, "{actual:?} != {expected:?}");
+        }
+    }
+
+    #[test]
+    fn rotated_avatar_table_bounds() {
+        let matrix = [0.0,-1.0,0.0,0.0, 1.0,0.0,0.0,0.0, 0.0,0.0,1.0,0.0, 130.0,480.0,0.0,1.0];
+        assert_plane(clip_plane_in_eye_space(matrix, [0.0,-1.0,0.0,100.0]).unwrap(), [-1.0,0.0,0.0,230.0]);
+        assert_plane(clip_plane_in_eye_space(matrix, [0.0,1.0,0.0,0.0]).unwrap(), [1.0,0.0,0.0,-130.0]);
+        assert_plane(clip_plane_in_eye_space(matrix, [1.0,0.0,0.0,0.0]).unwrap(), [0.0,-1.0,0.0,480.0]);
+        assert_plane(clip_plane_in_eye_space(matrix, [-1.0,0.0,0.0,480.0]).unwrap(), [0.0,1.0,0.0,0.0]);
+    }
+
+    #[test]
+    fn scaled_translated_oblique_plane() {
+        let matrix = [2.0,0.0,0.0,0.0, 0.0,3.0,0.0,0.0, 0.0,0.0,4.0,0.0, 10.0,-7.0,8.0,1.0];
+        assert_plane(clip_plane_in_eye_space(matrix, [1.0,2.0,4.0,-5.0]).unwrap(), [0.5,2.0/3.0,1.0,-40.0/3.0]);
+    }
+
+    #[test]
+    fn singular_modelview_preserves_driver_fallback() {
+        assert!(clip_plane_in_eye_space([0.0;16], [1.0,0.0,0.0,0.0]).is_none());
+    }
 }
 
 impl GLES for GLES1Native<'_> {
@@ -175,10 +240,35 @@ impl GLES for GLES1Native<'_> {
         gles11::ColorMask(red, green, blue, alpha)
     }
     unsafe fn ClipPlanef(&mut self, plane: GLenum, equation: *const GLfloat) {
-        gles11::ClipPlanef(plane, equation)
+        if !cfg!(target_os = "android") {
+            gles11::ClipPlanef(plane, equation);
+            return;
+        }
+        // Some Android GLES1 translators omit the required modelview transform
+        // when storing a clip plane. Submit an eye-space equation with identity
+        // modelview; this also produces the specified result on correct drivers.
+        let mut modelview = [0.0f32; 16];
+        gles11::GetFloatv(gles11::MODELVIEW_MATRIX, modelview.as_mut_ptr());
+        let object_plane = std::array::from_fn(|index| equation.add(index).read_unaligned());
+        let Some(eye_plane) = clip_plane_in_eye_space(modelview, object_plane) else {
+            gles11::ClipPlanef(plane, equation);
+            return;
+        };
+        let mut matrix_mode = 0;
+        gles11::GetIntegerv(gles11::MATRIX_MODE, &mut matrix_mode);
+        gles11::MatrixMode(gles11::MODELVIEW);
+        gles11::LoadIdentity();
+        gles11::ClipPlanef(plane, eye_plane.as_ptr());
+        gles11::LoadMatrixf(modelview.as_ptr());
+        gles11::MatrixMode(matrix_mode as _);
     }
     unsafe fn ClipPlanex(&mut self, plane: GLenum, equation: *const GLfixed) {
-        gles11::ClipPlanex(plane, equation)
+        if !cfg!(target_os = "android") {
+            gles11::ClipPlanex(plane, equation);
+            return;
+        }
+        let equation_float: [GLfloat; 4] = std::array::from_fn(|index| fixed_to_float(equation.add(index).read_unaligned()));
+        self.ClipPlanef(plane, equation_float.as_ptr());
     }
     unsafe fn CullFace(&mut self, mode: GLenum) {
         gles11::CullFace(mode)

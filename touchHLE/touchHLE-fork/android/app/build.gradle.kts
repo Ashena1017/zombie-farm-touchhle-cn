@@ -7,6 +7,8 @@
  * has a different license. Please see vendor/SDL/LICENSE.txt for details.
  */
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
+import org.gradle.api.tasks.Copy
+import java.security.MessageDigest
 
 plugins {
     id("com.android.application") version("8.10.1")
@@ -41,6 +43,24 @@ fun env(name: String): String? {
     return System.getenv(name)?.takeIf { it.isNotBlank() }
 }
 
+val bundledZombieFarmIpa = rootDir.parentFile.parentFile.parentFile.resolve(
+    "zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa"
+)
+val generatedZombieFarmAssets = layout.buildDirectory.dir("generated/zombieFarmAssets")
+val bundleZombieFarmIpa = tasks.register<Copy>("bundleZombieFarmIpa") {
+    from(bundledZombieFarmIpa)
+    into(generatedZombieFarmAssets)
+    rename { "Zombie_Farm_v29fix.ipa" }
+    outputs.file(generatedZombieFarmAssets.map { it.file("touchHLE_zombiefarm_ipa.sha256") })
+    doLast {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(bundledZombieFarmIpa.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        generatedZombieFarmAssets.get().file("touchHLE_zombiefarm_ipa.sha256")
+            .asFile.writeText(digest)
+    }
+}
+
 android {
     val releaseStoreFile = env("ANDROID_KEYSTORE_PATH")
     val releaseStorePassword = env("ANDROID_KEYSTORE_PASSWORD")
@@ -53,25 +73,27 @@ android {
         releaseKeyPassword,
     ).all { it != null }
 
-    ndkVersion = "25.2.9519653"
+    ndkVersion = "27.2.12479018"
     compileSdk = 31
     buildFeatures {
         buildConfig = true
     }
     defaultConfig {
         val branding = getTouchHLEBranding()
-        applicationId = "org.touchhle.android"
+        applicationId = "org.touchhle.zombiefarm"
+        versionCode = 3
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }
-        resValue("string", "app_name", join("touchHLE", " ", branding))
-        buildConfigField("String", "APP_NAME", "\"${join("touchHLE", " ", branding)}\"")
+        resValue("string", "app_name", join("ZF游戏管理", " ", branding))
+        buildConfigField("String", "APP_NAME", "\"${join("ZF游戏管理", " ", branding)}\"")
         manifestPlaceholders["icon"] = "@drawable/zombie_farm_icon"
-        buildConfigField("int", "APP_ICON", "R.drawable.zombie_farm_icon")
+        buildConfigField("int", "APP_ICON", "org.touchhle.android.R.drawable.zombie_farm_icon")
         versionName = join(getTouchHLEVersionName(), " ", branding)
 
         minSdk = 21 // first version with AArch64
         targetSdk = 31
+        testInstrumentationRunner = "org.touchhle.android.ManagerTestRunner"
         externalNativeBuild {
             ndkBuild {
                 arguments("APP_PLATFORM=android-21")
@@ -124,6 +146,7 @@ android {
             isJniDebuggable = true
         }
     }
+    testBuildType = "release"
 
     applicationVariants.all {
         val variantName = name.replaceFirstChar { char ->
@@ -131,12 +154,14 @@ android {
         }
         tasks.named("merge${variantName}Assets").configure {
             dependsOn("externalNativeBuild${variantName}")
+            dependsOn(bundleZombieFarmIpa)
         }
     }
 
     sourceSets {
         getByName("main") {
             java.srcDir("${rootDir.parentFile}/vendor/SDL/android-project/app/src/main/java")
+            assets.srcDir(generatedZombieFarmAssets)
         }
     }
 

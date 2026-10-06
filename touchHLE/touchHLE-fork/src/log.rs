@@ -27,7 +27,7 @@ pub fn get_log_file() -> &'static File {
 /// from.
 macro_rules! log {
     ($($arg:tt)+) => {
-        echo!("{}: {}", module_path!(), format_args!($($arg)+));
+        echo!("{}: {}", module_path!(), format_args!($($arg)+))
     }
 }
 
@@ -35,7 +35,7 @@ macro_rules! log {
 /// panicking.
 macro_rules! log_no_panic {
     ($($arg:tt)+) => {
-        echo_no_panic!("{}: {}", module_path!(), format_args!($($arg)+));
+        echo_no_panic!("{}: {}", module_path!(), format_args!($($arg)+))
     }
 }
 

@@ -1042,7 +1042,10 @@ fn zombie_farm_repair_ccnode_children_before_visit(
         return;
     };
     let children: id = env.mem.read(children_ivar.cast());
-    if children == nil || zombie_farm_ccarray_storage_is_safe_for_visit(env, children) {
+    if children == nil {
+        return;
+    }
+    if zombie_farm_ccarray_storage_is_safe_for_visit(env, children) {
         return;
     }
 

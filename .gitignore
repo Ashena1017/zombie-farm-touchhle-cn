@@ -13,6 +13,7 @@
 # === 交付包（构建产物，由 _analysis/_build_release.ps1 生成）================
 # 用 Releases 的 zip 分发；直接改 Release/ 会被下次构建覆盖。
 Release/
+touchHLE-zombiefarm-android-arm64/
 
 # === 游戏 IPA / 二进制补丁产物 ==============================================
 # IPA 是第三方游戏本体，既大又不适合放在 git 历史里；
@@ -56,8 +57,12 @@ touchHLE/touchHLE-fork/.git-upstream-fa3d095/
 # === 管理器 / 启动器的本机状态 =============================================
 launcher_selected_ipa.txt
 launcher_skip_memory.txt
+launcher_night_mode.txt
 # 启动脚本的历史备份（本机遗留，不属于源码）
 StartZombieFarmNextHour.ps1.backup-*
+
+# Android Gradle/Kotlin local caches
+touchHLE/touchHLE-fork/android/.kotlin/
 
 # === 分析产物（可由 _analysis 下的脚本重跑出来）============================
 _analysis/archive/

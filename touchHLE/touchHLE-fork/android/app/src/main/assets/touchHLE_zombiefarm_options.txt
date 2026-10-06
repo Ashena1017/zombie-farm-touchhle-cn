@@ -1,0 +1,2 @@
+# Touch-first defaults for the bundled Chinese Zombie Farm IPA.
+com.playforge.ZombieFarm.ZFR: --landscape-right --fps-limit=60 --device-family=iphone --non-blocking-zero-timeout-run-loop

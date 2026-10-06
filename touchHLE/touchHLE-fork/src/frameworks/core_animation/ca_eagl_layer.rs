@@ -46,7 +46,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 /// and present it directly from the app's context. This function is used to
 /// determine when that will happen.
 pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
-    if env.options.force_composition {
+    // SDL's Android window surface is not the same object as the guest
+    // CAEAGLLayer. The fast path would submit the guest renderbuffer to a
+    // non-displayable surface and produce a black screen, so Android always
+    // uses the normal Core Animation composition path.
+    if cfg!(target_os = "android") || env.options.force_composition {
         return nil;
     }
     if env.bundle.bundle_identifier() == "com.playforge.ZombieFarm2" {
@@ -107,12 +111,12 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         }
     }
 
-    if !env.objc.borrow::<CALayerHostObject>(layer).opaque {
+    let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
+    if !msg![env; layer isKindOfClass:ca_eagl_layer_class] {
         return nil;
     }
 
-    let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
-    if !msg![env; layer isKindOfClass:ca_eagl_layer_class] {
+    if !env.objc.borrow::<CALayerHostObject>(layer).opaque {
         return nil;
     }
 

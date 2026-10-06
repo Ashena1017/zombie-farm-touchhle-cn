@@ -1615,6 +1615,13 @@ fn node_f32_by_getter(env: &mut Environment, object: id, selector_name: &str) ->
         .then(|| msg_send_no_type_checking(env, (object, selector)))
 }
 
+fn node_i32_by_getter(env: &mut Environment, object: id, selector_name: &str) -> Option<i32> {
+    let selector = env.objc.lookup_selector(selector_name)?;
+    env.objc
+        .object_has_method(&env.mem, object, selector)
+        .then(|| msg_send_no_type_checking(env, (object, selector)))
+}
+
 fn node_bool_by_getter(env: &mut Environment, object: id, selector_name: &str) -> Option<bool> {
     let selector = env.objc.lookup_selector(selector_name)?;
     debug_object_has_method(env, object, selector)
@@ -3008,9 +3015,15 @@ fn cocos_node_summary(env: &mut Environment, node: id) -> String {
         .or_else(|| node_bool_by_getter(env, node, "visible"))
         .map(|visible| visible.to_string())
         .unwrap_or_else(|| "n/a".to_string());
+    let z_order = node_i32_by_getter(env, node, "zOrder")
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "n/a".to_string());
+    let arrival_order = node_i32_by_getter(env, node, "arrivalOrder")
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "n/a".to_string());
 
     format!(
-        "pos={position} world0={world} anchor={anchor} size={size} scale=({scale_x},{scale_y}) rot={rotation} visible={visible}"
+        "pos={position} world0={world} anchor={anchor} size={size} scale=({scale_x},{scale_y}) rot={rotation} visible={visible} z={z_order} arrival={arrival_order}"
     )
 }
 
