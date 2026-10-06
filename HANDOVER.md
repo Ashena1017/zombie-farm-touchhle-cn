@@ -37,6 +37,7 @@ touchHLE-zombiefarm/
 ├── MSVCP140.dll / VCRUNTIME140*.dll        VC++ 运行库（管理器需要）
 ├── zombie_farm_ipa/           IPA 谱系（63 个文件 / 1.8 GB）
 ├── tools/                     ★ 活代码：patcher + 反汇编基础设施（46 + 4 模块）
+├── .agents/skills/git-pr/     项目级 Codex skill 与 GitHub/Gitee PR 辅助脚本
 ├── _analysis/                 ★ 分析/验证脚本 + 精简后的历史产物（见其 TECHNICAL.md）
 ├── Release/                   ★ 交付包（构建产物，由 _build_release.ps1 生成）
 ├── touchHLE-zombiefarm-android-arm64/ Android APK 输出（构建产物，不入库）
@@ -187,19 +188,22 @@ _analysis\_device_size_e2e.ps1
 
 ### 3.5 发 PR（`git-pr.mjs`，Gitee / GitHub 通用）
 
-脚本：`C:\Users\Loner\.dsh\tools\git-pr.mjs`（零依赖，只用 Node 内置模块）。
+脚本与 Codex skill：`.agents\skills\git-pr\git-pr.mjs` 和同目录的 `SKILL.md`。
+脚本使用 Node.js 18+ 内置模块，无第三方依赖。
 **默认是预演，加了 `--apply` 才真动手** —— 这个设计是刻意的，别绕过它。
 
 ```powershell
-# 0. 先确认 git 身份（新克隆的仓库必然没有；用仓库本地配置，不要 --global）
-git config user.name; git config user.email
-git config user.name "Lonerwcq"; git config user.email "754663659@qq.com"
+# 0. 先确认 Git 最终解析到的身份与来源；缺失时只在目标仓库设置，不要 --global
+git -C <目标仓库> config --show-origin --get-regexp '^(user\.name|user\.email)$'
+git -C <目标仓库> config user.name "<Git author name>"
+git -C <目标仓库> config user.email "<Git author email>"
 
 # 1. 预演：只检查权限与分支，不推送、不开 PR
-node "$env:USERPROFILE\.dsh\tools\git-pr.mjs" --repo <本地仓库路径> --branch <分支> --title "<标题>"
+$gitPr = '.agents\skills\git-pr\git-pr.mjs'
+node $gitPr --repo <本地仓库路径> --branch <分支> --title "<标题>"
 
 # 2. 真提交：推 fork → 开 PR → 回读文件清单（幂等，可重复运行）
-node "$env:USERPROFILE\.dsh\tools\git-pr.mjs" --repo <本地仓库路径> --branch <分支> `
+node $gitPr --repo <本地仓库路径> --branch <分支> `
   --title "<标题>" --body-file <PR描述.md> --base main --apply
 ```
 
@@ -210,29 +214,21 @@ node "$env:USERPROFILE\.dsh\tools\git-pr.mjs" --repo <本地仓库路径> --bran
    **必然失败**（脚本会把它当 `HTTP 4xx` 抛出）。先查准：
    `git -C <仓库> remote show origin | Select-String 'HEAD branch'`。
    本仓库 `zombie-farm-touchhle-cn` 是例外，它的默认分支**就是 `master`**。
-2. **目标必须是自己的 fork，不是上游**。上游一般 `permission.push = false`，
-   直推 `origin` 必然 **403** —— 403 的根因几乎总是「推错仓库」，不是令牌无效。
-   脚本会先探测上游权限、不可推时自动改用 fork。
+2. **核对预演显示的推送目标**。脚本探测上游权限，并按 remote 的实际 push URL
+   选择有权限的上游或个人 fork；不要只凭 `origin` / `fork` 名称判断目标。
+   403 通常是推送目标或权限不匹配，不要先假定令牌失效。
 3. **分支必须与当前 HEAD 一致**（脚本会校验），且**基线要基于上游默认分支的最新 HEAD**
    （先 `git fetch`），否则会把上游较新的提交一起带进 PR，看起来像在回退别人的工作。
 4. **脚本只认文档里列出的参数，未知参数直接报错**（同样是刻意的）——
    别自己发明 `--force` 之类的参数，否则「以为在预演、其实已经推送并开了 PR」。
 
-**注意本仓库不需要走这条路**：`zombie-farm-touchhle-cn` 就是主人自己的仓库
+**注意本仓库不需要走这条 PR 流程**：`zombie-farm-touchhle-cn` 就是项目自己的仓库
 （origin = `Ashena1017/zombie-farm-touchhle-cn`），直接 `git push origin master` 即可。
 `git-pr.mjs` 是给**往别人的仓库提 PR** 用的（例如给上游 touchHLE 提改动、
 或给 `actualdoctornerd-ai/Zombie-Farm-2-Reforged` 提 PR）。
 
-**令牌与安全**：令牌由脚本从 Windows 凭据管理器自动读取（GitHub / Gitee 都已存在，
-不需要主人做任何事）。**绝不打印令牌值**，不写进文件、不 `echo`、不贴进会话。
-自己写 PowerShell 取令牌时有个静默陷阱：`git credential fill` 返回的是**字符串数组**，
-`$x.Length` 是**元素个数**而不是字符数（40 字符的令牌会显示成 `4`），必须先 join 再解析：
-
-```powershell
-$raw = (("protocol=https`nhost=github.com`n`n" | git credential fill 2>$null) -join "`n")
-$tok = (($raw -split "`n") | Where-Object { $_ -like 'password=*' }) -replace '^password=', ''
-if (-not $tok) { throw '未取到令牌' }   # 别把空值带进后续请求
-```
+**令牌与安全**：脚本从 Git credential helper 读取令牌，关闭交互提示且不打印令牌值。
+不要把令牌写入 remote URL、文件、命令行或会话；不要直接回显 `git credential fill` 的结果。
 
 ### 3.6 发 Release（打包 → 建 tag → 传附件 → 回读）
 
