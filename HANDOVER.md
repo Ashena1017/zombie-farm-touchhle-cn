@@ -25,7 +25,7 @@
 ```
 touchHLE-zombiefarm/
 ├── TECHNICAL.md                  ★ 主文档：技术细节 + 血泪教训（11 章，最大的文件）
-├── process.md                 ★ 历代改动流水账，一行一个批次（最新 #29）
+├── process.md                 ★ 历代改动流水账，一行一个批次（最新 #30）
 ├── HANDOVER.md                本文件
 ├── 交接提示词.md              给新会话的开场提示词（复制粘贴用）
 ├── 游戏管理.exe / GameManager.ps1   ★ 图形管理器（唯一入口，双击 exe）
@@ -671,3 +671,11 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 2. 新增 `WindowChrome` DWM 调用：日间恢复系统默认 caption/text/border 颜色；夜间模式设置标题栏底色为管理器深色背景、文字为浅色前景、边框为夜间分隔色。通过 `DWMWA_USE_IMMERSIVE_DARK_MODE`（不支持时回退属性 19）与 Windows 11 caption/text/border color 属性实现；颜色值由 C# 按 COLORREF 正确打包，避免 PowerShell byte 位移丢失高位。
 3. 当前 Windows 11 23H2 / build 22631 实窗验证：夜间标题栏为深灰底、浅色系统标题与按钮；日间标题栏恢复浅色系统样式。截图 `_analysis\dumps\windows-night-titlebar-settings.png` 和 `windows-day-titlebar-settings.png`。旧版 Windows 若不支持 caption color 属性，会保留系统可用的沉浸式深色模式，精确标题栏颜色由系统决定。
 4. Release 已通过 `_analysis\_build_release.ps1` 重建；`_analysis\_verify_release.ps1` 与 `_analysis\_gui_controls_test.ps1` PASS，后者实际切换日夜两次，无异常；Release sandbox 由验证脚本恢复。`git -c core.whitespace=cr-at-eol diff --check` PASS。没有启动游戏或写入真实存档。
+
+## 26. 交接后追加（2026-10-07，双平台默认夜间与清洁发行存档）
+
+1. README 分开写清设备分辨率：iPhone 原生 `480×320`；iPad 原生 `1024×768`，iPad ×1.5 才是 `1536×1152`。Android 首页截图改用 `_analysis\dumps\android-manager-night-relaunch.png` 的夜间管理器实拍。两端首次启动管理器都默认夜间；Windows 通过未创建 `launcher_night_mode.txt` 时默认 `$true` 实现，Android 新安装偏好默认 `true`，已有用户保存过的显式主题选择继续保留。Windows 按钮显式设置 `MiddleCenter` 与零 Padding。
+2. 发现并修正公开存档泄露来源：`_analysis\_build_release.ps1` 原会把开发机 `touchHLE\touchHLE_sandbox\...\saveGame.bin2` 复制进 Windows Release。现在 Release 从空 `touchHLE_sandbox` 构建，玩家首次进入游戏再自行生成进度；Release verifier 强制 sandbox 中没有文件。Android APK 本身只内置 IPA，不允许出现 `touchHLE_sandbox`、`sandbox/` 或 `saveGame.bin2` 条目，静态验证器已加断言。后续任何发行包都不要读取或复制工作目录真实 sandbox。
+3. 修复后 Windows ZIP 为 `95,055,963 B`，SHA-256 `0FC4DC8E3EF544C3945651F04434D883181586120E836E6953BBE374FBA49924`，42 个文件、0 个 sandbox/save 条目；Android APK 为 `97,302,385 B`，SHA-256 `8644CB871D01C0DDFD28C7E4ED80620865EA2E6FB2B471EE8EA6823F1E96FED6`。两者已重新上传到现有 `v29fix-platforms`，Release 说明、GitHub 首页也已更新。Assets API 下载回读的两份文件大小和 SHA-256 均与本地一致；直接 release 下载域名当时连接超时，API octet-stream 下载成功。
+4. 验证：BOM/Syntax、`GameManager.ps1 -SelfTest`、`_verify_layout_match.ps1`、`_verify_release.ps1`、`_verify_android_package.ps1`、`_gui_controls_test.ps1`、`git diff --check` PASS；Release standalone launch 45 秒仍存活。工作目录 `touchHLE\touchHLE_sandbox` 未被构建/测试写入，SelfTest 显示真实存档金币 `140586` / 脑子 `4410` 且只读。新截图显示 Android 夜间模式，但本次 MuMu 未连接，因此没有做 APK 新默认主题的设备端启动验证。
+5. GitHub `master` 为 `3cae4df063a6ab95cc499f5ffbe1f6f6695b2050`；包含本批代码与 README 更新的 tree `abf3e979bf801cd6ec65c98d1ee172d235310396`。`process.md` 最新批次 #30。
