@@ -1,4 +1,4 @@
-# Zombie Farm 中文版 · Windows / Android
+# 僵尸农场（Zombie Farm）中文版 · Windows / Android
 
 **在 Windows PC 或 Android ARM64 设备上，运行修复并完整中文化的原版《僵尸农场》（Zombie Farm）。**
 
