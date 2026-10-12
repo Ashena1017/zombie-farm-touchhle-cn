@@ -108,6 +108,7 @@ $psi.RedirectStandardOutput = $true
 $psi.RedirectStandardError = $true
 
 $env:TOUCHHLE_TIME_OFFSET_SECONDS = '0'
+$testStarted = [DateTime]::UtcNow
 $proc = [System.Diagnostics.Process]::Start($psi)
 $stdoutTask = $proc.StandardOutput.ReadToEndAsync()
 $stderrTask = $proc.StandardError.ReadToEndAsync()
@@ -115,20 +116,24 @@ $stderrTask = $proc.StandardError.ReadToEndAsync()
 # The game renders in a window; wait for it, then close it.
 Start-Sleep -Seconds 6
 $windowFound = $false
-$deadline = (Get-Date).AddSeconds($Seconds)
-while ((Get-Date) -lt $deadline) {
+$deadline = $testStarted.AddSeconds($Seconds)
+while ([DateTime]::UtcNow -lt $deadline) {
     $proc.Refresh()
     if (-not $proc.HasExited -and $proc.MainWindowHandle -ne 0) { $windowFound = $true; break }
     if ($proc.HasExited) { break }
     Start-Sleep -Milliseconds 500
 }
 
-# Let it run a little so loading failures would surface.
-Start-Sleep -Seconds 8
+# Keep observing until the requested runtime has really elapsed. Finding a
+# window early must not turn a 45-second check into a 14-second check.
+while (-not $proc.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+    Start-Sleep -Milliseconds 500
+}
 $stillRunning = -not $proc.HasExited
+$elapsed = ([DateTime]::UtcNow - $testStarted).TotalSeconds
 
 Write-Host ("  window appeared: {0}" -f $(if ($windowFound) { 'yes' } else { 'NO' }))
-Write-Host ("  still running after {0}s: {1}" -f ($Seconds), $(if ($stillRunning) { 'yes' } else { "no (exit $($proc.ExitCode))" }))
+Write-Host ("  still running after {0:F1}s: {1}" -f $elapsed, $(if ($stillRunning) { 'yes' } else { "no (exit $($proc.ExitCode))" }))
 
 # Collect output.
 if ($stillRunning) {

@@ -24,10 +24,13 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-windows-x64-v29fix.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-android-arm64-v29fix.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-invasion-fix/zombie-farm-windows-x64-v29fix-invasion-fix.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-invasion-fix/zombie-farm-android-arm64-v29fix-invasion-fix.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
-两份附件和版本说明也可在[跨平台 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-platforms)查看。
+两份附件和版本说明也可在[跨平台 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-invasion-fix)查看。
+
+**2026-10-13 入侵修复更新**：Windows 与 Android 已同步修复 touchHLE 的小堆内存释放错误，并补充 Cocos 调度器同步保护。旧分配器可能在加载战斗纹理时覆盖仍在使用的游戏对象，导致入侵闪退；此次修复不需要修改游戏 IPA 或存档。此前稳定闪退的单次 Windows 海盗入侵已由用户确认完成，日志正常退出；Android 已重新构建并通过包校验，本次尚未进行设备端入侵实测。更新前建议先在管理器里备份存档，Android 可直接覆盖安装。
+
 Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows 包面向 Windows 10/11 x64。
 两个版本首次启动管理器时都默认使用夜间模式。Android 默认按 iPhone 原生画面运行并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
 交付包不包含任何玩家 sandbox 存档；首次进入游戏后会为玩家创建新存档。
