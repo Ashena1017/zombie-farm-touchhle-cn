@@ -181,7 +181,7 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-android-arm64-v29fix.apk)；
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-save-selection/zombie-farm-android-arm64-v29fix-invasion-fix.apk)；
 2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。最新 v29fix IPA 已内置，首次启动自动校验安装，不需要手动复制 `data` 文件。
 
