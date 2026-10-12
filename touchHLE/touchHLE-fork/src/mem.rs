@@ -20,7 +20,7 @@ mod host;
 pub use allocator::VMAllocError;
 
 use crate::libc::wchar::wchar_t;
-use crate::mem::allocator::{Chunk, HeapAllocator, VMAllocator};
+use crate::mem::allocator::{AllocationOrigin, Chunk, HeapAllocator, VMAllocator};
 
 /// Equivalent of `usize` for guest memory.
 pub type GuestUSize = u32;
@@ -610,10 +610,20 @@ impl Mem {
     /// Free allocations made with non vm prefixed `alloc` methods on
     /// this type.
     pub fn free(&mut self, ptr: MutVoidPtr) {
-        let size = self.heap_allocator().free(ptr.to_bits());
+        let Some(freed) = self.heap_allocator().free(ptr.to_bits()) else {
+            // Preserve unknown-free's logged, non-fatal zero-byte behavior.
+            // In particular, do not return any VM pages or write guest bytes.
+            log_dbg!("Freed {:?} ({:#x} bytes)", ptr, 0);
+            return;
+        };
+        let size = freed.size;
 
-        if size > Self::MAX_HEAP_ALLOCATION_SIZE {
-            self.vm_free(ptr, size);
+        // A 15345..15359-byte heap request rounds to 15360 bytes. Reapplying
+        // the request threshold here would release part of the heap's VM
+        // reservation, allowing a future bitmap to overwrite live objects.
+        match freed.origin {
+            AllocationOrigin::Heap => {}
+            AllocationOrigin::External => self.vm_free(ptr, size),
         }
 
         if self.zero_memory_on_free {
@@ -683,5 +693,112 @@ impl Mem {
     /// memory allocator.
     pub fn reserve(&mut self, base: VAddr, size: GuestUSize) {
         self.vm_allocator.allocate(Some(base), size).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod allocation_origin_tests {
+    use super::{Mem, MutVoidPtr, VMAllocError, PAGE_SIZE};
+
+    fn assert_pattern(mem: &Mem, ptr: MutVoidPtr, size: u32, pattern: u8) {
+        assert!(mem
+            .bytes_at(ptr.cast(), size)
+            .iter()
+            .all(|&byte| byte == pattern));
+    }
+
+    #[test]
+    fn all_heap_alignment_edges_preserve_vm_reservation_and_live_neighbors() {
+        for requested in 15345..=15359 {
+            let mut mem = Mem::new();
+            mem.set_null_segment_size(PAGE_SIZE);
+            let before = mem.alloc(16);
+            let edge = mem.alloc(requested);
+            let after = mem.alloc(448);
+            mem.bytes_at_mut(before.cast(), 16).fill(0x5a);
+            mem.bytes_at_mut(edge.cast(), 15360).fill(0xcc);
+            mem.bytes_at_mut(after.cast(), 448).fill(0xa5);
+            assert_eq!(mem.malloc_size(edge.cast_const()), 15360);
+
+            // Exercise real Mem::free, not a copy of its routing decision.
+            mem.free(edge);
+            assert_pattern(&mem, edge, 15360, 0);
+            assert!(matches!(
+                mem.vm_alloc(Some(before.to_bits()), PAGE_SIZE),
+                Err(VMAllocError::AddressUnavailable)
+            ));
+            let reused_heap = mem.alloc(requested);
+            assert_eq!(reused_heap.to_bits(), edge.to_bits());
+            mem.free(reused_heap);
+
+            let bitmap = mem.alloc(16384);
+            let heap_start = u64::from(before.to_bits());
+            let heap_end = heap_start + u64::from(Mem::HEAP_SIZE);
+            let bitmap_start = u64::from(bitmap.to_bits());
+            let bitmap_end = bitmap_start + 16384;
+            assert!(
+                bitmap_end <= heap_start || bitmap_start >= heap_end,
+                "request {requested} exposed the heap reservation to a VM bitmap"
+            );
+            mem.bytes_at_mut(bitmap.cast(), 16384).fill(0x13);
+            assert_pattern(&mem, before, 16, 0x5a);
+            assert_pattern(&mem, after, 448, 0xa5);
+            assert_eq!(mem.malloc_size(before.cast_const()), 16);
+            assert_eq!(mem.malloc_size(after.cast_const()), 448);
+            mem.free(bitmap);
+        }
+    }
+
+    #[test]
+    fn external_boundary_and_bitmap_allocations_release_and_reuse_vm_pages() {
+        for requested in [15360, 16384] {
+            let mut mem = Mem::new();
+            mem.set_null_segment_size(PAGE_SIZE);
+            let before = mem.alloc(16);
+            let after = mem.alloc(448);
+            mem.bytes_at_mut(before.cast(), 16).fill(0x5a);
+            mem.bytes_at_mut(after.cast(), 448).fill(0xa5);
+            let external = mem.alloc(requested);
+            mem.bytes_at_mut(external.cast(), requested).fill(0xee);
+            mem.free(external);
+            assert_pattern(&mem, external, requested, 0);
+            assert_eq!(mem.try_malloc_size(external.cast_const()), None);
+
+            // A genuine external release must make its VM range available.
+            let probe = mem.vm_alloc(Some(external.to_bits()), requested).unwrap();
+            assert_eq!(probe.to_bits(), external.to_bits());
+            mem.vm_free(probe, requested);
+            let reused = mem.alloc(requested);
+            assert_eq!(reused.to_bits(), external.to_bits());
+            assert_pattern(&mem, reused, requested, 0);
+            assert_pattern(&mem, before, 16, 0x5a);
+            assert_pattern(&mem, after, 448, 0xa5);
+            mem.free(reused);
+        }
+    }
+
+    #[test]
+    fn heap_release_preserves_zero_on_alloc_mode_and_unknown_free_behavior() {
+        let mut mem = Mem::new();
+        mem.set_null_segment_size(PAGE_SIZE);
+        mem.zero_memory_on_free = false;
+        let before = mem.alloc(16);
+        let edge = mem.alloc(15359);
+        let after = mem.alloc(448);
+        mem.bytes_at_mut(before.cast(), 16).fill(0x5a);
+        mem.bytes_at_mut(edge.cast(), 15359).fill(0xee);
+        mem.bytes_at_mut(after.cast(), 448).fill(0xa5);
+        mem.free(edge);
+        assert_pattern(&mem, edge, 15359, 0xee);
+        mem.free(edge); // logged unknown/double free, no VM release or writes
+        assert_pattern(&mem, before, 16, 0x5a);
+        assert_pattern(&mem, after, 448, 0xa5);
+        let reused = mem.alloc(15359);
+        assert_eq!(reused.to_bits(), edge.to_bits());
+        assert_pattern(&mem, reused, 15359, 0);
+        assert!(matches!(
+            mem.vm_alloc(Some(before.to_bits()), PAGE_SIZE),
+            Err(VMAllocError::AddressUnavailable)
+        ));
     }
 }

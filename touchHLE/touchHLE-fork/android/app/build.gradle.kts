@@ -81,7 +81,7 @@ android {
     defaultConfig {
         val branding = getTouchHLEBranding()
         applicationId = "org.touchhle.zombiefarm"
-        versionCode = 3
+        versionCode = 4
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }

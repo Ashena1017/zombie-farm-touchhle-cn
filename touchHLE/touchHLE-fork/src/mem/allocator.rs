@@ -401,6 +401,21 @@ pub struct HeapAllocator {
     external_chunks: ChunkMap,
 }
 
+/// The allocator that owns an allocation, independent of its rounded size.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AllocationOrigin {
+    Heap,
+    External,
+}
+
+/// Release information returned by the heap registry. External allocations
+/// still need to be returned to their owning allocator by the caller.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct FreedAllocation {
+    pub size: GuestUSize,
+    pub origin: AllocationOrigin,
+}
+
 impl HeapAllocator {
     pub fn new(base: VAddr, size: GuestUSize) -> HeapAllocator {
         let allocation_space = Chunk::new(base, size);
@@ -456,16 +471,22 @@ impl HeapAllocator {
         self.external_chunks.insert(chunk);
     }
 
-    /// Returns the size of the freed chunk so it can be zeroed if desired
+    /// Return size and ownership for the freed chunk. Heap alignment may round
+    /// a small request across the caller's large-allocation threshold, so size
+    /// alone must never be used to infer whether the external allocator owns it.
+    /// Unknown/already-freed addresses are logged and return None.
     #[must_use]
-    pub fn free(&mut self, base: VAddr) -> GuestUSize {
+    pub fn free(&mut self, base: VAddr) -> Option<FreedAllocation> {
         if let Some(freed) = self.external_chunks.remove_with_base(base) {
-            return freed.size.get();
+            return Some(FreedAllocation {
+                size: freed.size.get(),
+                origin: AllocationOrigin::External,
+            });
         }
 
         let Some(freed) = self.used_chunks.remove_with_base(base) else {
             log!("Can't free {:#x}, unknown allocation!", base);
-            return 0;
+            return None;
         };
 
         if let Some(adjacent) = self
@@ -479,7 +500,49 @@ impl HeapAllocator {
             self.unused_chunks.insert(freed);
         }
 
-        freed.size.get()
+        Some(FreedAllocation {
+            size: freed.size.get(),
+            origin: AllocationOrigin::Heap,
+        })
+    }
+}
+
+#[cfg(test)]
+mod allocation_origin_tests {
+    use super::{AllocationOrigin, Chunk, FreedAllocation, HeapAllocator, VMAllocator};
+
+    #[test]
+    fn equal_sized_heap_and_external_releases_keep_distinct_owners() {
+        let mut vm = VMAllocator::new(0x1000, 0x100000);
+        let reservation = vm.allocate(None, 0x10000).unwrap();
+        let mut heap = HeapAllocator::new(reservation.base, reservation.size.get());
+        let rounded_heap = heap.alloc(15359).unwrap();
+        assert_eq!(
+            heap.free(rounded_heap),
+            Some(FreedAllocation {
+                size: 15360,
+                origin: AllocationOrigin::Heap,
+            })
+        );
+
+        let external = vm.allocate(None, 15360).unwrap();
+        heap.add_external_allocation(Chunk::new(external.base, 15360));
+        assert_eq!(
+            heap.free(external.base),
+            Some(FreedAllocation {
+                size: 15360,
+                origin: AllocationOrigin::External,
+            })
+        );
+    }
+
+    #[test]
+    fn unknown_and_duplicate_frees_do_not_report_an_owner() {
+        let mut heap = HeapAllocator::new(0x1000, 0x10000);
+        let object = heap.alloc(16).unwrap();
+        assert!(heap.free(object).is_some());
+        assert_eq!(heap.free(object), None);
+        assert_eq!(heap.free(0xdeadbeef), None);
     }
 }
 

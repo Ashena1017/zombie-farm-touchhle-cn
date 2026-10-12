@@ -31,6 +31,8 @@ mod objects;
 mod properties;
 mod selectors;
 mod synchronization;
+pub(crate) mod zombie_farm_scheduler;
+mod memory_trace;
 
 pub use classes::{objc_classes, Class, ClassExports, ClassTemplate};
 pub use messages::{
@@ -113,6 +115,10 @@ pub struct ObjC {
     /// Mutexes for running the +initialize function.
     initializer_threads: HashMap<id, ThreadInitializer>,
 
+    /// Shared guest-thread recursive gate for legacy Zombie Farm's Cocos
+    /// scheduler and action manager. One gate avoids opposite lock ordering.
+    zombie_farm_scheduler_mutex: Option<MutexId>,
+
     /// Temporary storage for optional type information when sending a message.
     /// Type information isn't part of the `objc_msgSend` ABI, so an alternative
     /// channel is needed.
@@ -140,6 +146,7 @@ impl ObjC {
             class_names: RefCell::new(HashMap::new()),
             sync_mutexes: HashMap::new(),
             initializer_threads: HashMap::new(),
+            zombie_farm_scheduler_mutex: None,
             message_type_info: None,
             last_message_debug: None,
         }

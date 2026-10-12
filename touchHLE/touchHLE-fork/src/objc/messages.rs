@@ -700,7 +700,9 @@ Type mismatch when sending message {} to {:?}!
                         }
                         // We can't create a new stack frame, because that would
                         // interfere with pass-through of stack arguments.
-                        IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
+                        IMP::Guest(guest_imp) => {
+                            super::zombie_farm_scheduler::call_guest_imp(env, orig_class, guest_imp)
+                        }
                     }
                 }
                 if let Some((call, start)) = zombie_farm_scroll_profile {

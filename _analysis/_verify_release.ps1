@@ -109,14 +109,16 @@ $psi.RedirectStandardError = $true
 
 $env:TOUCHHLE_TIME_OFFSET_SECONDS = '0'
 $proc = [System.Diagnostics.Process]::Start($psi)
+$stdoutTask = $proc.StandardOutput.ReadToEndAsync()
+$stderrTask = $proc.StandardError.ReadToEndAsync()
 
 # The game renders in a window; wait for it, then close it.
 Start-Sleep -Seconds 6
 $windowFound = $false
 $deadline = (Get-Date).AddSeconds($Seconds)
 while ((Get-Date) -lt $deadline) {
-    $p = Get-Process -Name 'touchHLE' -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($p -and $p.MainWindowHandle -ne 0) { $windowFound = $true; break }
+    $proc.Refresh()
+    if (-not $proc.HasExited -and $proc.MainWindowHandle -ne 0) { $windowFound = $true; break }
     if ($proc.HasExited) { break }
     Start-Sleep -Milliseconds 500
 }
@@ -130,12 +132,12 @@ Write-Host ("  still running after {0}s: {1}" -f ($Seconds), $(if ($stillRunning
 
 # Collect output.
 if ($stillRunning) {
-    Get-Process -Name 'touchHLE' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    try { $proc.Kill() } catch { }
 }
 $out = ''; $err = ''
-try { $out = $proc.StandardOutput.ReadToEnd() } catch { }
-try { $err = $proc.StandardError.ReadToEnd() } catch { }
 if (-not $proc.HasExited) { try { $proc.WaitForExit(10000) | Out-Null } catch { } }
+try { $out = $stdoutTask.GetAwaiter().GetResult() } catch { }
+try { $err = $stderrTask.GetAwaiter().GetResult() } catch { }
 
 $text = $out + "`n" + $err
 [System.IO.File]::WriteAllText($log, $text, (New-Object System.Text.UTF8Encoding($false)))

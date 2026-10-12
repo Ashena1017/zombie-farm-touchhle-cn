@@ -25,6 +25,99 @@ use crate::image::{gamma_decode, gamma_encode, Image};
 use crate::mem::{GuestUSize, Mem, MutVoidPtr};
 use crate::objc::ObjC;
 use crate::Environment;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::OnceLock;
+
+static ZF_BITMAP_TRACE_ENABLED: OnceLock<bool> = OnceLock::new();
+static ZF_BITMAP_TRACE_CREATES: AtomicUsize = AtomicUsize::new(0);
+static ZF_BITMAP_TRACE_FIRST_ANOMALY: AtomicBool = AtomicBool::new(false);
+
+fn zombie_farm_memory_trace_enabled(env: &Environment) -> bool {
+    *ZF_BITMAP_TRACE_ENABLED
+        .get_or_init(|| std::env::var("TOUCHHLE_ZF_MEMORY_TRACE").as_deref() == Ok("1"))
+        && matches!(
+            env.bundle.bundle_identifier(),
+            "com.playforge.ZombieFarm.ZFR" | "com.playforge.ZFR.LZ54D2GT3D"
+        )
+        && env.bundle.bundle_version() == "1.0"
+}
+
+/// Check a buffer before exposing any writable pixels. A missing exact-base
+/// heap allocation may be an interior/VM pointer, so it is metadata only.
+/// This diagnostic does not prevent a write or change the caller's allocation.
+fn trace_bitmap_destination(
+    objc: &ObjC,
+    mem: &mut Mem,
+    context: CGContextRef,
+    data: &CGBitmapContextData,
+    stage: &str,
+    write_lr: Option<u32>,
+) {
+    let Some(create_lr) = data.memory_trace_origin_lr else {
+        return;
+    };
+    if ZF_BITMAP_TRACE_FIRST_ANOMALY.load(Ordering::Relaxed) {
+        return;
+    }
+    let requested_size = u64::from(data.height) * u64::from(data.bytes_per_row);
+    let row_pixels = u64::from(data.width) * u64::from(bytes_per_pixel(data));
+    let stride_too_small = u64::from(data.bytes_per_row) < row_pixels;
+    let address_overflow = u64::from(data.data.to_bits()) + requested_size > (1u64 << 32);
+    let allocation_size = mem.try_malloc_size(data.data.cast_const());
+    let undersized = allocation_size.is_some_and(|size| requested_size > u64::from(size));
+    let overlaps = objc.registered_objects_in_range(mem, data.data.to_bits(), requested_size, 16);
+    let anomalous = undersized || stride_too_small || address_overflow || !overlaps.is_empty();
+    let report_create = stage == "create"
+        && ZF_BITMAP_TRACE_CREATES.fetch_add(1, Ordering::Relaxed) < 24;
+    if anomalous {
+        if ZF_BITMAP_TRACE_FIRST_ANOMALY
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+        {
+            return;
+        }
+        log!(
+            "ZFR memory trace FIRST ANOMALY stage={} context={:?} data={:?} owned={} width={} height={} stride={} requested={} row_pixels={} heap_size={:?} undersized={} stride_too_small={} address_overflow={} create_LR=0x{:08x} write_LR={:?}",
+            stage, context, data.data, data.data_is_owned, data.width, data.height,
+            data.bytes_per_row, requested_size, row_pixels, allocation_size,
+            undersized, stride_too_small, address_overflow, create_lr,
+            write_lr.map(|lr| format!("0x{lr:08x}")),
+        );
+        for overlap in overlaps {
+            log!(
+                "ZFR memory trace registered object overlap object={:?} heap_size={:?} isa={:?} class={:?}",
+                overlap.object, overlap.allocation_size,
+                overlap.isa.map(|isa| format!("0x{isa:08x}")), overlap.class_name,
+            );
+        }
+    } else if report_create {
+        log!(
+            "ZFR memory trace create context={:?} data={:?} owned={} width={} height={} stride={} requested={} heap_size={:?} color_space={} alpha={} create_LR=0x{:08x}",
+            context, data.data, data.data_is_owned, data.width, data.height,
+            data.bytes_per_row, requested_size, allocation_size, data.color_space,
+            data.alpha_info, create_lr,
+        );
+    }
+}
+
+fn trace_context_before_write(env: &mut Environment, context: CGContextRef, stage: &str) {
+    if !zombie_farm_memory_trace_enabled(env)
+        || ZF_BITMAP_TRACE_FIRST_ANOMALY.load(Ordering::Relaxed)
+    {
+        return;
+    }
+    let host_obj = env.objc.borrow::<CGContextHostObject>(context);
+    let CGContextSubclass::CGBitmapContext(bitmap_data) = host_obj.subclass;
+    let write_lr = env.cpu.regs()[crate::cpu::Cpu::LR];
+    trace_bitmap_destination(
+        &env.objc,
+        &mut env.mem,
+        context,
+        &bitmap_data,
+        stage,
+        Some(write_lr),
+    );
+}
 
 #[derive(Copy, Clone)]
 pub(super) struct CGBitmapContextData {
@@ -36,6 +129,8 @@ pub(super) struct CGBitmapContextData {
     bytes_per_row: GuestUSize,
     color_space: &'static str,
     alpha_info: CGImageAlphaInfo,
+    /// Only set for opt-in legacy ZFR diagnostics; never guest-visible.
+    memory_trace_origin_lr: Option<u32>,
 }
 
 pub fn CGBitmapContextCreate(
@@ -48,6 +143,8 @@ pub fn CGBitmapContextCreate(
     color_space: CGColorSpaceRef,
     bitmap_info: u32,
 ) -> CGContextRef {
+    let memory_trace_origin_lr = zombie_farm_memory_trace_enabled(env)
+        .then(|| env.cpu.regs()[crate::cpu::Cpu::LR]);
     assert!(bits_per_component == 8); // TODO: support other bit depths
 
     let color_space = env.objc.borrow::<CGColorSpaceHostObject>(color_space).name;
@@ -81,6 +178,7 @@ pub fn CGBitmapContextCreate(
             bytes_per_row,
             color_space,
             alpha_info: bitmap_info & kCGBitmapAlphaInfoMask,
+            memory_trace_origin_lr,
         }),
         // TODO: is this the correct default?
         rgb_fill_color: (0.0, 0.0, 0.0, 0.0),
@@ -92,8 +190,11 @@ pub fn CGBitmapContextCreate(
     let isa = env
         .objc
         .get_known_class("_touchHLE_CGContext", &mut env.mem);
-    env.objc
-        .alloc_object(isa, Box::new(host_object), &mut env.mem)
+    let context = env
+        .objc
+        .alloc_object(isa, Box::new(host_object), &mut env.mem);
+    trace_context_before_write(env, context, "create");
+    context
 }
 
 fn CGBitmapContextGetData(env: &mut Environment, context: CGContextRef) -> MutVoidPtr {
@@ -381,6 +482,14 @@ impl CGBitmapContextDrawer<'_> {
             ..
         } = objc.borrow(context);
 
+        trace_bitmap_destination(
+            objc,
+            mem,
+            context,
+            &bitmap_info,
+            "drawer-before-write",
+            None,
+        );
         let pixels = get_pixels(&bitmap_info, mem);
 
         CGBitmapContextDrawer {
@@ -533,6 +642,7 @@ fn test_iter_transformed_pixels() {
                 bytes_per_row: 3 * width,
                 color_space: "kCGColorSpaceGenericRGB",
                 alpha_info: 0,
+                memory_trace_origin_lr: None,
             },
             rgb_fill_color: (0.0, 0.0, 0.0, 0.0),
             transform,
@@ -610,6 +720,11 @@ fn test_iter_transformed_pixels() {
 /// Implementation of `CGContextFillRect` (`clear` == [false]) and
 /// `CGContextClearRect` (`clear` == [true]) for `CGBitmapContext`.
 pub(super) fn fill_rect(env: &mut Environment, context: CGContextRef, rect: CGRect, clear: bool) {
+    trace_context_before_write(
+        env,
+        context,
+        if clear { "clear-rect" } else { "fill-rect" },
+    );
     let (clip_mask, blend_mode) = {
         let host_obj = env.objc.borrow::<CGContextHostObject>(context);
         (
@@ -642,6 +757,7 @@ pub(super) fn draw_image(
     rect: CGRect,
     image: CGImageRef,
 ) {
+    trace_context_before_write(env, context, "draw-image");
     let image = cg_image::borrow_image(&env.objc, image);
     let (clip_mask, blend_mode) = {
         let host_obj = env.objc.borrow::<CGContextHostObject>(context);

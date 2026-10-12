@@ -48,6 +48,22 @@ fn main() {
         build.define("ALSOFT_NO_CONFIG_UTIL", "ON");
         build.define("ALSOFT_EXAMPLES", "OFF");
 
+        // CMake 4 enables OpenAL's C++20 modules with the VS 2022 generator,
+        // but our MSVC 19.42 build cannot resolve the alc.context module.
+        // Use the upstream header-based build without disabling EAX or any
+        // audio backend. Explicitly override an existing CMake cache as well.
+        if os.eq_ignore_ascii_case("windows") {
+            build.define("ALSOFT_ENABLE_MODULES", "OFF");
+            build.define("CMAKE_CXX_SCAN_FOR_MODULES", "OFF");
+            // cmake 0.1.49 replaces the VS configuration flags and drops
+            // CMake's default NDEBUG. Restore release semantics; otherwise
+            // OpenAL compiles its Windows debug-only std::format call, which
+            // lacks the zstring_view formatter in the header-based build.
+            if build.get_profile() != "Debug" {
+                build.cxxflag("-DNDEBUG");
+            }
+        }
+
         // Android's NDK libc++ does not make <compare> transitively available
         // from <string_view>, while OpenAL's alstring.h uses std::weak_ordering
         // in its public declarations. Force-include it for the Android build.
