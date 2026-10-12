@@ -24,10 +24,12 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-invasion-fix/zombie-farm-windows-x64-v29fix-invasion-fix.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-invasion-fix/zombie-farm-android-arm64-v29fix-invasion-fix.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-save-selection/zombie-farm-windows-x64-v29fix-save-selection.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-save-selection/zombie-farm-android-arm64-v29fix-invasion-fix.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
-两份附件和版本说明也可在[跨平台 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-invasion-fix)查看。
+两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-save-selection)查看。
+
+**2026-10-13 管理器显示更新**：Windows 存档列表的选中记录现在有整行高亮和左侧标记，日间与夜间均可清楚区分；点击操作按钮后仍保留高亮。Android 下载沿用已发布的入侵修复版 APK，已经安装该版的玩家无需重复升级。
 
 **2026-10-13 入侵修复更新**：Windows 与 Android 已同步修复 touchHLE 的小堆内存释放错误，并补充 Cocos 调度器同步保护。旧分配器可能在加载战斗纹理时覆盖仍在使用的游戏对象，导致入侵闪退；此次修复不需要修改游戏 IPA 或存档。此前稳定闪退的单次 Windows 海盗入侵已由用户确认完成，日志正常退出；Android 已重新构建并通过包校验，本次尚未进行设备端入侵实测。更新前建议先在管理器里备份存档，Android 可直接覆盖安装。
 
@@ -171,7 +173,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-platforms/zombie-farm-windows-x64-v29fix.zip) 并解压；
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-save-selection/zombie-farm-windows-x64-v29fix-save-selection.zip) 并解压；
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 

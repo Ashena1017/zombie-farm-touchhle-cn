@@ -1,5 +1,7 @@
 # 待办清单（用户反馈批次 2）
 
+> **2026-10-13 Windows 存档列表选中高亮（#37）**：主人反馈选中和未选中的存档同色；TEMP 隔离实窗复现：绘制事件的 `ItemState` 使三行无论实际选择状态都使用选中底色。改为读取 `ListViewItem.Selected`，选择变化和主题切换时重绘；夜间选中底色 RGB `50,83,69`、普通底色 `38,46,48`，日间分别 `208,231,219` / `255,255,255`，选中行左侧增加主题色标记。真实窗口截图和四列像素采样覆盖两种主题的单选、失焦、全选、取消和反选；仅使用 TEMP 虚拟条目，无真实存档操作。开发版与 `Release\GameManager.ps1` 同步；新版本 `v29fix-save-selection` 的 Windows ZIP 为 `95,948,563 B` / `7A924801C7BA86F853D1D682B674B5955A5E474E44A2451C5E19244805A2A130`，Android APK 沿用入侵修复版。验证范围见 `_analysis/reports/RELEASE_NOTES_v29fix-save-selection.md`。
+
 > **2026-10-13 入侵修复双平台打包（#36）**：基于源码 `2a478424b50591360f91790ee760f34b78072987` 重建 Windows ZIP 与 Android ARM64 APK；Android versionCode `4`、签名保持，IPA 内容保持。Windows 42 文件、实际启动 `45.5 s` 通过，APK 默认参数/内置 IPA/原生库/签名校验通过，两端不含玩家存档。ZIP `95,948,193 B` / `8935F65C5A754D5BADB92541AE09551EB3ADB8E98A8F9479A15B7CE02F2D9C67`；APK `97,312,084 B` / `C10F0E00B4AADA2E47944F41245AB5B64C5142849926FCC538179DD405920B7F`。本轮 MuMu 未启动，Android 入侵未实测。发布版本 `v29fix-invasion-fix` 的说明见 `_analysis/reports/RELEASE_NOTES_v29fix-invasion-fix.md`。
 
 > **2026-10-12 入侵闪退分配器修复（#35）**：真实诊断抓到 `16384 B` 位图覆盖仍登记的 `448 / 16 B` 对象，确定小堆请求 `15345..15359 B` 对齐为 `15360 B` 后被旧 free 错当 VM 回收。改为 Heap/External 明确来源释放，保留 Cocos 共用可重入同步；5 项新增真实 Mem 回归及全库 65 项通过，旧源码全部 15 个危险边界复现、2 个相邻对照正常。用户用原稳定复现隔离存档完成单次海盗入侵、未闪退，探针未记录重叠，战后保存及正常退出码 `0`；真实项目 sandbox 未改变，发行 sandbox 保持空。重复入侵和死亡后补队尚未实测；双平台打包结果见 #36。

@@ -2479,8 +2479,10 @@ $listSaves.Add_DrawItem({
 })
 $listSaves.Add_DrawSubItem({
     param($sender, $eventArgs)
-    $selected = ($eventArgs.ItemState -band [System.Windows.Forms.ListViewItemStates]::Selected) -ne 0
-    $background = if ($selected) { $script:SoftGreen } else { $script:Surface }
+    # Native custom-draw ItemState can report Selected for every subitem.
+    # Read the actual row state, including when focus moves to an action button.
+    $selected = $eventArgs.Item.Selected
+    $background = if ($selected) { $script:SaveSelection } else { $script:Surface }
     $foreground = if ($selected) { $script:Ink } else { $eventArgs.Item.ForeColor }
     if ($foreground.IsEmpty -or $foreground -eq [System.Drawing.Color]::Empty) {
         $foreground = $script:Ink
@@ -2489,6 +2491,13 @@ $listSaves.Add_DrawSubItem({
     $linePen = New-Object System.Drawing.Pen($script:Line)
     try {
         $eventArgs.Graphics.FillRectangle($fill, $eventArgs.Bounds)
+        if ($selected -and $eventArgs.ColumnIndex -eq 0) {
+            $accent = New-Object System.Drawing.SolidBrush($script:SaveSelectionAccent)
+            try {
+                $eventArgs.Graphics.FillRectangle($accent, $eventArgs.Bounds.Left,
+                    $eventArgs.Bounds.Top, 3, $eventArgs.Bounds.Height - 1)
+            } finally { $accent.Dispose() }
+        }
         $flags = [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor
             [System.Windows.Forms.TextFormatFlags]::EndEllipsis -bor
             [System.Windows.Forms.TextFormatFlags]::NoPrefix
@@ -3311,6 +3320,7 @@ $btnSelectInvert.Add_Click({
 
 $listSaves.Add_ItemSelectionChanged({
     Update-SelectionCount
+    $listSaves.Invalidate()
 })
 
 $listSaves.Add_DoubleClick({
@@ -3532,6 +3542,8 @@ function Set-ManagerPalette {
         $script:Paper = [System.Drawing.Color]::FromArgb(29, 35, 38)
         $script:Surface = [System.Drawing.Color]::FromArgb(38, 46, 48)
         $script:SoftGreen = [System.Drawing.Color]::FromArgb(48, 65, 56)
+        $script:SaveSelection = [System.Drawing.Color]::FromArgb(50, 83, 69)
+        $script:SaveSelectionAccent = $script:Sage
         $script:Line = [System.Drawing.Color]::FromArgb(49, 59, 56)
         $hover = [System.Drawing.Color]::FromArgb(88, 151, 122)
         $pressed = [System.Drawing.Color]::FromArgb(61, 119, 96)
@@ -3545,6 +3557,8 @@ function Set-ManagerPalette {
         $script:Paper = [System.Drawing.Color]::FromArgb(243, 246, 244)
         $script:Surface = [System.Drawing.Color]::White
         $script:SoftGreen = [System.Drawing.Color]::FromArgb(228, 236, 231)
+        $script:SaveSelection = [System.Drawing.Color]::FromArgb(208, 231, 219)
+        $script:SaveSelectionAccent = $script:Forest
         $script:Line = [System.Drawing.Color]::FromArgb(220, 228, 223)
         $hover = [System.Drawing.Color]::FromArgb(36, 83, 71)
         $pressed = [System.Drawing.Color]::FromArgb(39, 89, 75)
@@ -3629,6 +3643,7 @@ function Set-ManagerPalette {
             [int]$captionTextColor, [int]$captionBorderColor)
     }
     $tabs.Invalidate()
+    $listSaves.Invalidate()
 }
 
 $tabs.Add_DrawItem({
