@@ -8,6 +8,10 @@
 
 ## 0. 一句话现状
 
+> **2026-10-21 当前增补**：Windows 管理器修复了「闪退后误报游戏仍在运行」——运行状态改为读 `touchHLE\zfr_running.json` 的 pid + 启动时间 + exe 路径三元校验（失配即自愈），启动参数加 `--no-error-popup` 消除崩溃后的隐形模态框，等待改成切片并加看门狗，另加 `zfr_manager.log` 取证日志。已推送 `master` 为 `8a6e4776b7c457c2df5c1fe75371c952600641fc`；**线上 `v29fix-save-selection` 里的管理器仍是旧版，本轮未重建 Release / ZIP / APK**。接手先看 §35；Android 未改动，其同类判定由 `zf_game.lock` 文件锁保证，结构上不会出现该误报。
+
+> **2026-10-13 当前增补**：Windows 管理器的存档选中高亮已修复并发布为 latest `v29fix-save-selection`，GitHub `master` 为 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d`。两端附件的实际下载哈希、发布页面与首页链接均核验通过；Android APK 沿用 versionCode `4` 的入侵修复包。此前稳定闪退的单次 Windows 入侵已用修复版完成，正常退出码 `0`，生产库 65 项测试通过；重复入侵、死亡后补队和 Android 游戏场景尚未验证。接手先看 §31～§34；GitHub 大文件使用主人明确代理 `http://127.0.0.1:10808`，不要重新搜索环境或反复尝试直连。
+
 **Zombie Farm 中文版已经做完并可用。** touchHLE 的 ZFR 专用 fork + 图形化管理器
 `游戏管理.exe` + 交付包 `Release\` 都是绿的，主人正在实机使用。
 
@@ -35,9 +39,9 @@ touchHLE-zombiefarm/
 │                              命令行辅助脚本（管理器不依赖它们，但保留可用）
 ├── 运行游戏.bat / 选择跳过时间并启动.bat / 使用教程.txt
 ├── MSVCP140.dll / VCRUNTIME140*.dll        VC++ 运行库（管理器需要）
-├── zombie_farm_ipa/           IPA 谱系（63 个文件 / 1.8 GB）
+├── zombie_farm_ipa/           IPA 谱系（63 个文件 / 1.8 GB：33 个 .ipa + 30 个 .report.json）
 ├── tools/                     ★ 活代码：patcher + 反汇编基础设施（46 + 4 模块）
-├── .agents/skills/git-pr/     项目级 Codex skill 与 GitHub/Gitee PR 辅助脚本
+├── .agents/skills/            （空壳）旧的项目级 git-pr 技能已迁到个人 git-hosting 技能，见 §3.5
 ├── _analysis/                 ★ 分析/验证脚本 + 精简后的历史产物（见其 TECHNICAL.md）
 ├── Release/                   ★ 交付包（构建产物，由 _build_release.ps1 生成）
 ├── touchHLE-zombiefarm-android-arm64/ Android APK 输出（构建产物，不入库）
@@ -48,6 +52,9 @@ touchHLE-zombiefarm/
     ├── touchHLE_dylibs/  touchHLE_fonts/  touchHLE_sandbox/（存档在这里）
     ├── touchHLE_options.txt   ★ 管理器写的设置（每个 app id 一行）
     ├── touchHLE_default_options.txt  touchHLE_log.txt  zfr_last_run.log
+    ├── zfr_last_launch.txt    上次启动的 IPA 指纹（运行时状态）
+    ├── zfr_running.json       管理器记录的游戏进程 pid/启动时间/exe（见 §35）
+    ├── zfr_manager.log        管理器取证日志 launch/exit/guard/watchdog（见 §35、TECHNICAL §7.8）
     ├── touchHLE_time_offset_seconds.txt / zfrpatch_current.dylib / LICENSE
     ├── touchHLE-fork/         模拟器源码（上游 fa3d095 + 本项目适配）
     │   └── vendor/            构建依赖，**自包含**（曾是 junction，见 process.md #26）
@@ -67,7 +74,7 @@ touchHLE-zombiefarm/
 | 开发树模拟器 | `touchHLE\` （脚本用 `$hleRoot` 定位，**别硬编码**） |
 | 当前 IPA | `zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa`（59,564,493 B） |
 | 存档目录 | `touchHLE\touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGame.bin2` |
-| 真实存档 | 金币 **140586** / 脑子 **4410** / 等级 40（**主人的真进度，测试绝不能污染**） |
+| 真实存档 | 现为玩家复现档：金币 **9963972** / 脑子 **99997** / 等级 23，文件 `19,671 B` / SHA-256 `F6AFCC1A18D46981FDFB9BCACC468C8E737B5272CE794035C710572F0DE87FB4`（**测试绝不能污染；§31 记录的 40 级档已不是现场，任何情况下都不要拿旧快照覆盖**） |
 | 当前 options 行 | `com.playforge.ZombieFarm.ZFR: --fps-limit=60 --zf-wheel-zoom-step=1.1 --device-family=ipad --scale-hack=1.5 --non-blocking-zero-timeout-run-loop` |
 
 > ⚠️ `zombie_farm_ipa\` 里有 **3 个不同的 bundle id**。切换 IPA 会**同时切换设置行与存档目录**。
@@ -186,49 +193,37 @@ _analysis\_gui_tip_test.ps1        # 验证没有 ? 按钮，且说明书覆盖�
 _analysis\_device_size_e2e.ps1
 ```
 
-### 3.5 发 PR（`git-pr.mjs`，Gitee / GitHub 通用）
+### 3.5 推送 / PR / Release（个人 `git-hosting` 技能）
 
-脚本与 Codex skill：`.agents\skills\git-pr\git-pr.mjs` 和同目录的 `SKILL.md`。
-脚本使用 Node.js 18+ 内置模块，无第三方依赖。
-**默认是预演，加了 `--apply` 才真动手** —— 这个设计是刻意的，别绕过它。
+原 `git-pr` 已改名为 **`git-hosting`**（覆盖推送、PR、Issue/评论、Release），脚本沿用旧文件名。
+本项目不再保存副本，直接用个人技能：
+
+- 技能说明：`C:\Users\Loner\.dsh\skills\git-hosting\SKILL.md`（`C:\Users\Loner\.codex\skills\git-hosting` 是同一份的另一处副本，两处都可读；旧的 `.codex\skills\git-pr` **已不存在**）。
+- 脚本：`scripts\git-pr.mjs`（推送 / PR）、`scripts\discussions.mjs`（Issue / 评论）、`scripts\github-release.mjs`（Release）。
+- 默认预演，加 `--apply` 才写入；脚本使用 Node.js 18+（本机 `node` 已可用，实测 v24）。
 
 ```powershell
-# 0. 先确认 Git 最终解析到的身份与来源；缺失时只在目标仓库设置，不要 --global
+# 0. 核对 Git 身份；缺失时按已确认身份设置仓库级配置
 git -C <目标仓库> config --show-origin --get-regexp '^(user\.name|user\.email)$'
-git -C <目标仓库> config user.name "<Git author name>"
-git -C <目标仓库> config user.email "<Git author email>"
 
-# 1. 预演：只检查权限与分支，不推送、不开 PR
-$gitPr = '.agents\skills\git-pr\git-pr.mjs'
-node $gitPr --repo <本地仓库路径> --branch <分支> --title "<标题>"
+# 1. 只推送（本项目自己的仓库用这条）；--expected-files 收 JSON 数组文件，精确核对范围
+node "C:\Users\Loner\.dsh\skills\git-hosting\scripts\git-pr.mjs" --mode push `
+  --repo <本地仓库路径> --branch master --remote origin `
+  --expected-files <预期路径.json> --allow-dirty
 
-# 2. 真提交：推 fork → 开 PR → 回读文件清单（幂等，可重复运行）
-node $gitPr --repo <本地仓库路径> --branch <分支> `
-  --title "<标题>" --body-file <PR描述.md> --base main --apply
+# 2. 预演核对无误后，同参数加 --apply
+
+# 3. PR（往上游 / 别人的仓库）：--mode pr，remote 与 upstream 按真实目标填写
+node ...\git-pr.mjs --mode pr --repo <本地仓库路径> --branch <分支> `
+  --remote <推送remote> --upstream <owner/repo> --title "<标题>" --body-file <PR描述.md>
 ```
 
-**四条必守规则：**
-
-1. **GitHub 上必须显式传 `--base main`** —— 脚本的 `--base` 默认是 `master`，
-   而 GitHub 仓库默认分支是 `main`；不传就会以不存在的 `master` 为目标去建 PR，
-   **必然失败**（脚本会把它当 `HTTP 4xx` 抛出）。先查准：
-   `git -C <仓库> remote show origin | Select-String 'HEAD branch'`。
-   本仓库 `zombie-farm-touchhle-cn` 是例外，它的默认分支**就是 `master`**。
-2. **核对预演显示的推送目标**。脚本探测上游权限，并按 remote 的实际 push URL
-   选择有权限的上游或个人 fork；不要只凭 `origin` / `fork` 名称判断目标。
-   403 通常是推送目标或权限不匹配，不要先假定令牌失效。
-3. **分支必须与当前 HEAD 一致**（脚本会校验），且**基线要基于上游默认分支的最新 HEAD**
-   （先 `git fetch`），否则会把上游较新的提交一起带进 PR，看起来像在回退别人的工作。
-4. **脚本只认文档里列出的参数，未知参数直接报错**（同样是刻意的）——
-   别自己发明 `--force` 之类的参数，否则「以为在预演、其实已经推送并开了 PR」。
-
-**注意本仓库不需要走这条 PR 流程**：`zombie-farm-touchhle-cn` 就是项目自己的仓库
-（origin = `Ashena1017/zombie-farm-touchhle-cn`），直接 `git push origin master` 即可。
-`git-pr.mjs` 是给**往别人的仓库提 PR** 用的（例如给上游 touchHLE 提改动、
-或给 `actualdoctornerd-ai/Zombie-Farm-2-Reforged` 提 PR）。
-
-**令牌与安全**：脚本从 Git credential helper 读取令牌，关闭交互提示且不打印令牌值。
-不要把令牌写入 remote URL、文件、命令行或会话；不要直接回显 `git credential fill` 的结果。
+- `--base` 省略时查询目标仓库的真实默认分支，不假设 `main` 或 `master`。
+- 核对实际 remote 的 push URL、PR 目标仓库和文件范围；不要只凭 remote 名称判断。
+- 先按项目流程测试、fetch 并审查基线，只发布已提交的内容。
+- `--allow-dirty` 的语义是「只发已提交 HEAD」，不是「把未提交内容一起发」；本项目工作区常年不干净，必须用它并明确说明。
+- 凭据由 Git credential helper 提供，禁止回显令牌或 `git credential fill` 的原始输出。
+- 本项目 `zombie-farm-touchhle-cn`（`Ashena1017/zombie-farm-touchhle-cn`）沿用直接推送 `master`；Release 见 §3.6。
 
 ### 3.6 发 Release（打包 → 建 tag → 传附件 → 回读）
 
@@ -700,3 +695,54 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 
 1. 主人反馈应用改名后首页「准备就绪」胶囊看起来偏斜。根因是状态标记绝对定位在右上角，而长标题占满整行并从其下方穿过。现将胶囊放在标题和副标题之后的纵向内容流中，取消右上角绝对定位；主题按钮仍在右侧独立定位。标题长度变化不再改变状态胶囊的排版或与其重叠。
 2. `_analysis\_build_android_local.ps1` Release 构建成功，内置 IPA 校验仍为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，APK 静态校验 PASS。新 APK `97,302,304 B` / SHA-256 `99F896A3E157E4BAD8C099FF8DE825EC9A97AC09E9F3EDB374D53968B932ABB8`。源码提交 `7e8922914eb79710e8b32b5c9e2e1acb615be389` 已推送 `master`；`v29fix-platforms` 的 Android 附件已替换，API 下载回读大小与 SHA-256 一致，Release 正文与本地说明逐字符一致。新附件 asset id `616716673`。未启动 MuMu、游戏或触碰任何 sandbox。
+
+## 31. 交接后追加（2026-10-12，入侵闪退分配器修复，原复现入侵已通过）
+
+1. 本轮持续任务是 Windows 入侵闪退。用户已在当前项目目录用玩家存档稳定复现。前轮 Cocos scheduler/action manager 共用可重入 guest mutex 的候选仍被用户反馈闪退；不要宣称同步修复已经解决此次稳定崩溃。最新报告：`_analysis\reports\ZFR_入侵闪退_分配器修复_20261012.md`，初次反汇编记录另见 `ZFR_入侵随机闪退_20261012.md`。
+2. 确定 allocator bug：原请求 `15345..15359 B` 走小堆，对齐后为 `15360 B`；旧 free 按对齐大小误判 VM，释放 arena 页面，使新的 `16384 B` 纹理与仍存活的小对象重叠。真实诊断日志 `memory-diagnostic-20261012-232158.log` 已抓到 `0x820000 / 16384 B` 包含仍登记的 `0x820b10 / 448 B` 和多个 `16 B` 对象，创建位图前 `isa` 已为零。修复是明确返回 Heap/External 来源并按来源释放，不是调整阈值或修改存档。
+3. 新增 5 项真实 `Mem` 回归覆盖全部边界、相邻哨兵、VM 保留/复用与清零；生产库全部 65 项通过。复跑入口：`powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_test_invasion_mem.ps1 -All`。固定 Windows 构建入口仍是 `_analysis\_build_fork_now.ps1`，已成功增量构建并同步三份 exe，均为 `28,878,848 B` / SHA-256 `948D59D1D3FCDF5CE1198356AF296C37B690611E8FE86A99203A625A99E9D34E`。OpenAL 构建环境坑已解决并记录于 `_analysis\reports\Windows_OpenAL构建配置_20261012.md`，不要再次绕回 vendor/EAX/工具链探索。
+4. 存档现状：用户主动换入玩家测试进度并改过货币；绝不能自动把原开发存档恢复覆盖当前项目 sandbox。原开发完整快照在 `%TEMP%\zfr-owner-before-invasion-ea82b6f0719f4aa5988fe1cb8401a208`。当前稳定复现快照在 `%TEMP%\zfr-project-stable-repro-cb7865f404094e1798db7dcdd15173f0`；存档 SHA-256 `FC2F6465009DA3117A39ED58412EBB52AC1F6FCD2491D67B4E3CB350298B800E`。fixture 及所有固定路径见 `_analysis\dumps\player-invasion-20261012\fixture.json`。
+5. 诊断复测入口：`powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_run_invasion_diagnostic.ps1 -TimeoutSeconds 900`。只恢复并运行 TEMP 副本，启用默认关闭的只读内存探针。本轮窗口 PID `80356` 已正常关闭，exec session `95101` 已完成；日志 `memory-diagnostic-20261012-235139.log`。用户明确反馈“入侵完成，未闪退”；日志记录战后存档、金币增加 `2000`、正常请求退出和退出存档，进程退出码 `0`。24 条探针创建记录确认诊断开启，FIRST ANOMALY/对象重叠/MemoryError/panic 均未出现。机器可读记录 `fixed-invasion-result.json`。确认范围为单次海盗入侵，重复、死亡补队和 Android 未测；上一轮仅进入后仍崩溃的窗口不能算成功。
+6. 没有修改 IPA、占用 code cave、提交 Git 或发布 GitHub。Android 共享此次修复的内存源码，但尚未重建 APK 或验证 Android 入侵。用户初始未提交的技能删除、`HANDOVER.md` 更改、`tools\AndroidEnterAvatar.exe` 与 crash snapshot 必须保留，不要 blanket stage/清理。
+7. 本轮常规验证已完成：BOM/语法、管理器自检、布局、布局匹配、设备设置往返、交付包独立启动 `45 s` 均通过。项目 sandbox 5 个文件与测试前路径/大小/SHA-256 全部相同；Release sandbox 仍空。旧 allocator 独立证明全部 15 个危险边界复现对象字节被清零/覆盖，2 个相邻对照正常；输出 `allocator-threshold-old-proof.txt`，证明入口 `_analysis\_prove_allocator_threshold.rs`，不能将其当作游戏实测。
+8. 日志仍有既有 `xpNeededForLevel:oob` 被忽略断言、离线资源、GL fallback 和 CCArray 保护记录，不要写“无任何警告”。本次退出后再次核对项目 sandbox 5 文件未改变；入侵进度只写在 TEMP 副本。`process.md` 本批 #35。
+
+## 32. 交接后追加（2026-10-13，Windows / Android 同步构建与发布）
+
+1. 用户本轮明确要求用个人 `git-pr` 技能同步 GitHub，并询问两端是否都已修改。已将共用 allocator/Cocos 修复编译到 Windows exe 和 Android ARM64 `libtouchHLE.so`，APK versionCode 由 `3` 增至 `4`，versionName 为构建源码 `2a47842`。Android 固定 `_build_android_local.ps1` 完整构建成功，`2m51s`；内置 IPA、默认 iPhone/横屏/60FPS/两指缩放和夜间模式保持。MuMu `127.0.0.1:5557` 连接被拒绝，本轮没有 Android 设备游戏实测，也没有执行旧 instrumentation。
+2. APK `97,312,084 B` / SHA-256 `C10F0E00B4AADA2E47944F41245AB5B64C5142849926FCC538179DD405920B7F`。包内 ARM64 lib `29,914,056 B` / SHA-256 `71A0FFFB7A42A4C823D3FB8064D7AB7863F3D954787C58D230865DB2668DEC7A`，与新构建的 stripped native lib 完全相同；IPA 哈希仍 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`。签名校验通过，certificate SHA-256 `c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f` 保持。包不含存档。
+3. Windows 已在源码 commit 后重编，以 `D48D903494AEC412386472637282AA8A1ACC4F0789E1A16921585EE702C1041D` 同步三份 exe（`28,878,848 B`）；和前次实测版的核心源码完全相同，新增差异为版本 commit 标识。用 `_build_release.ps1` 重建，再用修正后的 verifier 实际观察 `45.5 s`，启动通过。旧 verifier 的 `Seconds=45` 曾只是找窗口超时，通常实际约 `14 s`；现在修正为实际等待完整时长，并打印实际时间。不要把早期输出里的 `45s` 当成真实计时证据。
+4. Windows ZIP `95,948,193 B` / SHA-256 `8935F65C5A754D5BADB92541AE09551EB3ADB8E98A8F9479A15B7CE02F2D9C67`，顶层单一同名目录，42 文件，ZIP 中 exe 哈希与构建相同，无人物存档。打包位置、两份产物和 manifest 记录于 `_analysis\dumps\invasion-release-packages-20261013.json` 与 `invasion-release-manifest-20261013.json`。
+5. 源码 commit `2a478424b50591360f91790ee760f34b78072987`，发布文档/README/真实观察时长修正 commit `4f803c3116a797b9a5afbae0aba0a18c4d961187`，已通过技能预演和 apply 推送并回读。15 个明确审查路径；使用 `--allow-dirty` 仅发布已提交 HEAD，旧技能删除、初始 HANDOVER 技能迁移和本机分析数据等均保留，未夹入本批。
+6. Release tag `v29fix-invasion-fix` 绑定实际构建源 `2a478424...`；发布标题「僵尸农场 · Windows / Android 入侵闪退修复」。说明文件 `_analysis\reports\RELEASE_NOTES_v29fix-invasion-fix.md` 与 Git blob 字节相同。为满足技能发布仓干净要求，使用 managed worktree `C:\Users\Loner\.codex\worktrees\invasion-fix-release\touchHLE-zombiefarm`，HEAD 固定构建源；主工作区未清理或 stash 用户改动。Release id `410793711`。初次默认 transport 上传留下本次草稿的 `starter` 记录，已只删除本次未公开失败记录 `634286109`（未碰旧 Release）。任务私有 `_analysis\_publish_invasion_fix.mjs` 复用技能流程，asset transfer 走 Git 自带 OpenSSL curl/stdin 内存凭据、600s 有界等待。**主人已明确代理 `http://127.0.0.1:10808`**；下次 GitHub 大文件传输直接使用这个地址，`--proxy` 并配合 `--noproxy ''`，不要仅凭 HTTPS_PROXY 环境变量为空就认定没有代理，也不要重复测试直连 CDN。当前 exec session `19845`；Windows asset `634299433` 已 `uploaded`，必须等下载验证及公开真实结果再称完成。最终结果自动写 `invasion-release-upload-result-20261013.json`。
+7. 本次常规 BOM/语法、布局匹配、Windows 实际启动与 APK 静态/签名/元数据校验通过。发行包仍空 sandbox；项目真实存档没有参与打包。公开说明不含原始玩家存档、QQ 收件路径、诊断原始日志和本机完整快照路径；这些只在本机分析数据中保留。`process.md` 本批 #36。
+8. **已完成发布**：`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-invasion-fix`，release id `410793711`，draft=false/prerelease=false，`/releases/latest` 确认本版，tag 解析到构建源完整 SHA。Windows asset id `634299433`，Android asset id `634322519`，两者均 uploaded，大小及通过代理实际下载的 SHA-256 与本地完全一致。正文与已提交说明逐字符一致，GitHub README 两端链接和 Release 页面两文件名/两 SHA 均已渲染确认。最终记录 `invasion-release-final-20261013.json` 和 `invasion-release-upload-result-20261013.json`；最终 exec session `19845` 正常退出。不要再跑前面失败/中断的旧 session 或创建重复 Release。
+9. 发布辅助 managed worktree 已归档，可从本 chat artifact 恢复；主项目 checkout 与未提交文件均保留。若未来需要重新执行发布 helper，可创建另一个固定 source SHA 的干净 worktree，不要以为归档路径仍存在。最终再核验项目 sandbox 5 文件未改变、Release sandbox 为空。
+
+## 33. 交接后追加（2026-10-13，Windows 存档选中高亮）
+
+1. 主人反馈存档列表选中和未选中颜色相同。TEMP 隔离包内放三行虚拟记录，实际 `Selected` 为 false/true/false，但旧 `DrawSubItem.ItemState` 路径把四列都画为相同的 SoftGreen；两种主题、选中/未选中及失焦时均复现。此次直接对应 Windows；Android 备份记录点击后立即打开操作弹窗，没有持久选中列表，未改 Android。
+2. `GameManager.ps1` 改为读取 `$eventArgs.Item.Selected`，选中行使用专用底色和左侧 3px 主题色标记。夜间选中/普通背景 RGB `50,83,69` / `38,46,48`，日间 `208,231,219` / `255,255,255`。选择变化与切换主题均显式 Invalidate，焦点移到按钮后仍显示选择。未改存档数据、操作逻辑、模拟器或 IPA。
+3. 一次性实窗取证入口 `_analysis\_probe_save_selection.ps1`；它只复制无存档的 Release 到本次 GUID 命名 TEMP 目录，注入虚拟条目和截图定时器，退出后检查路径并清理该 TEMP 副本。截图/逐列像素为 `_analysis\dumps\save-selection-before\` 与 `save-selection-after\`，覆盖日夜单选、失焦、全选、取消和反选；修改前四列同色，修改后所有行四列均按真实 Selected 状态显示。真实 sandbox 未参与。
+4. 开发版及 `Release\GameManager.ps1` 已同步；此次只修改脚本，`游戏管理.exe` 启动壳不需重编。修复提交 `63e29f0f1227054166b8d2bb00a47ab00c087c38` 已推送；后续 README Android 安装链接修正提交 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d` 为发布 tag 目标。新包已公开，详见 §34。`process.md` 本批 #37。
+5. 修改前基线及修改后的 BOM/语法、开发版 SelfTest、布局、布局匹配、设备设置往返均通过；更新后的 Release 独立运行实际 `45.5 s` 通过并恢复为空 sandbox。两份管理器 SHA-256 均为 `0E2C9F78ADACE3B3D2CCF6821F96D62275897BE1FABA8CBDE0C05A42F8644E74`。注意旧 `-SelfTest` 货币段依赖已有存档，直接对空存档的 Release 运行会报存档不存在；本轮改用 `_probe_save_selection.ps1 -SourceManager Release/GameManager.ps1 -FixtureSelfTest -Label after` 在 TEMP 副本和 128 B 合成版本 14 玩家块执行，全部通过（`save-selection-after\release-fixture-selftest.txt`），没有把测试存档放入交付目录。不要因此重新往正式 Release 里放入人物存档。
+
+## 34. 交接后追加（2026-10-13，存档高亮更新发布完成）
+
+1. 用户调用个人 `git-pr` 技能要求同步 GitHub。本项目继续直接推送 `master`；精确审查并发布 `GameManager.ps1`、`README.md`、`process.md` 与新发行说明 `_analysis\reports\RELEASE_NOTES_v29fix-save-selection.md`。提交 `63e29f0...` 是修复和下载说明，`49c597a...` 修正安装步骤中遗漏的旧 Android APK 链接；两次技能预演和 apply 均通过，远端 master SHA 已回读为 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d`。其余初始删除/修改/未跟踪文件均保留，未夹入提交。
+2. Release `https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-save-selection` 已公开，release id `410826263`，latest 确认为本版，tag 指向上述完整 SHA。旧 Release 和 tag 未覆盖或删除。README 首页、两平台安装步骤、Release 正文及 Assets 的线上下载链接均已检查；正文与 Git 源文件逐字符相同，管理器磁盘文件与 Git blob 逐字节相同。
+3. Windows ZIP `zombie-farm-windows-x64-v29fix-save-selection.zip`，`95,948,563 B` / SHA-256 `7A924801C7BA86F853D1D682B674B5955A5E474E44A2451C5E19244805A2A130`，asset id `634385971`。从 `_build_release.ps1` 重建后验证，实际运行 `45.5 s`；ZIP 42 文件、单一同名顶层目录，无玩家存档和日志。ZIP 管理器 SHA 为 §33 所列，exe 和 IPA 仍为入侵修复版。包路径见 `save-selection-release-packages-20261013.json`。
+4. Android 下载 `zombie-farm-android-arm64-v29fix-invasion-fix.apk`，`97,312,084 B` / SHA-256 `C10F0E00B4AADA2E47944F41245AB5B64C5142849926FCC538179DD405920B7F`，asset id `634387040`。与上一公开版本完全相同，本次仅为方便下载而同页提供；没有重编 APK 或新增 Android 实测结论。两端附件均通过明确代理 `http://127.0.0.1:10808` 上传，草稿阶段与公开后均实际下载核对 SHA-256，全部一致。
+5. 任务私有上传脚本 `_analysis\_publish_save_selection.mjs` 复用个人技能 `runRelease` 与既有显式 curl 代理传输，未改个人技能。最终 exec session `79255` 正常退出。只读回读脚本 `_analysis\_verify_save_selection_release.mjs` 完成 API/latest/branch/tag/页面核验。持久记录：`_analysis\dumps\save-selection-release-manifest-20261013.json`、`save-selection-release-upload-result-20261013.json`、`save-selection-release-final-20261013.json`。不要重跑本次创建 Release 的写请求；如需确认，做只读核验。
+6. 发布使用 managed worktree `C:\Users\Loner\.codex\worktrees\save-selection-release\touchHLE-zombiefarm`，HEAD 固定 `49c597a...`，工作树干净；已用应用归档工具归档这个临时发布工作树，需要时从本 chat artifact 恢复，不要直接重用已移除的磁盘路径。真实开发 sandbox 未参与此次构建、打包或发布；发行 sandbox 最终复核为 0 文件。
+
+## 35. 交接后追加（2026-10-21，Windows「游戏已经在运行」误报修复）
+
+1. **现象**：玩家反馈闪退后偶尔出现游戏已不在、任务管理器里也看不到 `touchHLE.exe`，管理器却提示「游戏已经在运行了」；只在闪退后出现，且时有时无。现场抓到活体样本：一个 `touchHLE.exe` 存活但**名下 0 个顶层窗口**（无控制台 + 隐藏父窗口的启动方式下原生模态错误框不可见，或主机线程卡死）。旧判定 `Get-Process -Name touchHLE` 只回答「全世界有没有叫 touchHLE 的进程」，于是把残留进程、其它安装副本、被复用的 PID 一律当成游戏在跑。
+2. **修复**（`GameManager.ps1`，提交 `8a6e4776b7c457c2df5c1fe75371c952600641fc`）：启动时写 `touchHLE\zfr_running.json`（pid、启动时间、exe 绝对路径、IPA、启动时刻），`Get-GameProcessState` 每次校验 pid 存在 + 启动时间 + 镜像路径，任一失配立即删除记录并当作没在跑——这是自愈的关键，崩溃后不再卡住备份 / 还原 / 改存档。`Source` 区分 `record`（管理器自己起的）与 `scan`（`.bat` 起的，且必须是本安装目录下的 exe）。
+3. **启动参数**增加 `--no-error-popup`（现役 `2a47842` exe 的 `--help` 已确认该参数存在），崩溃不再留下隐形模态框。等待由一次 `WaitForExit()` 改成 500 ms 切片 + 看门狗：见过窗口后窗口消失 20 秒，或 120 秒从未开窗，管理器回到前台并询问是否结束残留进程。
+4. **交互**：点「启动游戏」/「启动并跳过时间」时若发现无窗口残留进程，直接给出 PID 与成因并提供「结束它并继续」，不再只回一句「已经在运行」。新增按安装目录 SHA-256 前 16 位命名的单实例互斥 `Local\ZombieFarmManager-<hash>`：同一份安装不能开两个管理器，不同安装可并存。
+5. **可读化与取证**：`Get-ExitCodeHint` 把 `-1073741819` 译成 `0xC0000005 访问冲突` 等；`Get-PanicSummary` 从捕获的 stderr 取 panic 首行显示在状态栏。新增 `touchHLE\zfr_manager.log`（launch / exit / guard / watchdog，超 1 MB 轮转），已加入 `.gitignore`；`_build_release.ps1` 是白名单拷贝，这些运行态文件不会进发行包。
+6. **验证**：78 个 `.ps1` 解析与 BOM 检查通过；`-SelfTest` PASS（新增 5 项：活记录被采信、PID 复用被拒、死 PID 被拒、退出码解码、panic 首行提取）；`_verify_layout` / `_verify_layout_match` / `_device_size_roundtrip` PASS；新增 `_analysis\_probe_launch_state.ps1` 在 `%TEMP%` 的 Release 副本里真实启动游戏，正常退出（`code=0`）与强杀（`code=-1`）两条路径均确认记录写入、pid/exe 正确、记录在 1 秒内清除，并核对了日志行。玩家真实存档 `F6AFCC1A...`（`2026-10-20 23:30:03`）全程未改动。
+7. **边界**：看门狗分支尚未由真实闪退触发（加 `--no-error-popup` 后 panic 直接退出），目前只有强杀测试覆盖；Android 未改动——它的运行状态来自 `zf_game.lock` 的 `FileLock` 与独立 `:game` 进程，进程一死锁即释放，结构上不会出现该误报，但 `gameRunning()` 仍把所有 `IOException` 当「运行中」，属粗糙映射。本轮**未重建 Release / ZIP / APK、未创建新 Release**，线上 `v29fix-save-selection` 内的管理器仍是旧版；要发给玩家必须重跑 `_build_release.ps1` 并发布新 Release。
+8. **文档**：`process.md` 批次 #38、`TECHNICAL.md` §7.8（判定机制与故障模式）随本批更新。`HANDOVER.md` 此次一并提交了上一轮遗留的技能迁移修订（§3.5 已按现状改指个人 `git-hosting` 技能：`C:\Users\Loner\.dsh\skills\git-hosting\SKILL.md`）；`.agents\skills\git-pr\` 的两个删除状态仍保留，未提交。`C:\Haven\Games` 那份旧的安装副本由主人自行更新，本会话未改动。

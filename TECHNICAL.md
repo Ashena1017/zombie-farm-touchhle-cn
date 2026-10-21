@@ -1591,6 +1591,38 @@ touchHLE 下能拿到字体。如果拿不到，那 ~30 处会一起变空白（
 - `ZFAlertWindowQuestComplete` / `Quest` 等子类自带字号，v5 已覆盖；但仍有一批
   slide-in 家族与 `StorageItem` 用的是另一档设计（正文已是 18.0，标题 19.0），**刻意未动**。
 
+### 7.8 Windows 管理器如何判断「游戏正在运行」（2026-10-21 修复）
+
+**故障模式**：旧实现只有一行 `[bool](Get-Process -Name 'touchHLE')`。它回答的是「全世界有没有叫
+touchHLE 的进程」，而玩家实际遇到的三种情况都会被它误判：
+
+| 实际情况 | 旧判定 | 后果 |
+|---|---|---|
+| 闪退后进程存活但无窗口（模态错误框不可见、主机线程卡死） | 命中 | 永远「已经在运行」，启动按钮成死路 |
+| 另一份安装的游戏正在跑 | 命中 | 无故拒绝启动 |
+| 上次的 PID 被系统复用给别的程序 | 无法判断 | 状态不可解释 |
+
+**现行机制**（`GameManager.ps1` 的 `Get-GameProcessState`）：
+
+1. 启动时写 `touchHLE\zfr_running.json`：`pid`、`start`（UTC ISO）、`exe`（绝对路径）、`ipa`、`launched`。
+2. 每次判定先读记录，用 `Get-Process -Id` 找进程，再比 `StartTime.ToUniversalTime()` 与 `Path`。
+   三者全中才算是 `Source='record'` 的在跑；任何一项对不上就删除记录（自愈，崩溃不再卡住存档操作）。
+3. 没有记录时退化为按名字扫描，但只接受**本安装目录**下的 exe（`scan` 来源），覆盖 `.bat` 启动的情况。
+4. 进程活着但 `MainWindowHandle == 0` 时，启动按钮不再拒绝，而是给出 PID、成因和「结束它并继续」。
+
+**看门狗**：`Start-GameProcess` 用 `WaitForExit(500)` 切片轮询，每 2 秒 `Refresh()` 取一次窗口句柄。
+「见过窗口后消失 20 秒」或「120 秒从未开窗」→ 管理器 `Show()` 回前台并询问是否 `Stop-Process`。
+
+**崩溃不再弹框**：启动参数带 `--no-error-popup`（`src/options.rs` 的 `popup_errors`，与 `--headless` 同一开关）。
+管理器改为从捕获的 stderr 取 panic 首行，并把退出码译成人话（`-1073741819` → `0xC0000005 访问冲突`）。
+
+**Android 为什么没有这个问题**：`ZfStorage.gameRunning()` 判断的是 `zf_game.lock` 上的 `FileLock`，
+游戏跑在独立 `:game` 进程（`AndroidManifest.xml` 的 `android:process=":game"`）。进程崩溃时内核关闭
+FD、锁自动释放，因此不存在「记录残留」。Windows 侧做不到这一点，因为 `touchHLE.exe` 自己不持有任何锁；
+要彻底对齐需要让 fork 启动时也拿一把锁文件（要重编三份 exe，目前没有必要）。
+
+**取证**：`touchHLE\zfr_manager.log` 记录 launch / exit / guard / watchdog；`zfr_last_run.log` 仍记录子进程输出。
+
 ---
 
 ## 七·五、能不能重写这个游戏？（重构可行性调研）
