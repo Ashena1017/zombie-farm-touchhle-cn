@@ -8,7 +8,7 @@
 
 ## 0. 一句话现状
 
-> **2026-10-21 当前增补**：Windows 管理器修复了「闪退后误报游戏仍在运行」——运行状态改为读 `touchHLE\zfr_running.json` 的 pid + 启动时间 + exe 路径三元校验（失配即自愈），启动参数加 `--no-error-popup` 消除崩溃后的隐形模态框，等待改成切片并加看门狗，另加 `zfr_manager.log` 取证日志。已推送 `master` 为 `8a6e4776b7c457c2df5c1fe75371c952600641fc`；**线上 `v29fix-save-selection` 里的管理器仍是旧版，本轮未重建 Release / ZIP / APK**。接手先看 §35；Android 未改动，其同类判定由 `zf_game.lock` 文件锁保证，结构上不会出现该误报。
+> **2026-10-21 当前增补**：Windows 管理器修复了「闪退后误报游戏仍在运行」——运行状态改为读 `touchHLE\zfr_running.json` 的 pid + 启动时间 + exe 路径三元校验（失配即自愈），启动参数加 `--no-error-popup` 消除崩溃后的隐形模态框，等待改成切片并加看门狗，另加 `zfr_manager.log` 取证日志。源码已推送 `master`（`8a6e477` 修复、`e0abbd0` 文档），并已发布新版本 `v29fix-running-detect`（release id `419529614`，latest 已确认，两端资产经代理下载核对）。Android 未改动，其同类判定由 `zf_game.lock` 文件锁保证，结构上不会出现该误报。接手先看 §35～§36。
 
 > **2026-10-13 当前增补**：Windows 管理器的存档选中高亮已修复并发布为 latest `v29fix-save-selection`，GitHub `master` 为 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d`。两端附件的实际下载哈希、发布页面与首页链接均核验通过；Android APK 沿用 versionCode `4` 的入侵修复包。此前稳定闪退的单次 Windows 入侵已用修复版完成，正常退出码 `0`，生产库 65 项测试通过；重复入侵、死亡后补队和 Android 游戏场景尚未验证。接手先看 §31～§34；GitHub 大文件使用主人明确代理 `http://127.0.0.1:10808`，不要重新搜索环境或反复尝试直连。
 
@@ -746,3 +746,13 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 6. **验证**：78 个 `.ps1` 解析与 BOM 检查通过；`-SelfTest` PASS（新增 5 项：活记录被采信、PID 复用被拒、死 PID 被拒、退出码解码、panic 首行提取）；`_verify_layout` / `_verify_layout_match` / `_device_size_roundtrip` PASS；新增 `_analysis\_probe_launch_state.ps1` 在 `%TEMP%` 的 Release 副本里真实启动游戏，正常退出（`code=0`）与强杀（`code=-1`）两条路径均确认记录写入、pid/exe 正确、记录在 1 秒内清除，并核对了日志行。玩家真实存档 `F6AFCC1A...`（`2026-10-20 23:30:03`）全程未改动。
 7. **边界**：看门狗分支尚未由真实闪退触发（加 `--no-error-popup` 后 panic 直接退出），目前只有强杀测试覆盖；Android 未改动——它的运行状态来自 `zf_game.lock` 的 `FileLock` 与独立 `:game` 进程，进程一死锁即释放，结构上不会出现该误报，但 `gameRunning()` 仍把所有 `IOException` 当「运行中」，属粗糙映射。本轮**未重建 Release / ZIP / APK、未创建新 Release**，线上 `v29fix-save-selection` 内的管理器仍是旧版；要发给玩家必须重跑 `_build_release.ps1` 并发布新 Release。
 8. **文档**：`process.md` 批次 #38、`TECHNICAL.md` §7.8（判定机制与故障模式）随本批更新。`HANDOVER.md` 此次一并提交了上一轮遗留的技能迁移修订（§3.5 已按现状改指个人 `git-hosting` 技能：`C:\Users\Loner\.dsh\skills\git-hosting\SKILL.md`）；`.agents\skills\git-pr\` 的两个删除状态仍保留，未提交。`C:\Haven\Games` 那份旧的安装副本由主人自行更新，本会话未改动。
+
+## 36. 交接后追加（2026-10-21，运行状态修复发布）
+
+1. 主人要求「更新 Release」，于是把 §35 的修复打成新版本 `v29fix-running-detect`。先在开发树跑 `_analysis\_build_release.ps1` 重建 `Release\`（42 文件 / 117.5 MB，sandbox 为空），再用 `_analysis\_verify_release.ps1` 实际启动发行副本，窗口出现、存活 `45.0 s`、无 panic，结束后 sandbox 复原为 0 文件。
+2. Windows ZIP `zombie-farm-windows-x64-v29fix-running-detect.zip`：42 个文件 + 单一同名顶层目录，`95,955,050 B` / SHA-256 `FE942A83D6409C26268F4F637EF51D4A0347E117E6BAE21EDF70B089DD0C69F4`；包内 `GameManager.ps1` 与本次 Git blob 逐字节一致（`C8DF5046...`），无任何 sandbox / 日志条目。Android 未重编，沿用 `zombie-farm-android-arm64-v29fix-invasion-fix.apk`（`97,312,084 B` / `C10F0E00...`）。
+3. Release `https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-running-detect` 已公开，release id `419529614`，`draft=false` / `prerelease=false`，tag 解析到 `e0abbd0bc299c8fc407a86a8a1a16ab120df2689`，`/releases/latest` 确认本版；标题与正文同源文件逐字符一致（2562 字符）。资产：ZIP id `662436607`、APK id `662446606`。
+4. **传输层结论（下次直接用）**：个人技能的 `github-release.mjs` 用 node fetch，**不读 `HTTP(S)_PROXY`**。`api.github.com` 可直连，但 `uploads.github.com` 直连会出现 `ENOTFOUND`，其 96/97 MB 的下载核对也会超时。本轮改用两个任务脚本：`_analysis\_upload_release_assets.ps1`（上传 + 经代理重新下载核对）与 `_analysis\_publish_running_detect.ps1`（PATCH 公开 + 公开 URL 重新下载核对 + latest/tag/正文字符数核对），都用 `HttpClient` + 显式 `WebProxy http://127.0.0.1:10808`；令牌从 Git credential helper 读入内存，未打印、未落盘。后续发布可复用这两个脚本，不要再去试直连 CDN。
+5. 校验记录：`_analysis\dumps\running-detect-release-manifest-20261021.json`（manifest）、`running-detect-release-upload-20261021.json`（上传后下载核对）、`running-detect-release-final-20261021.json`（公开后 10 项检查全 PASS）。正文源文件 `_analysis\reports\RELEASE_NOTES_v29fix-running-detect.md`，已随本批提交。
+6. README 已更新为三处新 tag 下载链接（下载表 Windows/Android、快速开始两处）并新增 2026-10-21 说明；端到端探针 `_analysis\_probe_launch_state.ps1` 纳入仓库，可按需复跑（`%TEMP%` 副本、不碰真实存档）。`process.md` 本批 #39。
+7. 边界：本次没有重编 APK、没有 Android 设备实测、没有新增游戏场景结论；看门狗分支仍只由「强制结束进程」的探针覆盖，未由真实闪退触发。发布用的临时 worktree `C:\Users\Loner\.codex\worktrees\running-detect-release\touchHLE-zombiefarm` 固定在 `e0abbd0`，用完应 `git worktree remove`，不要直接复用已移除的路径。
