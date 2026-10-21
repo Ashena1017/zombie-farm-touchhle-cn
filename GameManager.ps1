@@ -89,6 +89,20 @@ $script:LiveSave = ''
 $script:BackupPrefix = 'saveGame.bin2.bak'
 $script:BackupOffsetSuffix = '.zf-offset'
 
+# Runtime state of a launched game, so "is it running?" has an exact answer.
+#
+# A name-wide Get-Process scan answers a different question ("is any process
+# called touchHLE alive?"), and it lies in the cases players actually hit: a
+# crash can leave the emulator resident with no window, and a leftover record
+# must never wedge the save operations. So the manager records what it started
+# (pid, start time, exe path) and re-verifies all three on every check.
+$script:RunStateFile = Join-Path $script:HleDir 'zfr_running.json'
+# Append-only breadcrumb trail: launches, exits, guards, watchdog decisions.
+# When a player reports "it says the game is running but nothing is", this file
+# says what the manager actually saw.
+$script:ManagerLog = Join-Path $script:HleDir 'zfr_manager.log'
+$script:ManagerLogReady = $false
+
 # Read Info.plist out of an IPA without extracting it.
 #
 # An IPA is a zip and its Info.plist is normally a BINARY plist (bplist00), which
@@ -785,8 +799,161 @@ function Save-SkipMemory {
     } catch { <# remembering is a nicety, not a requirement #> }
 }
 
+function Write-ManagerLog {
+    param([string]$Message)
+    try {
+        # Rotate once per manager run: a crash loop must not grow this forever.
+        if (-not $script:ManagerLogReady) {
+            $script:ManagerLogReady = $true
+            try {
+                if ((Test-Path -LiteralPath $script:ManagerLog) -and
+                    ((Get-Item -LiteralPath $script:ManagerLog).Length -gt 1MB)) {
+                    Move-Item -LiteralPath $script:ManagerLog -Destination "$($script:ManagerLog).1" -Force
+                }
+            } catch { }
+        }
+        $line = '[{0}] {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
+        [System.IO.File]::AppendAllText($script:ManagerLog, $line + "`r`n",
+            (New-Object System.Text.UTF8Encoding($false)))
+    } catch { <# a breadcrumb is a nicety, not a requirement #> }
+}
+
+function Remove-RunState {
+    try {
+        if (Test-Path -LiteralPath $script:RunStateFile) {
+            Remove-Item -LiteralPath $script:RunStateFile -Force
+        }
+    } catch { }
+}
+
+function Get-ProcessStartStamp {
+    param([Parameter(Mandatory = $true)]$Process)
+    try { return $Process.StartTime.ToUniversalTime().ToString('o') } catch { return $null }
+}
+
+function Get-ProcessImagePath {
+    param([Parameter(Mandatory = $true)]$Process)
+    try { return $Process.Path } catch {
+        try { return $Process.MainModule.FileName } catch { return $null }
+    }
+}
+
+# Is the game running, and if so which process is it?
+#
+# The old check was a bare  Get-Process -Name touchHLE  scan, which is wrong in
+# the three cases that matter in practice:
+#
+#   * a crash can leave the emulator alive with no window (the guest thread is
+#     gone; a stuck host loop or an invisible modal error box keeps the process
+#     resident), so the manager claimed "already running" while the player saw
+#     nothing at all -- and could not find it in Task Manager either;
+#   * a game started from a DIFFERENT copy of the bundle was treated as if it
+#     were this one, blocking launches for no reason;
+#   * a PID from an earlier run can be reused by an unrelated process.
+#
+# So the recorded pid + start time + exe path are all re-verified. A record that
+# no longer matches is deleted on the spot: that self-healing is what keeps a
+# crash from wedging backup/restore/currency for the rest of the session.
+function Get-GameProcessState {
+    param([string]$RunStateFile = $script:RunStateFile)
+
+    $state = [pscustomobject]@{
+        Running = $false      # a game process belonging to THIS bundle is alive
+        Process = $null       # that process object, when we could get one
+        Source  = 'none'      # 'record' = we launched it, 'scan' = started elsewhere
+        Stale   = $false      # a leftover record was found and cleared
+        Window  = [int64]0    # MainWindowHandle; 0 means "alive but no window"
+        Pid     = 0
+    }
+
+    $expectedExe = Join-Path $script:HleDir 'touchHLE.exe'
+
+    if (Test-Path -LiteralPath $RunStateFile) {
+        $record = $null
+        try {
+            $record = Get-Content -LiteralPath $RunStateFile -Raw | ConvertFrom-Json
+        } catch { $record = $null }
+
+        $process = $null
+        if ($record -and $record.pid) {
+            $process = Get-Process -Id ([int]$record.pid) -ErrorAction SilentlyContinue
+        }
+        if ($process) {
+            # Both must hold: the recorded start time (guards PID reuse) and the
+            # recorded image path (guards another copy of touchHLE.exe).
+            $stampOk = (-not $record.start) -or ((Get-ProcessStartStamp -Process $process) -eq [string]$record.start)
+            $pathOk = (-not $record.exe) -or ((Get-ProcessImagePath -Process $process) -eq [string]$record.exe)
+            if ($stampOk -and $pathOk) {
+                try { $process.Refresh() } catch { }
+                $state.Running = $true
+                $state.Process = $process
+                $state.Source = 'record'
+                $state.Pid = $process.Id
+                try { $state.Window = $process.MainWindowHandle.ToInt64() } catch { }
+                return $state
+            }
+        }
+
+        Remove-RunState
+        $state.Stale = $true
+        Write-ManagerLog ('stale run record cleared (pid={0})' -f $(if ($record) { $record.pid } else { '?' }))
+    }
+
+    # No record: the game may still have been started from the .bat launchers.
+    # Only a process running THIS installation's executable counts as ours.
+    $candidates = @()
+    try { $candidates = @(Get-Process -Name 'touchHLE' -ErrorAction SilentlyContinue) } catch { }
+    foreach ($process in $candidates) {
+        $path = Get-ProcessImagePath -Process $process
+        if (-not $path) { continue }
+        if ($path -ne $expectedExe -and $path -notlike (Join-Path $script:HleDir '*')) { continue }
+        try { $process.Refresh() } catch { }
+        $state.Running = $true
+        $state.Process = $process
+        $state.Source = 'scan'
+        $state.Pid = $process.Id
+        try { $state.Window = $process.MainWindowHandle.ToInt64() } catch { }
+        return $state
+    }
+
+    return $state
+}
+
 function Test-GameRunning {
-    return [bool](Get-Process -Name 'touchHLE' -ErrorAction SilentlyContinue)
+    return [bool](Get-GameProcessState).Running
+}
+
+# Ask before launching when something is already running.
+#
+# Returns $true when the caller may launch. "Already running" alone is a dead
+# end for the player when the process has no window, so that case offers to end
+# the leftover instead of just refusing.
+function Confirm-NoRunningGame {
+    $state = Get-GameProcessState
+    if (-not $state.Running) { return $true }
+
+    if ($state.Window -gt 0) {
+        Write-ManagerLog ('guard: launch refused, pid={0} has a window' -f $state.Pid)
+        Update-Status '游戏已经在运行了。' 'busy'
+        return $false
+    }
+
+    Write-ManagerLog ('guard: launch refused, pid={0} has no window (source={1})' -f $state.Pid, $state.Source)
+    $answer = [System.Windows.Forms.MessageBox]::Show(
+        ("发现一个没有窗口的游戏进程（PID {0}）。`n`n它通常是上次闪退后残留的：任务管理器里看不到游戏窗口，但进程还占着。`n`n结束它并继续吗？" -f $state.Pid),
+        '残留的游戏进程', 'YesNo', 'Warning')
+    if ($answer -ne 'Yes') { return $false }
+
+    try {
+        Stop-Process -Id $state.Pid -Force -ErrorAction Stop
+        Remove-RunState
+        Write-ManagerLog ('guard: ended leftover pid={0}' -f $state.Pid)
+        return $true
+    } catch {
+        Update-Status ("结束残留进程失败：{0}" -f $_.Exception.Message) 'err'
+        Write-ManagerLog ('guard: failed to end pid={0}: {1}' -f $state.Pid, $_.Exception.Message)
+        return $false
+    }
 }
 
 # Paths the launcher needs. Defined up here (rather than next to the launching
@@ -807,6 +974,44 @@ function Get-LaunchPaths {
         # the child process must be started in.
         WorkingDir  = $script:HleDir
     }
+}
+
+# Windows exit codes are signed 32-bit; report the hex an engineer expects.
+#
+# These two helpers live up here (rather than beside the launching code) for the
+# same reason Get-LaunchPaths does: the -SelfTest block runs before that part of
+# the file is in scope, and it checks both of them.
+function Get-ExitCodeHint {
+    param([int]$Code)
+    # -band with 0xFFFFFFFF is unreliable here (PowerShell keeps the sign), so
+    # map the signed 32-bit value to its unsigned equivalent explicitly.
+    $unsigned = [int64]$Code
+    if ($unsigned -lt 0) { $unsigned += 4294967296 }
+    $hex = '0x{0:X8}' -f $unsigned
+    if ($Code -eq -1073741819) { return "$hex 访问冲突" }
+    if ($Code -eq -1073741795) { return "$hex 非法指令" }
+    if ($Code -eq -1073741571) { return "$hex 栈溢出" }
+    if ($Code -eq -1073740791) { return "$hex 快速失败（fail-fast）" }
+    if ($Code -eq -1073741515) { return "$hex 缺少 DLL" }
+    if ($Code -eq -1073741816) { return "$hex 无法启动子进程" }
+    if ($Code -eq -1) { return '0xFFFFFFFF 游戏主动退出（异常路径）' }
+    if ($Code -eq 101) { return 'Rust panic' }
+    return $hex
+}
+
+# The first panic-ish line of stderr, short enough for the status bar.
+function Get-PanicSummary {
+    param([string]$Text)
+    if (-not $Text) { return '' }
+    foreach ($line in ($Text -split "`r?`n")) {
+        $t = $line.Trim()
+        if (-not $t) { continue }
+        if ($t -match "panicked at|^Error:|^thread '.*' panicked") {
+            if ($t.Length -gt 160) { return $t.Substring(0, 160) + '…' }
+            return $t
+        }
+    }
+    return ''
 }
 
 # ---------------------------------------------------------------------------
@@ -1735,6 +1940,63 @@ if ($SelfTest) {
         Write-Host ("  no --device-family arg: " + $(if ($noDeviceArg) { 'PASS' } else { 'FAIL' }))
         if (-not $noDeviceArg) { $ok = $false }
 
+        # "Is the game running?" must be answered from a verified record, not
+        # from a name-wide scan: a leftover record or a reused PID used to make
+        # the manager claim a game was running when nothing was on screen.
+        Write-Host ''
+        Write-Host '--- game process state ---'
+        $savedRunState = $script:RunStateFile
+        $savedManagerLog = $script:ManagerLog
+        $script:RunStateFile = Join-Path $sandbox 'zfr_running.json'
+        $script:ManagerLog = Join-Path $sandbox 'zfr_manager.log'
+        try {
+            $self = Get-Process -Id $PID
+            $selfPath = Get-ProcessImagePath -Process $self
+            $selfStamp = Get-ProcessStartStamp -Process $self
+
+            # A record that matches a live process is authoritative.
+            @{ pid = $PID; start = $selfStamp; exe = $selfPath } | ConvertTo-Json -Compress |
+                Set-Content -LiteralPath $script:RunStateFile -Encoding utf8
+            $st = Get-GameProcessState
+            $recOk = $st.Running -and $st.Source -eq 'record'
+            Write-Host ("  live record honoured : running={0} source={1}  {2}" -f $st.Running, $st.Source, $(if ($recOk) { 'PASS' } else { 'FAIL' }))
+            if (-not $recOk) { $ok = $false }
+
+            # Same PID, different start time = the PID was reused: the record
+            # must be dropped instead of reporting a phantom game.
+            @{ pid = $PID; start = '2001-01-01T00:00:00.0000000Z'; exe = $selfPath } |
+                ConvertTo-Json -Compress | Set-Content -LiteralPath $script:RunStateFile -Encoding utf8
+            $st = Get-GameProcessState
+            $reuseOk = (-not $st.Running -or $st.Source -ne 'record') -and
+                       (-not (Test-Path -LiteralPath $script:RunStateFile))
+            Write-Host ("  reused pid rejected  : running={0} record cleared={1}  {2}" -f $st.Running,
+                (-not (Test-Path -LiteralPath $script:RunStateFile)),
+                $(if ($reuseOk) { 'PASS' } else { 'FAIL' }))
+            if (-not $reuseOk) { $ok = $false }
+
+            # A record whose process is gone must not survive.
+            @{ pid = 999999; start = 'x'; exe = 'x' } | ConvertTo-Json -Compress |
+                Set-Content -LiteralPath $script:RunStateFile -Encoding utf8
+            $st = Get-GameProcessState
+            $deadOk = (-not (Test-Path -LiteralPath $script:RunStateFile))
+            Write-Host ("  dead pid rejected    : record cleared={0}  {1}" -f $deadOk, $(if ($deadOk) { 'PASS' } else { 'FAIL' }))
+            if (-not $deadOk) { $ok = $false }
+
+            # Exit codes and panic text are what the player actually sees.
+            $hint = Get-ExitCodeHint -Code -1073741819
+            $hintOk = $hint -like '0xC0000005*'
+            Write-Host ("  crash code readable  : '{0}'  {1}" -f $hint, $(if ($hintOk) { 'PASS' } else { 'FAIL' }))
+            if (-not $hintOk) { $ok = $false }
+
+            $panic = Get-PanicSummary -Text "noise`r`nthread 'main' panicked at src/foo.rs:12:3`r`nnote: run with RUST_BACKTRACE"
+            $panicOk = $panic -like "*panicked at src/foo.rs*"
+            Write-Host ("  panic line extracted : '{0}'  {1}" -f $panic, $(if ($panicOk) { 'PASS' } else { 'FAIL' }))
+            if (-not $panicOk) { $ok = $false }
+        } finally {
+            $script:RunStateFile = $savedRunState
+            $script:ManagerLog = $savedManagerLog
+        }
+
         # The real save must be byte-identical to when the selftest started.
         # (Also fails if the game itself wrote the save mid-test -- close the
         # game before running -SelfTest.)
@@ -1757,6 +2019,40 @@ if ($SelfTest) {
             Remove-Item -LiteralPath $sandbox -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
+}
+
+# ---------------------------------------------------------------------------
+# Single instance
+# ---------------------------------------------------------------------------
+#
+# Two managers used to be able to run side by side. The second one then saw the
+# first one's game and said "already running" -- with no manager window anywhere
+# to explain why -- and both could write the same options and save files. A
+# per-session mutex removes that whole class of confusion.
+#
+# The name is keyed on the bundle folder, not global: two DIFFERENT installs
+# (the dev tree and a Release copy, say) are separate games with separate
+# sandboxes and must be able to run at the same time, while two windows onto the
+# SAME install are exactly what this has to prevent.
+#
+# An abandoned mutex means the previous manager died rather than exited; that
+# still counts as "we may run".
+
+$instanceKey = ([System.BitConverter]::ToString(
+    [System.Security.Cryptography.SHA256]::Create().ComputeHash(
+        [System.Text.Encoding]::UTF8.GetBytes($script:HleDir.ToLowerInvariant())))).Replace('-', '').Substring(0, 16)
+$script:InstanceMutex = New-Object System.Threading.Mutex($false, ('Local\ZombieFarmManager-' + $instanceKey))
+$haveInstance = $false
+try {
+    $haveInstance = $script:InstanceMutex.WaitOne(0)
+} catch [System.Threading.AbandonedMutexException] {
+    $haveInstance = $true
+}
+if (-not $haveInstance) {
+    [void][System.Windows.Forms.MessageBox]::Show(
+        "游戏管理器已经在运行了。`n`n请切换到已经打开的窗口；如果找不到它，说明它正卡在游戏里，先关掉游戏再试。",
+        '僵尸农场 · 游戏管理', 'OK', 'Information')
+    exit 0
 }
 
 # ---------------------------------------------------------------------------
@@ -2965,6 +3261,30 @@ foreach ($key in $script:CustomEditors.Keys) {
 #
 # Get-LaunchPaths lives near the top of the file, with the other helpers.
 
+function Write-RunState {
+    param(
+        [Parameter(Mandatory = $true)]$Process,
+        [Parameter(Mandatory = $true)][string]$Ipa
+    )
+    try {
+        # The exe path is recorded too: a bare PID would be enough to find a
+        # process, but not enough to prove it is OURS (PIDs get reused).
+        $exe = Get-ProcessImagePath -Process $Process
+        if (-not $exe) { $exe = Join-Path $script:HleDir 'touchHLE.exe' }
+        $record = [ordered]@{
+            pid      = $Process.Id
+            start    = Get-ProcessStartStamp -Process $Process
+            exe      = $exe
+            ipa      = $Ipa
+            launched = (Get-Date).ToString('o')
+        }
+        [System.IO.File]::WriteAllText($script:RunStateFile, ($record | ConvertTo-Json -Compress),
+            (New-Object System.Text.UTF8Encoding($false)))
+    } catch {
+        Write-ManagerLog ('could not write run record: {0}' -f $_.Exception.Message)
+    }
+}
+
 # Start the game and block until it exits.
 #
 #   -SkipSeconds 0 means "do not advance the clock", otherwise the cumulative
@@ -3015,7 +3335,15 @@ function Start-GameProcess {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $paths.TouchHLE
     # Quotes matter: the IPA file name contains spaces.
-    $psi.Arguments = '"' + $paths.Ipa + '" --landscape-right'
+    #
+    # --no-error-popup: on a guest panic touchHLE would otherwise show a modal
+    # "touchHLE crashed!" box and stay alive until somebody clicks it. This
+    # manager starts the game with no console and a hidden parent window, so
+    # that box can end up invisible -- leaving a bare touchHLE.exe behind that
+    # looks exactly like "the game is still running" while nothing is on screen.
+    # The manager reports the crash itself (exit code + captured panic text), so
+    # the box is pure downside on this launch path.
+    $psi.Arguments = '"' + $paths.Ipa + '" --landscape-right --no-error-popup'
     # MUST be touchHLE's own folder. src/paths.rs resolves resources against the
     # current directory (Path::new(".") on Windows), not the executable location,
     # so starting this from anywhere else panics with
@@ -3032,20 +3360,95 @@ function Start-GameProcess {
 
     # The log belongs beside touchHLE's other state, not in the parent folder.
     $logFile = Join-Path $script:HleDir 'zfr_last_run.log'
-    $proc = [System.Diagnostics.Process]::Start($psi)
+    $started = Get-Date
+    $proc = $null
+    try {
+        $proc = [System.Diagnostics.Process]::Start($psi)
+    } catch {
+        $form.Show()
+        $form.Activate()
+        throw
+    }
+    Write-RunState -Process $proc -Ipa $paths.Ipa
+    Write-ManagerLog ('launch pid={0} ipa={1} skip={2}s' -f $proc.Id, (Split-Path -Leaf $paths.Ipa), $SkipSeconds)
+
     # Drain both pipes concurrently; reading them one after the other can deadlock
     # if the child fills the second pipe's buffer while we block on the first.
     $outTask = $proc.StandardOutput.ReadToEndAsync()
     $errTask = $proc.StandardError.ReadToEndAsync()
 
-    $proc.WaitForExit()
+    # Wait in slices rather than one blind WaitForExit(): a crash can leave the
+    # process alive with its window gone, and then this method never returns and
+    # the manager never comes back -- the state players described as "the game
+    # says it is running, but there is nothing running".
+    $seenWindow = $false
+    $windowlessSince = $null
+    $offeredRecovery = $false
+    $endedByManager = $false
+    $slice = 0
+    while ($true) {
+        $exited = $false
+        try { $exited = $proc.WaitForExit(500) } catch { $exited = $true }
+        if ($exited) { break }
+        try { if ($proc.HasExited) { break } } catch { break }
+
+        $slice++
+        # Sampling window handles is cheap but not free; every fourth slice is plenty.
+        if (($slice % 4) -ne 0) { continue }
+        $hasWindow = $false
+        try {
+            $proc.Refresh()
+            $hasWindow = ($proc.MainWindowHandle.ToInt64() -gt 0)
+        } catch { }
+        if ($hasWindow) {
+            $seenWindow = $true
+            $windowlessSince = $null
+            continue
+        }
+        if ($null -eq $windowlessSince) { $windowlessSince = Get-Date }
+        if ($offeredRecovery) { continue }
+
+        # Offer recovery when a window that existed has been gone for a while, or
+        # when a process that never opened one is clearly stalling.
+        $silentFor = ((Get-Date) - $windowlessSince).TotalSeconds
+        $stalledBeforeWindow = (-not $seenWindow) -and (((Get-Date) - $started).TotalSeconds -ge 120)
+        if (-not (($seenWindow -and $silentFor -ge 20) -or $stalledBeforeWindow)) { continue }
+
+        $offeredRecovery = $true
+        Write-ManagerLog ('watchdog: pid={0} alive, no window for {1:N0}s (seenWindow={2})' -f $proc.Id, $silentFor, $seenWindow)
+        $form.Show()
+        $form.Activate()
+        Update-Status '游戏窗口已消失，但进程仍在运行。' 'err'
+        $answer = [System.Windows.Forms.MessageBox]::Show(
+            ("游戏窗口已经消失，但 touchHLE.exe 仍在运行（PID {0}）。`n`n这通常是闪退后残留的进程：它不会自己退出，还会让管理器一直以为游戏在运行。`n`n结束它并回到管理器吗？（选「否」会继续等待它自行退出。）" -f $proc.Id),
+            '游戏可能已崩溃', 'YesNo', 'Warning')
+        if ($answer -eq 'Yes') {
+            try {
+                Stop-Process -Id $proc.Id -Force -ErrorAction Stop
+                $endedByManager = $true
+                Write-ManagerLog ('watchdog: user ended leftover pid={0}' -f $proc.Id)
+            } catch {
+                Write-ManagerLog ('watchdog: could not end pid={0}: {1}' -f $proc.Id, $_.Exception.Message)
+            }
+        } else {
+            $form.Hide()
+        }
+    }
+
+    # The timeout overload does not wait for the redirected readers; this one does.
+    try { $proc.WaitForExit() } catch { }
+
     $out = ''; $err = ''
     try { $out = $outTask.Result } catch { }
     try { $err = $errTask.Result } catch { }
 
+    $exitCode = $proc.ExitCode
+    Remove-RunState
+    Write-ManagerLog ('exit pid={0} code={1} after {2:N0}s' -f $proc.Id, $exitCode, ((Get-Date) - $started).TotalSeconds)
+
     if ($out -or $err) {
         $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-        $text = "[$stamp] exit=$($proc.ExitCode)`r`n$out`r`n$err`r`n"
+        $text = "[$stamp] exit=$exitCode`r`n$out`r`n$err`r`n"
         Add-Content -LiteralPath $logFile -Value $text -Encoding UTF8
     }
 
@@ -3054,15 +3457,22 @@ function Start-GameProcess {
     Refresh-Currency
     Update-SaveTab
 
-    if ($proc.ExitCode -eq 0) {
+    if ($endedByManager) {
+        Update-Status '已结束残留的游戏进程。' 'ok'
+    } elseif ($exitCode -eq 0) {
         Update-Status '游戏已退出。' 'info'
     } else {
-        Update-Status ("游戏退出，代码 {0}（详见 zfr_last_run.log）" -f $proc.ExitCode) 'err'
+        $panic = Get-PanicSummary -Text $err
+        if ($panic) {
+            Update-Status ("游戏异常退出：{0}" -f $panic) 'err'
+        } else {
+            Update-Status ("游戏异常退出：{0}（详见 zfr_last_run.log）" -f (Get-ExitCodeHint -Code $exitCode)) 'err'
+        }
     }
 }
 
 $btnStart.Add_Click({
-    if (Test-GameRunning) { Update-Status '游戏已经在运行了。' 'busy'; return }
+    if (-not (Confirm-NoRunningGame)) { return }
     try {
         Start-GameProcess -SkipSeconds 0 -BusyMessage '正在启动…'
     } catch {
@@ -3074,7 +3484,7 @@ $btnStart.Add_Click({
 })
 
 $btnStartSkip.Add_Click({
-    if (Test-GameRunning) { Update-Status '游戏已经在运行了。' 'busy'; return }
+    if (-not (Confirm-NoRunningGame)) { return }
 
     # Collect hours/minutes in two numeric boxes (no HH:MM string to type), in a
     # modal dialog rather than console input, so the UI never hands control back

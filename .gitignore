@@ -41,6 +41,10 @@ touchHLE/touchHLE_options.txt
 touchHLE/touchHLE_log.txt
 touchHLE/zfr_last_run.log
 touchHLE/zfr_last_launch.txt
+# 管理器的运行状态与取证日志：每台机器各不相同，绝不进 git / 发行包。
+touchHLE/zfr_running.json
+touchHLE/zfr_manager.log
+touchHLE/zfr_manager.log.1
 touchHLE/zfrpatch_current.dylib
 touchHLE/touchHLE_time_offset_seconds.txt
 
