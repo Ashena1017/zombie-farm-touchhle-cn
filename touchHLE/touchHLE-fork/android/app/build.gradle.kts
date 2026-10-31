@@ -81,7 +81,9 @@ android {
     defaultConfig {
         val branding = getTouchHLEBranding()
         applicationId = "org.touchhle.zombiefarm"
-        versionCode = 4
+        // 5: free/open-source statement (first-run dialog + permanent footer)
+        // and the signing-certificate self-check.
+        versionCode = 5
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }

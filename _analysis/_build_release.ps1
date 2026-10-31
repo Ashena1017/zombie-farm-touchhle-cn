@@ -233,6 +233,13 @@ $readme = @'
   <div class="sub">运行说明 · 双击「游戏管理.exe」开始</div>
 </header>
 
+<div class="warn" style="border-left:4px solid #c8892f;background:#fdf6e8;">
+<strong>本软件完全免费、开源。</strong>
+官方地址：<a href="https://github.com/Ashena1017/zombie-farm-touchhle-cn">github.com/Ashena1017/zombie-farm-touchhle-cn</a><br>
+如果你是通过付款拿到这个压缩包的，请尽快向卖家申请退款，并向平台举报那条商品 —— 你买到的只是一份可以免费下载的公开文件。
+本项目不通过任何中间渠道销售，也不对转卖渠道提供任何支持。
+</div>
+
 <h2>一、怎么玩</h2>
 <p>双击 <code>游戏管理.exe</code>，点「启动游戏」即可。窗口标题栏是「Zombie Farm 游戏管理」，里面可以：</p>
 <ul>
@@ -330,6 +337,7 @@ $readme = @'
   <tr><td>zombie_farm_ipa\</td><td>游戏本体（IPA 文件放这里）</td></tr>
   <tr><td>touchHLE\</td><td>模拟器本体，不用管它</td></tr>
   <tr><td>使用说明.html</td><td>本文件</td></tr>
+  <tr><td>请勿购买.txt</td><td>免费声明与官方地址，内容与本文顶部相同</td></tr>
 </table>
 <p>想换游戏版本，就把别的 <code>.ipa</code> 放进 <code>zombie_farm_ipa\</code>，然后在管理器的「游戏版本 (IPA)」里选。</p>
 
@@ -370,6 +378,17 @@ $readme = @'
 [System.IO.File]::WriteAllText((Join-Path $release '使用说明.html'), $readme,
     (New-Object System.Text.UTF8Encoding($true)))
 Log '  written'
+
+# --- a plain-text copy of the free statement ------------------------------
+# The HTML page covers anyone who opens it; this file exists so the statement is
+# readable without a browser, is trivially greppable, and travels with the zip
+# even if the folder is re-packed by a reseller who drops the HTML.
+Log ''
+Log '--- 请勿购买.txt ---'
+$noticeSrc = Join-Path $Root '请勿购买.txt'
+if (-not (Test-Path -LiteralPath $noticeSrc)) { throw "missing: $noticeSrc" }
+Copy-Item -LiteralPath $noticeSrc -Destination $release
+Log ("  {0,-30} {1,12:N0} B" -f '请勿购买.txt', (Get-Item -LiteralPath $noticeSrc).Length)
 
 # Also carry the licenses, since third-party components are redistributed. They go
 # beside touchHLE.exe because they cover the emulator and its dylibs.

@@ -69,6 +69,21 @@ $script:NightMode = if (Test-Path -LiteralPath $script:NightModeFile -PathType L
     [System.IO.File]::ReadAllText($script:NightModeFile).Trim() -eq '1'
 } else { $true }
 
+# Free / open-source statement.
+#
+# The project is given away; copies of it do turn up for sale on marketplaces.
+# A buyer can only be protected by knowing, from inside the software itself,
+# that this is a free download and where the original lives. So the statement
+# is shown once per install and then stays visible as a footer link.
+#
+# The marker is keyed on the install folder, but notice changes are announced
+# again by bumping $script:NoticeVersion rather than by deleting the file.
+# ZFR_MANAGER_NO_NOTICE=1 suppresses the first-run dialog for automation
+# (see _analysis\_notice_probe.ps1), which otherwise runs against a fresh copy.
+$script:ProjectUrl = 'https://github.com/Ashena1017/zombie-farm-touchhle-cn'
+$script:NoticeVersion = '1'
+$script:NoticeFile = Join-Path $script:Root 'launcher_notice_seen.txt'
+
 # NOTE: this manager is self-contained. It does NOT call
 # StartZombieFarmNextHour.ps1 or SetZombieFarmCurrency.ps1 -- the launching and
 # currency-writing logic is implemented in this file. Those two scripts still
@@ -1504,7 +1519,7 @@ if ($SelfTest) {
 
             # Baseline the real save's hash now that LiveSave is resolved.
             if (Test-Path -LiteralPath $script:LiveSave) {
-                $liveHashBefore = (Get-FileHash -LiteralPath $script:LiveSave -Algorithm SHA256).Hash
+                $liveHashBefore = Get-Sha256Hex $script:LiveSave
             }
         }
 
@@ -2001,7 +2016,7 @@ if ($SelfTest) {
         # (Also fails if the game itself wrote the save mid-test -- close the
         # game before running -SelfTest.)
         if ($null -ne $liveHashBefore) {
-            $liveHashAfter = (Get-FileHash -LiteralPath $script:LiveSave -Algorithm SHA256).Hash
+            $liveHashAfter = Get-Sha256Hex $script:LiveSave
             $liveOk = $liveHashAfter -eq $liveHashBefore
             Write-Host ("  real save untouched  : " + $(if ($liveOk) { 'PASS' } else { 'FAIL (live save changed during selftest!)' }))
             if (-not $liveOk) { $ok = $false }
@@ -2295,7 +2310,10 @@ $script:PaletteComboDraw = {
 }
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'Zombie Farm 游戏管理'
+# "免费开源" rides along in the title bar so it is visible in the taskbar and
+# in any screenshot of the window. Automation matches this title with
+# -match 'Zombie Farm', so the prefix must keep that phrase intact.
+$form.Text = 'Zombie Farm 游戏管理 · 免费开源'
 # Height is sized to the content (see the tab height below) rather than padded out,
 # so there is no dead space at the bottom of either tab.
 $form.ClientSize = New-Object System.Drawing.Size(960, 574)
@@ -2856,6 +2874,24 @@ $status.Size = New-Object System.Drawing.Size(916, 26)
 $status.ForeColor = [System.Drawing.Color]::FromArgb(60, 60, 60)
 $form.Controls.Add($status)
 
+# --- free / open-source footer ---------------------------------------------
+#
+# Permanent, unlike the first-run dialog: this is the line a buyer sees while
+# the software is open, on every page, without having to click anything. The
+# whole line is one link that opens the statement.
+
+$noticeLink = New-Object System.Windows.Forms.LinkLabel
+$noticeLink.Text = ('免费开源 · 唯一官方来源 {0} · 付费购买请联系退款（点此查看声明）' -f
+    $script:ProjectUrl.Replace('https://', ''))
+$noticeLink.Font = $fontSmall
+$noticeLink.LinkBehavior = [System.Windows.Forms.LinkBehavior]::HoverUnderline
+$noticeLink.TabStop = $false
+$noticeLink.AutoSize = $false
+$noticeLink.Location = New-Object System.Drawing.Point(24, ($status.Top + $status.Height))
+$noticeLink.Size = New-Object System.Drawing.Size(916, 20)
+$noticeLink.Add_LinkClicked({ Show-ProjectNotice })
+$form.Controls.Add($noticeLink)
+
 # ---------------------------------------------------------------------------
 # Behaviour
 # ---------------------------------------------------------------------------
@@ -3323,7 +3359,7 @@ function Start-GameProcess {
     # Diagnostic fingerprint: which IPA build actually ran.
     @(
         "ipa = $(Split-Path -Leaf $paths.Ipa)"
-        "sha256 = $((Get-FileHash -LiteralPath $paths.Ipa -Algorithm SHA256).Hash)"
+        "sha256 = $(Get-Sha256Hex $paths.Ipa)"
         "launched = $(Get-Date -Format o)"
     ) | Set-Content -LiteralPath $paths.Fingerprint -Encoding utf8
 
@@ -3917,6 +3953,191 @@ $btnIpaBrowse.Add_Click({
     $cmbIpa.SelectedIndex = $index
 })
 
+# --- free / open-source statement ------------------------------------------
+#
+# Shown once on a fresh install (see $script:NoticeFile) and again from the
+# footer link at any time. Measured behaviour, not a preference: a modeless
+# window shown from this form's Shown handler -- while the main form is itself
+# inside ShowDialog -- is created enabled but never receives input, so it could
+# be neither clicked nor dismissed. A nested ShowDialog works, so the notice is
+# always modal. The dialog title deliberately avoids "Zombie Farm": the
+# automation in _analysis\ finds the manager window by that phrase.
+
+function Test-NoticeDue {
+    if ($env:ZFR_MANAGER_NO_NOTICE -eq '1') { return $false }
+    if (-not (Test-Path -LiteralPath $script:NoticeFile -PathType Leaf)) { return $true }
+    try {
+        return ([System.IO.File]::ReadAllText($script:NoticeFile).Trim() -ne $script:NoticeVersion)
+    } catch {
+        return $true
+    }
+}
+
+function Set-NoticeSeen {
+    try {
+        [System.IO.File]::WriteAllText(
+            $script:NoticeFile, $script:NoticeVersion, [System.Text.Encoding]::ASCII)
+    } catch { }
+}
+
+# A short fingerprint the player can compare against the published Release
+# notes, so "is this file the one they shipped" has an answer that does not
+# depend on trusting whoever handed them the folder.
+#
+# Hashing goes through .NET rather than Get-FileHash: that cmdlet lives in the
+# Microsoft.PowerShell.Utility module, and it is genuinely missing when the
+# manager is started by a shell whose PSModulePath points at another
+# PowerShell's module tree (seen here, not hypothetical). Launch and currency
+# code hash files too, so the same helper is used everywhere.
+function Get-Sha256Hex {
+    param([string]$Path)
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $stream = $null
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        $bytes = $sha.ComputeHash($stream)
+        return ([System.BitConverter]::ToString($bytes)).Replace('-', '')
+    } finally {
+        if ($stream) { $stream.Dispose() }
+        $sha.Dispose()
+    }
+}
+
+function Get-ManagerFingerprint {
+    try {
+        return (Get-Sha256Hex (Join-Path $script:Root 'GameManager.ps1')).Substring(0, 16)
+    } catch {
+        return '未知'
+    }
+}
+
+function Open-ProjectUrl {
+    try {
+        [System.Diagnostics.Process]::Start($script:ProjectUrl) | Out-Null
+    } catch {
+        [void][System.Windows.Forms.MessageBox]::Show(
+            ("无法自动打开浏览器。请手动访问：`n`n{0}" -f $script:ProjectUrl),
+            '免费开源声明', 'OK', 'Information')
+    }
+}
+
+function Show-ProjectNotice {
+    param([switch]$FirstRun)
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = if ($FirstRun) { '欢迎使用 · 免费开源声明' } else { '免费开源声明' }
+    $dlg.Font = $font
+    $dlg.FormBorderStyle = 'FixedDialog'
+    $dlg.MaximizeBox = $false
+    $dlg.MinimizeBox = $false
+    $dlg.ShowInTaskbar = $false
+    $dlg.StartPosition = 'CenterParent'
+    $dlg.ClientSize = New-Object System.Drawing.Size(560, 400)
+    $dlg.BackColor = $script:Paper
+    $dlg.ForeColor = $script:Ink
+
+    $heading = New-Object System.Windows.Forms.Label
+    $heading.Text = '本软件完全免费、开源'
+    $heading.Font = $fontBold
+    $heading.ForeColor = $script:Forest
+    $heading.Location = New-Object System.Drawing.Point(22, 16)
+    $heading.AutoSize = $true
+    $dlg.Controls.Add($heading)
+
+    $body = New-Object System.Windows.Forms.Label
+    $body.Text = @(
+        '任何人都可以从下面的官方地址免费下载，不需要付款，也没有付费版。'
+        ''
+        ('官方地址：{0}' -f $script:ProjectUrl)
+        ''
+        '如果你是花钱买到这个软件包的：你买到的只是一份免费的公开文件，'
+        '请尽快向卖家申请退款，并向平台举报那条商品。本项目不通过任何中间渠道销售，'
+        '也不对转卖渠道提供任何支持。'
+        ''
+        '· 基于 touchHLE 模拟器制作，非官方同人作品；模拟器部分遵循 MPL-2.0 许可。'
+        '· 游戏素材版权归原开发商所有，本项目仅供个人学习与怀旧使用。'
+        '· 发行包不含任何玩家存档，首次进入游戏会新建进度。'
+    ) -join "`r`n"
+    $body.Location = New-Object System.Drawing.Point(22, 48)
+    $body.Size = New-Object System.Drawing.Size(516, 262)
+    $body.ForeColor = $script:Ink
+    $dlg.Controls.Add($body)
+
+    $fingerprint = New-Object System.Windows.Forms.Label
+    $fingerprint.Text = ('管理器版本标识：{0}（与 Release 说明中的哈希比对）' -f (Get-ManagerFingerprint))
+    $fingerprint.Font = $fontSmall
+    $fingerprint.ForeColor = $script:Grey
+    $fingerprint.Location = New-Object System.Drawing.Point(24, 314)
+    $fingerprint.Size = New-Object System.Drawing.Size(516, 20)
+    $dlg.Controls.Add($fingerprint)
+
+    $btnOpen = New-Object System.Windows.Forms.Button
+    $btnOpen.Text = '打开项目主页'
+    $btnOpen.Size = New-Object System.Drawing.Size(122, 34)
+    $btnOpen.Location = New-Object System.Drawing.Point(22, 344)
+    $btnOpen.FlatStyle = 'Flat'
+    $btnOpen.BackColor = $script:Forest
+    $btnOpen.ForeColor = [System.Drawing.Color]::White
+    $btnOpen.FlatAppearance.BorderSize = 0
+    $btnOpen.Add_Click({ Open-ProjectUrl })
+    $dlg.Controls.Add($btnOpen)
+
+    $btnCopy = New-Object System.Windows.Forms.Button
+    $btnCopy.Text = '复制链接'
+    $btnCopy.Size = New-Object System.Drawing.Size(96, 34)
+    $btnCopy.Location = New-Object System.Drawing.Point(156, 344)
+    $btnCopy.FlatStyle = 'Flat'
+    $btnCopy.BackColor = $script:SoftGreen
+    # Secondary buttons follow the main window's rule: the lighter sage reads on
+    # dark, the darker forest reads on light. Using forest in both themes made
+    # this dialog's buttons look disabled in night mode.
+    $btnCopy.ForeColor = if ($script:NightMode) { $script:Sage } else { $script:Forest }
+    $btnCopy.FlatAppearance.BorderColor = $script:Line
+    $btnCopy.Add_Click({
+        try {
+            [System.Windows.Forms.Clipboard]::SetText($script:ProjectUrl)
+            $btnCopy.Text = '已复制'
+        } catch {
+            [void][System.Windows.Forms.MessageBox]::Show(
+                ($script:ProjectUrl), '请手动复制这个地址', 'OK', 'Information')
+        }
+    })
+    $dlg.Controls.Add($btnCopy)
+
+    $btnClose = New-Object System.Windows.Forms.Button
+    $btnClose.Text = if ($FirstRun) { '我知道了，开始使用' } else { '关闭' }
+    $btnClose.Size = New-Object System.Drawing.Size(158, 34)
+    $btnClose.Location = New-Object System.Drawing.Point(380, 344)
+    $btnClose.FlatStyle = 'Flat'
+    $btnClose.BackColor = $script:SoftGreen
+    $btnClose.ForeColor = if ($script:NightMode) { $script:Sage } else { $script:Forest }
+    $btnClose.FlatAppearance.BorderColor = $script:Line
+    $btnClose.Add_Click({ $dlg.Close() })
+    $dlg.Controls.Add($btnClose)
+    $dlg.AcceptButton = $btnClose
+    $dlg.CancelButton = $btnClose
+
+    $dlg.Add_FormClosed({
+        if ($FirstRun) { Set-NoticeSeen }
+        $dlg.Dispose()
+    })
+
+    # The main window gets a dark title bar; the dialog has to match it, or a
+    # night-mode user sees one bright strip in an otherwise dark UI.
+    $null = $dlg.Handle
+    if ($script:NightMode) {
+        [WindowChrome]::Apply(
+            $dlg.Handle, $true,
+            [int][WindowChrome]::PackColor($script:Paper),
+            [int][WindowChrome]::PackColor($script:Ink),
+            [int][WindowChrome]::PackColor($script:Line))
+    }
+
+    # Modal: see the note above -- a modeless window here cannot be dismissed.
+    [void]$dlg.ShowDialog($form)
+}
+
 # --- startup / shutdown ----------------------------------------------------
 
 $form.Add_Shown({
@@ -3928,6 +4149,7 @@ $form.Add_Shown({
     $script:UiReady = $true
     Update-Status '就绪。改动会立即保存。' 'info'
     Set-ManagerPalette -Night $script:NightMode
+    if (Test-NoticeDue) { Show-ProjectNotice -FirstRun }
 })
 
 $form.Add_FormClosing({
@@ -4029,6 +4251,11 @@ function Set-ManagerPalette {
     $lblSaveInfo.ForeColor = $script:Grey
     $lblSaveHint.ForeColor = $script:Grey
     $status.ForeColor = $script:Grey
+    $noticeLink.LinkColor = $script:Sage
+    $noticeLink.ActiveLinkColor = $script:Amber
+    $noticeLink.VisitedLinkColor = $script:Sage
+    $noticeLink.ForeColor = $script:Grey
+    $noticeLink.BackColor = $script:Paper
 
     foreach ($button in @(
         $btnIpaBrowse, $btnStartSkip, $btnApplyCurrency, $btnBackup, $btnRestore,
@@ -4137,9 +4364,10 @@ function Update-WindowForSelectedTab {
     else { $pageHeight = $script:GameContentHeight }
     $tabs.Height = $pageHeight + $tabHeaderAllowance
     $status.Top = $tabs.Top + $tabs.Height + 6
+    $noticeLink.Top = $status.Top + $status.Height
     $form.ClientSize = [System.Drawing.Size]::new(
         $form.ClientSize.Width,
-        [int]($status.Top + $status.Height + 10))
+        [int]($noticeLink.Top + $noticeLink.Height + 8))
 }
 
 $tabs.Add_SelectedIndexChanged({ Update-WindowForSelectedTab })

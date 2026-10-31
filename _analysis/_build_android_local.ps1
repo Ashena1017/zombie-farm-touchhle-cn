@@ -1,3 +1,8 @@
+﻿param(
+    # Forwarded to the inner build: dependency cache only, no network resolves.
+    [switch]$Offline
+)
+
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -31,7 +36,7 @@ $env:PATH = @(
     $env:PATH
 ) -join ';'
 
-& (Join-Path $PSScriptRoot '_build_android.ps1') -Gradle $gradle
+& (Join-Path $PSScriptRoot '_build_android.ps1') -Gradle $gradle -Offline:$Offline
 if ($LASTEXITCODE -ne 0) {
     throw "Android build failed with exit code $LASTEXITCODE."
 }

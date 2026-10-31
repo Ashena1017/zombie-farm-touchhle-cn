@@ -1,5 +1,8 @@
-param(
-    [string]$Gradle = 'gradle'
+﻿param(
+    [string]$Gradle = 'gradle',
+    # --offline: dependency cache only. This machine's network occasionally leaves
+    # Gradle waiting on a resolve that never returns; offline fails fast instead.
+    [switch]$Offline
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +14,7 @@ $outputApk = Join-Path $outputDir 'touchHLE-zombiefarm-android-arm64-fixed.apk'
 $localPropertiesPath = Join-Path $androidProject 'local.properties'
 
 $gradleCommand = Get-Command $Gradle -ErrorAction Stop
+$gradleArgs = @(); if ($Offline) { $gradleArgs += '--offline' }
 $sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { $null }
 if (-not $sdkRoot -and (Test-Path -LiteralPath $localPropertiesPath -PathType Leaf)) {
     $sdkLine = Get-Content -LiteralPath $localPropertiesPath -Raw -Encoding ASCII | Select-String -Pattern '(?m)^sdk\.dir=(.+)$'
@@ -104,7 +108,7 @@ try {
     }
 
     # Force a fresh merge so a previously cached libc++_shared.so cannot survive.
-    & $gradleCommand.Source --project-dir $androidProject clean assembleRelease
+    & $gradleCommand.Source --project-dir $androidProject --console=plain @gradleArgs clean assembleRelease
     if ($LASTEXITCODE -ne 0) {
         throw "Gradle failed with exit code $LASTEXITCODE."
     }

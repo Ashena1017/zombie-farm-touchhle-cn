@@ -3,11 +3,15 @@ package org.touchhle.android;
 
 import android.app.*;
 import android.content.*;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -17,12 +21,29 @@ import android.view.*;
 import android.widget.*;
 import org.json.JSONObject;
 import java.io.*;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.*;
 
 /** Native touch-first launcher; the emulator runs in the separate :game process. */
 public class ManagerActivity extends Activity {
     private static final int IMPORT_IPA = 10, IMPORT_SAVE = 11, EXPORT_SAVE = 12;
+
+    // Free / open-source statement.
+    //
+    // Copies of this app turn up for sale. The only thing that helps the person
+    // who paid is telling them, from inside the app, that it is a free download
+    // and where the original lives. Shown once per install, then kept on screen
+    // as the footer line.
+    private static final String PROJECT_URL = "https://github.com/Ashena1017/zombie-farm-touchhle-cn";
+    private static final String NOTICE_VERSION = "1";
+    // SHA-256 of the signing certificate this project is built with. A repack
+    // signed with someone else's key will not match, which is exactly the case
+    // worth warning about: re-signed copies are how ads or a paywall get bolted
+    // on before resale. Update this constant if the keystore ever changes.
+    private static final String OFFICIAL_CERT =
+        "c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f";
+
     private int INK, NIGHT_BLUE, LAVENDER, MUTED, BACKGROUND, SOFT, LINE, GOLD, SURFACE;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private ZfStorage storage;
@@ -65,6 +86,8 @@ public class ManagerActivity extends Activity {
         try { storage = new ZfStorage(this); }
         catch (Exception e) { error(e); return; }
         setTitle("Zombie Farm 游戏管理"); render();
+        verifySignature();
+        showNoticeIfNeeded();
     }
     @Override protected void onResume() {
         super.onResume(); if (storage != null && !busy) refresh(true);
@@ -187,7 +210,7 @@ public class ManagerActivity extends Activity {
         FrameLayout hero = new FrameLayout(this); hero.setBackground(shape(SOFT, 8)); hero.setClipToOutline(true);
         LinearLayout titles = vertical(); titles.setPadding(dp(17), dp(17), 0, 0);
         titles.addView(text("Zombie Farm 游戏管理", 20, INK, true));
-        titles.addView(text("僵尸农场 · 中文版", 12, MUTED, false));
+        titles.addView(text("僵尸农场 · 中文版 · 免费开源", 12, MUTED, false));
         TextView state = text(busy ? "处理中…" : running ? "游戏运行中" : "准备就绪", 11, NIGHT_BLUE, true);
         state.setPadding(dp(9), dp(4), dp(9), dp(4)); state.setBackground(shape(SURFACE, 12));
         LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(-2, -2);
@@ -224,9 +247,17 @@ public class ManagerActivity extends Activity {
             tabParams.setMargins(dp(2), 0, dp(2), 0); nav.addView(b, tabParams);
         }
         LinearLayout.LayoutParams navParams = new LinearLayout.LayoutParams(-1, -2); navParams.bottomMargin = dp(4); shell.addView(nav, navParams);
-        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
-        body = vertical(); body.setPadding(0, dp(8), 0, dp(18)); scroll.addView(body);
-        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1)); setContentView(shell);
+        ScrollView scroller = new ScrollView(this); scroller.setFillViewport(true);
+        body = vertical(); body.setPadding(0, dp(8), 0, dp(18)); scroller.addView(body);
+        shell.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1));
+        // The footer is outside the scroll view: it is the one line that has to
+        // be visible on every page without scrolling, which is the whole point.
+        TextView footer = text("免费开源 · 唯一官方来源 github.com/Ashena1017/zombie-farm-touchhle-cn · 付费购买请联系退款",
+            10, MUTED, false);
+        footer.setGravity(Gravity.CENTER); footer.setPadding(dp(4), dp(6), dp(4), dp(10));
+        footer.setOnClickListener(v -> showProjectNotice(false));
+        shell.addView(footer, new LinearLayout.LayoutParams(-1, -2));
+        setContentView(shell);
         if (selected == null) { card("正在准备游戏", "首次打开会安装内置中文版，请稍候。"); return; }
         if (page == 0) gamePage(); else if (page == 1) settingsPage(); else savePage();
     }
@@ -529,4 +560,81 @@ public class ManagerActivity extends Activity {
             .setPositiveButton("知道了", null).show();
     }
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_LONG).show(); }
+
+    // --- free / open-source statement --------------------------------------
+
+    private void showNoticeIfNeeded() {
+        String seen = getPreferences(MODE_PRIVATE).getString("notice_version", "");
+        if (NOTICE_VERSION.equals(seen)) return;
+        // Recorded before showing, so a crash while the dialog is up does not
+        // make it reappear on every launch.
+        getPreferences(MODE_PRIVATE).edit().putString("notice_version", NOTICE_VERSION).apply();
+        showProjectNotice(true);
+    }
+
+    private void showProjectNotice(boolean firstRun) {
+        String message =
+            "本软件完全免费、开源，任何人都可以从下面这个官方地址免费下载，不需要付款，也没有付费版。\n\n"
+            + PROJECT_URL + "\n\n"
+            + "如果你是花钱买到这个软件包的：你买到的只是一份免费的公开文件，请尽快向卖家申请退款。"
+            + "本项目不通过任何中间渠道销售，也不对转卖渠道提供任何支持。\n\n"
+            + "· 基于 touchHLE 模拟器制作，非官方同人作品；模拟器部分遵循 MPL-2.0 许可。\n"
+            + "· 游戏素材版权归原开发商所有，本项目仅供个人学习与怀旧使用。\n"
+            + "· 发行包不含任何玩家存档，首次进入游戏会新建进度。";
+        new AlertDialog.Builder(this)
+            .setTitle(firstRun ? "欢迎使用 · 免费开源声明" : "免费开源声明")
+            .setMessage(message)
+            .setPositiveButton("打开项目主页", (dialog, which) -> openProjectUrl())
+            .setNeutralButton("复制链接", (dialog, which) -> {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                clipboard.setPrimaryClip(ClipData.newPlainText("Zombie Farm", PROJECT_URL));
+                toast("官方地址已复制");
+            })
+            .setNegativeButton(firstRun ? "我知道了，开始使用" : "关闭", null)
+            .show();
+    }
+
+    private void openProjectUrl() {
+        try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PROJECT_URL))); }
+        catch (Exception e) { toast("无法打开浏览器，请手动访问：" + PROJECT_URL); }
+    }
+
+    // --- signature self-check ----------------------------------------------
+
+    private void verifySignature() {
+        String actual;
+        try { actual = signatureOfSelf(); }
+        catch (Exception e) { return; }             // never block the app on this
+        if (actual == null || actual.equalsIgnoreCase(OFFICIAL_CERT)) return;
+        new AlertDialog.Builder(this)
+            .setTitle("检测到非官方修改版本")
+            .setMessage("这个安装包的签名与官方发布版不一致，说明它被动过（例如塞入广告、替换内容）后重新打包。\n\n"
+                + "当前签名：" + actual + "\n\n官方签名：" + OFFICIAL_CERT
+                + "\n\n它可能是别人转卖的改版，建议从官方地址重新下载。")
+            .setPositiveButton("打开项目主页", (dialog, which) -> openProjectUrl())
+            .setNegativeButton("继续使用", null)
+            .show();
+    }
+
+    private String signatureOfSelf() throws Exception {
+        PackageManager pm = getPackageManager();
+        String name = getPackageName();
+        if (Build.VERSION.SDK_INT >= 28) {
+            PackageInfo info = pm.getPackageInfo(name, PackageManager.GET_SIGNING_CERTIFICATES);
+            if (info.signingInfo == null) return null;
+            Signature[] signatures = info.signingInfo.hasMultipleSigners()
+                ? info.signingInfo.getApkContentsSigners()
+                : info.signingInfo.getSigningCertificateHistory();
+            return signatures == null || signatures.length == 0 ? null : sha256Hex(signatures[0].toByteArray());
+        }
+        PackageInfo info = pm.getPackageInfo(name, PackageManager.GET_SIGNATURES);
+        return info.signatures == null || info.signatures.length == 0 ? null : sha256Hex(info.signatures[0].toByteArray());
+    }
+
+    private static String sha256Hex(byte[] data) throws Exception {
+        byte[] hash = MessageDigest.getInstance("SHA-256").digest(data);
+        StringBuilder text = new StringBuilder(hash.length * 2);
+        for (byte value : hash) text.append(String.format(Locale.ROOT, "%02x", value));
+        return text.toString();
+    }
 }
