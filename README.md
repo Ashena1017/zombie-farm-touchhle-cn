@@ -30,10 +30,12 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-running-detect/zombie-farm-windows-x64-v29fix-running-detect.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-running-detect/zombie-farm-android-arm64-v29fix-invasion-fix.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-free-notice/zombie-farm-windows-x64-v29fix-free-notice.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-free-notice/zombie-farm-android-arm64-v29fix-free-notice.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
-两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-running-detect)查看。
+两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-free-notice)查看。
+
+**2026-11-01 免费开源声明与安卓签名校验**：针对有人倒卖本项目的整合包，这一版把「免费、开源、官方地址」直接放进软件里——Windows 管理器标题栏带「免费开源」、底部常驻可点击脚注、首次运行弹一次完整声明（含官方地址、退款提示，以及管理器自身的 SHA-256 便于核对）；Android 管理器副标题与底部脚注同样标明，首启弹一次声明，并在启动时核对安装包签名，被人改包重签时会提示「检测到非官方修改版本」。压缩包根目录新增 `请勿购买.txt`，说明书顶部也加了声明横幅。**如果你花钱买过这个软件，请申请退款并向平台举报那条商品**。
 
 **2026-10-21 运行状态修复**：Windows 管理器此前只按进程名判断游戏是否在运行，闪退后残留的无窗口进程会让它一直提示「游戏已经在运行了」，而任务管理器里又找不到可关的东西。现在改为核对 PID、启动时间和可执行文件路径，对不上就自动清理；崩溃不再弹出可能藏在窗口后面的错误框，改为在状态栏给出退出原因（如 `0xC0000005 访问冲突`）；窗口消失但进程还在时，管理器会自己回来询问是否结束它；遇到无窗口的残留进程也可以直接结束并启动。Android 未改动——它的运行状态本来就是文件锁，进程结束即释放，APK 与上一版逐字节相同。
 
@@ -181,7 +183,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-running-detect/zombie-farm-windows-x64-v29fix-running-detect.zip) 并解压；
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-free-notice/zombie-farm-windows-x64-v29fix-free-notice.zip) 并解压；
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 
@@ -189,7 +191,7 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-running-detect/zombie-farm-android-arm64-v29fix-invasion-fix.apk)；
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-free-notice/zombie-farm-android-arm64-v29fix-free-notice.apk)；
 2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。最新 v29fix IPA 已内置，首次启动自动校验安装，不需要手动复制 `data` 文件。
 
