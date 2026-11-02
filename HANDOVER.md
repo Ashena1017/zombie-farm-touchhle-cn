@@ -781,3 +781,27 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 4. **发布通道**：本轮 `127.0.0.1:10808` 未监听（端口关闭），直接连接 `api.github.com` 与 `uploads.github.com` 正常，因此没有动用任务私有上传脚本，全程走个人技能 `github-release.mjs`：manifest 在 `_analysis\dumps\free-notice-release-manifest-20261101.json`（声明了 `sha256` 与 `size`），`--apply --publish` 上传并公开，随后 `--verify --recheck` 全量重下载复核。下次照抄这条链路即可；如果哪天代理恢复，技能会自动探测，无需手工拼 `HttpClient`。
 5. **线上回读**：Release 正文 2,466 字符与 `_analysis\reports\RELEASE_NOTES_v29fix-free-notice.md` 逐字符一致；README 五处下载链接、Release 页面两个附件名与「免费开源」文案均已在线上渲染确认。
 6. **验证边界**：Android 只在 MuMu 上验过（同页 §37 第 9 条），签名不匹配的警告路径仍未用真实重签名包触发；游戏侧结论未变（重复入侵、死亡补队、Android 入侵仍未实测）。本轮没有改动 IPA、没有重编 Windows exe、没有触碰玩家真实存档。
+
+## 39. 交接后追加（2026-11-02，启动画面水印与窗口标题）
+
+1. **决策与边界**：上一版把声明放进管理器，但转卖者卖的是游戏本体，买家可能压根不打开管理器。本轮把「本作免费开源 · 请勿购买 + 项目地址」直接印在**标题画面**右上角的空天上，并把 touchHLE 窗口标题改成带项目地址。**这不是防盗版**：拦不住有人用 v28 或网上的其他包，也拦不住买家付款前看不到启动画面；它的作用是让「用我们的包转卖」变得不划算（买家一启动就发现是免费的，会退款/举报），并且让任何截图、录屏都带上出处。别在文档里把它写成「已经解决转卖问题」。
+
+2. **改的是哪一张图**：IPA 内 839 张图**全是普通 PNG**，没有 PVR/PVRTC，所以不需要解码或重压纹理。标题界面是分层独立图，不是图集：`MainMenuBG.png`（1024×683，天空+远山）、`MainMenuBGFront.png`（1024×179，泥土层）、`MainMenuPlayBG.png`（644×88，按钮底条）、`MainMenuPlayButton.png` / `ZombieFarmLogo.png`（`zh-Hans.lproj` 里的本地化版，**Apple CgBI 变体**：`CgBI` 块在 `IHDR` 之前、raw deflate、BGRA 预乘，本轮没有碰它们）。只重绘 `MainMenuBG.png` 的右上角，logo 与「开始游戏」之间/周围的几何关系不变。
+
+3. **屏幕映射（复算用）**：`touchHLE_options.txt` 里是 `--device-family=ipad --scale-hack=1.5`，1024×768 逻辑屏渲染到 1536×1152 客户区，贴图与屏幕 1:1 映射，窗口边框 11 px、标题栏约 37–56 px。所以贴图坐标 (x,y) → 截图坐标 (11 + 1.5x, 56 + 1.5y)，水印位置可以精确到像素。实测窗口 `1558×1208`。
+
+4. **产物**：
+   - 新 IPA `zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa`，`59,570,028 B`，SHA-256 `7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC`；1086 个成员里只有 `Payload/ZFR.app/MainMenuBG.png` 变了，其余 1085 个**逐字节相同**，`Payload/ZFR.app/ZFR` 仍为 `45D647787CC6256DBE83B041808E5845739A7B331B72DC030C7FD6E9CC04B05B`。报告 `...v29fix-notice.report.json` 与文件同目录。生成脚本：`_analysis\_make_notice_texture.py`、`_analysis\_build_notice_ipa.py`。
+   - Windows `touchHLE.exe` 重编于 `src/environment.rs` 的标题格式串，`28,878,848 B`，SHA-256 `D9F7506BE3CAF7261290358FCB26784C83FB5BA98232D6517B8764D0599B463F`。**体积与上一版完全相同是正常的**（段对齐吸收了字符串增量），用「二进制里能检到 UTF-8 `免费开源`」来证明改生效，不要用体积判断。
+   - Windows ZIP `zombie-farm-windows-x64-v29fix-notice.zip`，`95,976,692 B`，`4A9168B5CA8817A8B5BE973CC37440344514824520FAA69C4A7883BD884B1195`，43 文件、单一同名顶层目录、无日志与 sandbox。
+   - Android APK `zombie-farm-android-arm64-v29fix-notice.apk`，`97,333,093 B`，`7138BD24597C8BF46F4779161A7FF12BB8AB8412C462DC71AAEE69EF2F0E5D7C`，`versionCode 6`，签名证书仍是 `C2:DD:CA:91:…:CA:6F`（即 `~\.android\debug.keystore`，本机没有 release keystore，`hasReleaseSigning` 为假时走 debug 签名——**这就是为什么旧 APK 能覆盖安装**）。
+
+5. **本轮踩到的两个坑**：
+   - `_verify_android_package.ps1` 第 7 行硬编码了 v29fix 的 IPA 路径，改名后 Gradle 明明 `BUILD SUCCESSFUL`，脚本仍报「APK IPA does not match the repository v29fix IPA」。改名 IPA 必须同步这个脚本。
+   - APK 内资产名 `Zombie_Farm_v29fix.ipa` 被 `ZfStorage.BUNDLED` 与 `ZfIpa.java` 按文件名匹配，**不要跟着改名**；只在 `build.gradle.kts` 里改源路径，`rename {}` 保持不变。
+
+6. **验证**：① 用新 exe + 新 IPA 直接跑，抓到真实标题画面（水印在右上、窗口标题带地址、存档读回正常），截图 `_analysis\dumps\title-capture\verify-notice.png`；② 成品 ZIP 解压到 `%TEMP%` 后独立跑 `_verify_release.ps1` 45.0 s PASS（窗口出现、iPad 选项生效、无 panic、sandbox 干净）；③ `_verify_android_package.ps1` PASS（包内 IPA 哈希与哈希戳一致、`libc++_shared.so` 与 NDK 27.2 一致、默认选项未被改动），`aapt2` 读到 `versionCode='6'`，`keytool -printcert` 读到证书不变，`.so` 内检出新标题字符串。
+
+7. **验证边界**：Android **没有**在本轮重装实测——MuMu 实例未运行，且工具链里的 `adb.exe` 单文件启动报 `0xC0000135`（`platform-tools` 只剩 `adb.exe`，缺 `AdbWinApi.dll`），需改用 `C:\Program Files\Netease\MuMu\nx_device\12.0\shell\adb.exe`；端口 7555/16384/5555/5554 均未监听。Android 侧只做到包级校验。签名不匹配的警告路径仍未用真实重签名包触发过。游戏侧结论未变。
+
+8. **发布状态**：截至本节写入时**尚未提交、尚未发版**。发版计划：tag `v29fix-notice`，资产名 `zombie-farm-windows-x64-v29fix-notice.zip` / `zombie-farm-android-arm64-v29fix-notice.apk`（已在 `%TEMP%` 备好，可直接走 `git-hosting` 技能的 `github-release.mjs --apply --publish`），正文源文件 `_analysis\reports\RELEASE_NOTES_v29fix-notice.md`，README 五处下载链接已改指新 tag。

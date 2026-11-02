@@ -1,0 +1,29 @@
+{
+  "generated": "2026-11-02T19:36:24+08:00",
+  "tool": "_build_notice_ipa.py",
+  "kind": "NOTICE",
+  "supersedes": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa",
+  "purpose": "Burn the free/open-source notice into the main-menu background so every launch shows it. Resale copies of this build advertise the original.",
+  "members": [
+    {
+      "member": "Payload/ZFR.app/MainMenuBG.png",
+      "change": "sky layer repainted: right-top notice block",
+      "size_before": 319107,
+      "size_after": 321453,
+      "sha256_after": "465F796661F8B64D7414C1AD0C36C354EAB498D94BE6730A39713BACD3A75860"
+    }
+  ],
+  "member_count": 1086,
+  "other_members_unchanged": 1085,
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa",
+    "size": 59564493,
+    "sha256": "E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED"
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa",
+    "size": 59570028,
+    "sha256": "7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC",
+    "executable_sha256": "45D647787CC6256DBE83B041808E5845739A7B331B72DC030C7FD6E9CC04B05B"
+  }
+}

@@ -349,8 +349,10 @@ impl Environment {
             };
 
             Some(Box::new(window::Window::new(
+                // 僵尸农场中文移植：窗口标题里带上「免费开源 + 项目地址」，
+                // 这样任何人截图/录屏都会把出处带出去（转卖包也一样）。
                 &format!(
-                    "{} (touchHLE {}{}{})",
+                    "{} · 免费开源 · Ashena1017/zombie-farm-touchhle-cn (touchHLE {}{}{})",
                     bundle.display_name(),
                     super::branding(),
                     if super::branding().is_empty() {

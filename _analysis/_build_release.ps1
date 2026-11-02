@@ -36,7 +36,7 @@ $hleRoot = if (Test-Path -LiteralPath (Join-Path $root 'touchHLE\touchHLE.exe'))
 $ErrorActionPreference = 'Stop'
 
 $release = Join-Path $Root 'Release'
-$ipaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa'
+$ipaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
 
 function Log([string]$m) { Write-Host $m }
 

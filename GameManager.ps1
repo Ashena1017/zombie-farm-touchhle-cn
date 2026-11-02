@@ -343,7 +343,7 @@ function Get-DefaultIpaPath {
             if (Test-Path -LiteralPath $candidate) { return $candidate }
         }
     }
-    $fallback = Join-Path $script:IpaDir 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa'
+    $fallback = Join-Path $script:IpaDir 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
     if (Test-Path -LiteralPath $fallback) { return $fallback }
     $any = Get-IpaList | Select-Object -First 1
     if ($any) { return $any.FullName }

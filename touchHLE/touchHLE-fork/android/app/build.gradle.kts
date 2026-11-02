@@ -44,12 +44,14 @@ fun env(name: String): String? {
 }
 
 val bundledZombieFarmIpa = rootDir.parentFile.parentFile.parentFile.resolve(
-    "zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa"
+    "zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa"
 )
 val generatedZombieFarmAssets = layout.buildDirectory.dir("generated/zombieFarmAssets")
 val bundleZombieFarmIpa = tasks.register<Copy>("bundleZombieFarmIpa") {
     from(bundledZombieFarmIpa)
     into(generatedZombieFarmAssets)
+    // Asset name is frozen: ZfStorage.BUNDLED / ZfIpa match on it at runtime.
+    // It keeps saying "v29fix" even when the source IPA is the -notice build.
     rename { "Zombie_Farm_v29fix.ipa" }
     outputs.file(generatedZombieFarmAssets.map { it.file("touchHLE_zombiefarm_ipa.sha256") })
     doLast {
@@ -83,7 +85,7 @@ android {
         applicationId = "org.touchhle.zombiefarm"
         // 5: free/open-source statement (first-run dialog + permanent footer)
         // and the signing-certificate self-check.
-        versionCode = 5
+        versionCode = 6
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }
