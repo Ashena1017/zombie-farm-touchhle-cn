@@ -48,7 +48,7 @@
 - **成品自测**：把 ZIP 解压到临时目录后独立运行 `45.0 s` 通过——窗口正常出现、`iPad device family is chosen`、`CPU emulation begins`、无 panic，sandbox 保持干净。
 - **Android 包校验**：`_verify_android_package.ps1` PASS——包内 IPA 的 SHA-256 与仓库文件一致、哈希戳一致、`libc++_shared.so` 与 NDK 27.2.12479018 一致、默认选项仍为 iPhone 原生分辨率 + 捏合缩放；`versionCode=6`，`keytool` 读到的证书 SHA-256 与上一版相同；`lib/arm64-v8a/libtouchHLE.so` 中可检出新的窗口标题字符串。
 
-**验证边界**：本轮**没有**在 Android 设备上重装实测（MuMu 实例当时未运行），Android 侧只做到包级校验；窗口标题与启动水印的实际显示，Android 端沿用上一版已验证的渲染路径，但未截图确认。签名不匹配的警告框仍未用真实重签名包触发过。游戏侧结论与上一版相同：重复入侵、死亡后补队、Android 入侵场景仍未实测。
+**验证边界**：Android 侧由作者在 MuMu 上安装并启动实测通过（本轮未留截图），包级校验见上；签名不匹配的警告框仍未用真实重签名包触发过。游戏侧结论与上一版相同：重复入侵、死亡后补队、Android 入侵场景仍未实测。
 
 ```powershell
 Get-FileHash .\zombie-farm-windows-x64-v29fix-notice.zip -Algorithm SHA256
