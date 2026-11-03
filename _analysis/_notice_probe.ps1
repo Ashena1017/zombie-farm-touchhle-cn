@@ -1,13 +1,16 @@
 ﻿# Verify the free / open-source statement in the Windows manager, on a fresh
 # copy that has never been run:
 #
-#   1. the first-run dialog appears, and it is a separate top-level window whose
-#      title does NOT contain "Zombie Farm" (the automation in this folder finds
-#      the main window by that title and must not be confused by a dialog);
-#   2. clicking "我知道了" closes it and writes the once-per-install marker;
-#   3. the permanent footer link is drawn in both themes;
-#   4. a second launch does not show the dialog again;
-#   5. ZFR_MANAGER_NO_NOTICE=1 suppresses the dialog even without a marker.
+#   1. the dialog appears, and it is a separate top-level window whose title does
+#      NOT contain "Zombie Farm" (the automation in this folder finds the main
+#      window by that title and must not be confused by a dialog);
+#   2. it carries the QQ group and the file-integrity verdict;
+#   3. clicking "我知道了" closes it and writes the notice marker;
+#   4. the 文件校验 page reports the shipped files as official;
+#   5. the permanent footer link is drawn in both themes;
+#   6. a SECOND launch shows the dialog again -- it is per launch, not per
+#      install, which is the whole point: a seller cannot pre-open the manager;
+#   7. ZFR_MANAGER_NO_NOTICE=1 suppresses the dialog even without a marker.
 #
 # Everything happens in a throwaway copy under %TEMP%; the real Release folder
 # and the real sandbox are never opened for writing.
@@ -161,6 +164,53 @@ public class NoticeCap {
         }, IntPtr.Zero);
         return found;
     }
+
+    // Switch tabs the way a person does: click the strip, then arrow across.
+    //
+    // Do NOT ask the control for its item rectangles (TCM_GETITEMRECT) from
+    // outside the process. That message takes a pointer, the system does not
+    // marshal pointers for control messages, so the target writes a RECT through
+    // an address that means nothing in its address space -- the manager dies
+    // with an AccessViolationException. That happened here once. The strip sits
+    // at the top of the control, so a click near its left edge lands on tab 0
+    // and the rest is keyboard.
+    [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, IntPtr extra);
+
+    public static IntPtr TabControl(IntPtr parent) {
+        // WinForms registers its own window class for every control, so the
+        // native "SysTabControl32" never matches exactly -- the real name is
+        // "WindowsForms10.SysTabControl32.app.0.<pid>_r9_ad1". Match a fragment.
+        IntPtr found = IntPtr.Zero;
+        EnumChildWindows(parent, delegate(IntPtr h, IntPtr p) {
+            if (ClassName(h).IndexOf("SysTabControl32", StringComparison.OrdinalIgnoreCase) >= 0) { found = h; return false; }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    public static bool ClickTab(IntPtr parent, int index) {
+        IntPtr tc = TabControl(parent);
+        if (tc == IntPtr.Zero) return false;
+        RECT w; GetWindowRect(tc, out w);
+        POINT old; GetCursorPos(out old);
+        Raise(GetAncestor(tc, 2));
+        SetForegroundWindow(tc);
+        System.Threading.Thread.Sleep(150);
+        SetCursorPos(w.Left + 8, w.Top + 12);
+        System.Threading.Thread.Sleep(150);
+        mouse_event(0x0002, 0, 0, 0, IntPtr.Zero);
+        System.Threading.Thread.Sleep(60);
+        mouse_event(0x0004, 0, 0, 0, IntPtr.Zero);
+        System.Threading.Thread.Sleep(300);
+        for (int i = 0; i < index; i++) {
+            PostMessage(tc, 0x0100, (IntPtr)0x27, (IntPtr)0x014D0001);       // WM_KEYDOWN VK_RIGHT
+            System.Threading.Thread.Sleep(70);
+            PostMessage(tc, 0x0101, (IntPtr)0x27, new IntPtr(0xC14D0001L));  // WM_KEYUP
+            System.Threading.Thread.Sleep(220);
+        }
+        SetCursorPos(old.x, old.y);
+        return true;
+    }
 }
 '@
 
@@ -214,6 +264,15 @@ if (-not (Test-Path -LiteralPath (Join-Path $temp 'GameManager.ps1'))) {
 }
 $marker = Join-Path $temp 'launcher_notice_seen.txt'
 Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+
+# Read the version the manager will write, instead of hardcoding it here: it is
+# bumped whenever the statement changes, and a stale literal in the test just
+# turns a real regression into a false alarm.
+$noticeVersion = $null
+$managerText = [System.IO.File]::ReadAllText((Join-Path $temp 'GameManager.ps1'))
+$versionMatch = [regex]::Match($managerText, "\`$script:NoticeVersion\s*=\s*'([^']+)'")
+if ($versionMatch.Success) { $noticeVersion = $versionMatch.Groups[1].Value }
+Write-Host ("        manager notice version: '{0}'" -f $noticeVersion)
 
 $script:failures = 0
 function Check([bool]$ok, [string]$what) {
@@ -277,6 +336,23 @@ function Stop-Manager([System.Diagnostics.Process]$proc) {
     } catch { }
 }
 
+# Open the throwaway copy on a given tab. Only the copy in %TEMP% is edited --
+# the release bundle is never touched -- and the insertion uses the same public
+# API a user would (SelectedIndex), so the layout that gets captured is the real
+# one.
+function Set-StartupTab([int]$index) {
+    $manager = Join-Path $temp 'GameManager.ps1'
+    $lines = [System.IO.File]::ReadAllLines($manager, [System.Text.Encoding]::UTF8)
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i].Trim() -eq 'Update-WindowForSelectedTab') {
+            $lines[$i] = ('$tabs.SelectedIndex = ' + $index + [Environment]::NewLine + $lines[$i])
+            Write-Host ("        forced startup tab: {0} (line {1})" -f $index, ($i + 1))
+            break
+        }
+    }
+    [System.IO.File]::WriteAllLines($manager, $lines, (New-Object System.Text.UTF8Encoding($true)))
+}
+
 Write-Host ''
 Write-Host '--- run 1: fresh copy, dialog expected ---'
 $proc = Start-Manager $false
@@ -295,6 +371,10 @@ if ($dialog -ne [IntPtr]::Zero) {
     $title = [NoticeCap]::Title($dialog)
     Write-Host ("        dialog title: '{0}'" -f $title)
     Check ($title -notmatch 'Zombie Farm') 'dialog title does not collide with the automation title match'
+    Check ($title -match '免费开源声明') 'dialog title names the statement'
+    Check ([NoticeCap]::ByText($dialog, '1185712984') -ne [IntPtr]::Zero) 'dialog carries the QQ group'
+    Check ([NoticeCap]::ByText($dialog, '文件校验：') -ne [IntPtr]::Zero) 'dialog shows the integrity verdict'
+    Check ([NoticeCap]::ByText($dialog, '均与官方发布一致') -ne [IntPtr]::Zero) 'dialog verdict is the passing one, not a false alarm'
     Start-Sleep -Milliseconds 700
     $ok = Save-Window $dialog (Join-Path $outDir 'dialog-first-run.png')
     Check $ok 'dialog screenshot saved'
@@ -314,10 +394,10 @@ if ($dialog -ne [IntPtr]::Zero) {
         Start-Sleep -Milliseconds 1800
         Check ([NoticeCap]::Find([uint32]$proc.Id, '免费开源声明') -eq [IntPtr]::Zero) 'dialog closed by its button'
     }
-    Check (Test-Path -LiteralPath $marker) 'once-per-install marker written'
+    Check (Test-Path -LiteralPath $marker) 'notice marker written'
     if (Test-Path -LiteralPath $marker) {
         $value = ([System.IO.File]::ReadAllText($marker)).Trim()
-        Check ($value -eq '1') ("marker holds the notice version (got '{0}')" -f $value)
+        Check ($value -eq $noticeVersion) ("marker holds the notice version (got '{0}', want '{1}')" -f $value, $noticeVersion)
     }
 }
 Start-Sleep -Milliseconds 500
@@ -326,6 +406,10 @@ Check $ok 'main window screenshot saved'
 $link = if ($main -ne [IntPtr]::Zero) { [NoticeCap]::Link($main) } else { [IntPtr]::Zero }
 Check ($link -ne [IntPtr]::Zero) 'footer link control exists'
 if ($link -ne [IntPtr]::Zero) { Write-Host ("        footer text: '{0}'" -f [NoticeCap]::Title($link)) }
+Check ($link -ne [IntPtr]::Zero -and [NoticeCap]::Title($link) -match '1185712984') 'footer carries the QQ group'
+
+Write-Host ''
+Write-Host '--- verify page: checked in run 3, which starts on that tab ---'
 
 # Day theme: same window, theme button is the only 38x38 button.
 $theme = [IntPtr]::Zero
@@ -334,7 +418,14 @@ if ($theme -ne [IntPtr]::Zero) {
     [void][NoticeCap]::SetForegroundWindow($main)
     Start-Sleep -Milliseconds 200
     [void][NoticeCap]::Click($theme)
-    Start-Sleep -Milliseconds 900
+    Start-Sleep -Milliseconds 1600
+    # A lost synthetic click is an artefact of this desktop, not of the code:
+    # retry once before calling the theme broken.
+    Check (Save-Window $main (Join-Path $outDir 'main-day.png')) 'day-theme screenshot saved'
+    if ([Math]::Abs((Get-MeanLuma (Join-Path $outDir 'main-night.png')) - (Get-MeanLuma (Join-Path $outDir 'main-day.png'))) -le 25) {
+        [void][NoticeCap]::Click($theme)
+        Start-Sleep -Milliseconds 1600
+    }
     Check (Save-Window $main (Join-Path $outDir 'main-day.png')) 'day-theme screenshot saved'
     $nightLuma = Get-MeanLuma (Join-Path $outDir 'main-night.png')
     $dayLuma = Get-MeanLuma (Join-Path $outDir 'main-day.png')
@@ -350,23 +441,48 @@ Stop-Manager $proc
 Start-Sleep -Milliseconds 800
 
 Write-Host ''
-Write-Host '--- run 2: marker present, dialog must stay away ---'
+Write-Host '--- run 2: marker present, dialog must STILL appear ---'
 $proc = Start-Manager $false
 $main = Wait-Window $proc 'Zombie Farm 游戏管理'
 Check ($main -ne [IntPtr]::Zero) 'main window appears again'
-Start-Sleep -Seconds 6
-$again = [NoticeCap]::Find([uint32]$proc.Id, '免费开源声明')
-Check ($again -eq [IntPtr]::Zero) 'dialog not shown a second time'
+$again = [IntPtr]::Zero
+$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+while ((Get-Date) -lt $deadline -and $again -eq [IntPtr]::Zero) {
+    $again = [NoticeCap]::Find([uint32]$proc.Id, '免费开源声明')
+    if ($again -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 300 }
+}
+Check ($again -ne [IntPtr]::Zero) 'dialog shown on a later launch too (not once per install)'
+if ($again -ne [IntPtr]::Zero) {
+    $againTitle = [NoticeCap]::Title($again)
+    Write-Host ("        second-launch title: '{0}'" -f $againTitle)
+    Check ($againTitle -notmatch '欢迎使用') 'later launches use the plain title, not the welcome one'
+    Check ([NoticeCap]::Button($again, '关闭') -ne [IntPtr]::Zero) 'later dialog offers 关闭'
+}
 Stop-Manager $proc
 Start-Sleep -Milliseconds 800
 
 Write-Host ''
-Write-Host '--- run 3: no marker, but ZFR_MANAGER_NO_NOTICE=1 ---'
+Write-Host '--- run 3: no marker, ZFR_MANAGER_NO_NOTICE=1, opened on the 文件校验 page ---'
 Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+# Start the copy on the fourth tab rather than clicking it. Synthetic clicks need
+# the window to own the foreground, which a background session cannot always
+# arrange -- and a probe that fails for that reason says nothing about the code.
+# The page itself is what this run is here to look at.
+Set-StartupTab 3
 $proc = Start-Manager $true
 $main = Wait-Window $proc 'Zombie Farm 游戏管理'
 Check ($main -ne [IntPtr]::Zero) 'main window appears with the opt-out set'
-Start-Sleep -Seconds 6
+$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+while ((Get-Date) -lt $deadline) {
+    if ($main -ne [IntPtr]::Zero -and [NoticeCap]::ByText($main, '与官方一致') -ne [IntPtr]::Zero) { break }
+    Start-Sleep -Milliseconds 300
+}
+Check ($main -ne [IntPtr]::Zero -and [NoticeCap]::ByText($main, '官方 SHA-256') -ne [IntPtr]::Zero) 'verify page has the hash columns'
+Check ([NoticeCap]::ByText($main, '与官方一致') -ne [IntPtr]::Zero) 'verify page reports the files as official'
+Check ([NoticeCap]::ByText($main, '文件不存在') -eq [IntPtr]::Zero) 'no missing-file verdict'
+Check ([NoticeCap]::ByText($main, '想反馈都可以来群里说') -ne [IntPtr]::Zero) 'verify page carries the QQ group'
+Check (Save-Window $main (Join-Path $outDir 'verify-tab.png')) 'verify page screenshot saved'
+Start-Sleep -Milliseconds 500
 $suppressed = [NoticeCap]::Find([uint32]$proc.Id, '免费开源声明')
 Check ($suppressed -eq [IntPtr]::Zero) 'dialog suppressed by ZFR_MANAGER_NO_NOTICE=1'
 Check (-not (Test-Path -LiteralPath $marker)) 'opt-out does not write the marker'

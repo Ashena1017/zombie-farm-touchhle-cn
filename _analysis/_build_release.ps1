@@ -236,6 +236,7 @@ $readme = @'
 <div class="warn" style="border-left:4px solid #c8892f;background:#fdf6e8;">
 <strong>本软件完全免费、开源。</strong>
 官方地址：<a href="https://github.com/Ashena1017/zombie-farm-touchhle-cn">github.com/Ashena1017/zombie-farm-touchhle-cn</a><br>
+交流群：QQ 1185712984<br>
 如果你是通过付款拿到这个压缩包的，请尽快向卖家申请退款，并向平台举报那条商品 —— 你买到的只是一份可以免费下载的公开文件。
 本项目不通过任何中间渠道销售，也不对转卖渠道提供任何支持。
 </div>
@@ -252,6 +253,9 @@ $readme = @'
   <li>备份、还原、删除存档</li>
 </ul>
 <div class="tip">设置改完立刻生效，不用点保存。</div>
+<p>每次打开管理器都会先显示一次「免费开源声明」，点「关闭」或按回车就能进去 —— 这是故意的：
+转卖的人就算事先打开过一次，也拦不住你看到这句话。声明最下面一行是<b>文件校验</b>，
+如果显示「与官方发布不一致」，说明这个副本被动过，别继续用。</p>
 
 <h2>二、设置都是什么意思</h2>
 <p>管理器里每个设置右边都有一个下拉框，下面逐项说明。这一页就是原来的「?」按钮里
@@ -338,6 +342,8 @@ $readme = @'
   <tr><td>touchHLE\</td><td>模拟器本体，不用管它</td></tr>
   <tr><td>使用说明.html</td><td>本文件</td></tr>
   <tr><td>请勿购买.txt</td><td>免费声明与官方地址，内容与本文顶部相同</td></tr>
+  <tr><td>校验.bat</td><td>双击核对文件有没有被改过（用系统自带的 certutil，不联网、不改文件）</td></tr>
+  <tr><td>SHA256SUMS.txt</td><td>包内每个文件的 SHA-256，可手动或脚本核对</td></tr>
 </table>
 <p>想换游戏版本，就把别的 <code>.ipa</code> 放进 <code>zombie_farm_ipa\</code>，然后在管理器的「游戏版本 (IPA)」里选。</p>
 
@@ -404,6 +410,131 @@ foreach ($pair in @(
     }
 }
 Log '  licenses copied'
+
+# --- fingerprints -----------------------------------------------------------
+# The manager pins the SHA-256 of touchHLE.exe and of the bundled IPA, and
+# touchHLE refuses to run a mismatched IPA. Those constants are edited by hand,
+# so a rebuild that forgets one would ship a bundle that argues with itself:
+# every player sees a red 文件校验 line and the game does not start. Fail here
+# instead, where the cause is obvious.
+Log ''
+Log '--- pinned hashes (GameManager.ps1 vs the files being packaged) ---'
+& (Join-Path $PSScriptRoot '_check_pinned_hashes.ps1') `
+    -ManagerPath (Join-Path $release 'GameManager.ps1') `
+    -ExePath (Join-Path $hleDir 'touchHLE.exe') `
+    -IpaPath (Join-Path (Join-Path $release 'zombie_farm_ipa') $ipaName)
+if ($LASTEXITCODE -ne 0) {
+    throw 'the bundle does not match the hashes pinned in GameManager.ps1; fix the constants and retry'
+}
+
+# .NET rather than Get-FileHash: see the note in _check_pinned_hashes.ps1.
+function Get-Sha256Hex {
+    param([string]$Path)
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        return ([System.BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-', '')
+    } finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+}
+
+# --- 校验.bat: check the files without trusting the manager ----------------
+#
+# Publishing a hash only helps if checking it is easy. The manager shows the
+# numbers, but whoever hands over the folder also hands over the manager; this
+# script hashes the files itself with certutil, which ships with Windows, and
+# says which ones do not match.
+#
+# Written as GBK, not UTF-8: cmd.exe decodes a .bat file with the OEM code page,
+# so a UTF-8 batch file full of Chinese renders as mojibake on a zh-CN system.
+# The verdict tokens are ASCII on purpose -- they stay readable either way.
+Log ''
+Log '--- 校验.bat ---'
+$checkTargets = @(
+    @{ Rel = 'touchHLE\touchHLE.exe';                 File = (Join-Path $hleDir 'touchHLE.exe') },
+    @{ Rel = ('zombie_farm_ipa\' + $ipaName);         File = (Join-Path (Join-Path $release 'zombie_farm_ipa') $ipaName) },
+    @{ Rel = 'GameManager.ps1';                       File = (Join-Path $release 'GameManager.ps1') },
+    @{ Rel = '游戏管理.exe';                          File = (Join-Path $release '游戏管理.exe') },
+    @{ Rel = '请勿购买.txt';                          File = (Join-Path $release '请勿购买.txt') }
+)
+
+$bat = New-Object System.Collections.Generic.List[string]
+foreach ($line in @(
+    '@echo off',
+    'chcp 936 >nul',
+    'setlocal enabledelayedexpansion',
+    'cd /d "%~dp0"',
+    'set "FAILS=0"',
+    'echo.',
+    'echo   Zombie Farm 中文版 - 文件校验',
+    'echo   只读取文件、计算 SHA-256，不会改动任何东西。',
+    'echo.'
+)) { $bat.Add($line) }
+
+foreach ($target in $checkTargets) {
+    $bat.Add(('call :check "{0}" "{1}"' -f $target.Rel, (Get-Sha256Hex $target.File)))
+}
+
+foreach ($line in @(
+    'echo.',
+    'if "!FAILS!"=="0" (',
+    '  echo   全部通过：这些文件和官方发布的一致。',
+    ') else (',
+    '  echo   有 !FAILS! 个文件对不上，可能被替换或被改过。',
+    '  echo   请从官方地址重新下载：https://github.com/Ashena1017/zombie-farm-touchhle-cn',
+    ')',
+    'echo.',
+    'pause',
+    'exit /b 0',
+    '',
+    ':check',
+    'set "FILE=%~1"',
+    'set "EXPECT=%~2"',
+    'if not exist "%FILE%" (',
+    '  echo   [MISS] %FILE%',
+    '  set /a FAILS+=1',
+    '  exit /b',
+    ')',
+    'set "ACTUAL="',
+    'for /f "skip=1 delims=" %%H in (''certutil -hashfile "%FILE%" SHA256 2^>nul'') do (',
+    '  if not defined ACTUAL set "ACTUAL=%%H"',
+    ')',
+    'set "ACTUAL=!ACTUAL: =!"',
+    'if /i "!ACTUAL!"=="!EXPECT!" (',
+    '  echo   [ OK ] %FILE%',
+    ') else (',
+    '  echo   [FAIL] %FILE%',
+    '  echo          期望 !EXPECT!',
+    '  echo          实际 !ACTUAL!',
+    '  set /a FAILS+=1',
+    ')',
+    'exit /b'
+)) { $bat.Add($line) }
+
+[System.IO.File]::WriteAllLines((Join-Path $release '校验.bat'), $bat,
+    [System.Text.Encoding]::GetEncoding(936))
+Log ("  {0,-30} {1,12:N0} B" -f '校验.bat', (Get-Item -LiteralPath (Join-Path $release '校验.bat')).Length)
+
+# --- SHA256SUMS.txt ---------------------------------------------------------
+# Every file in the bundle except itself, in `sha256sum -c` format. The .bat
+# above covers the five files that matter for "was this tampered with"; this is
+# the complete list, for anyone who wants to check all 45.
+Log ''
+Log '--- SHA256SUMS.txt ---'
+$sums = New-Object System.Collections.Generic.List[string]
+Get-ChildItem -LiteralPath $release -Recurse -File |
+    Where-Object { $_.Name -ne 'SHA256SUMS.txt' } |
+    Sort-Object FullName |
+    ForEach-Object {
+        $relative = $_.FullName.Substring($release.Length + 1)
+        $sums.Add(('{0}  {1}' -f (Get-Sha256Hex $_.FullName), $relative))
+    }
+[System.IO.File]::WriteAllLines((Join-Path $release 'SHA256SUMS.txt'), $sums,
+    (New-Object System.Text.UTF8Encoding($false)))
+Log ("  {0,-30} {1,3} entries" -f 'SHA256SUMS.txt', $sums.Count)
 
 # --- summary ---------------------------------------------------------------
 Log ''

@@ -33,10 +33,12 @@ public class ManagerActivity extends Activity {
     //
     // Copies of this app turn up for sale. The only thing that helps the person
     // who paid is telling them, from inside the app, that it is a free download
-    // and where the original lives. Shown once per install, then kept on screen
-    // as the footer line.
+    // and where the original lives. Shown on EVERY launch -- a seller who opens
+    // the app once before handing the phone over must not be able to make the
+    // statement disappear for the buyer -- and kept on screen as the footer line.
     private static final String PROJECT_URL = "https://github.com/Ashena1017/zombie-farm-touchhle-cn";
-    private static final String NOTICE_VERSION = "1";
+    private static final String QQ_GROUP = "1185712984";
+    private static final String NOTICE_VERSION = "2";
     // SHA-256 of the signing certificate this project is built with. A repack
     // signed with someone else's key will not match, which is exactly the case
     // worth warning about: re-signed copies are how ads or a paywall get bolted
@@ -252,7 +254,7 @@ public class ManagerActivity extends Activity {
         shell.addView(scroller, new LinearLayout.LayoutParams(-1, 0, 1));
         // The footer is outside the scroll view: it is the one line that has to
         // be visible on every page without scrolling, which is the whole point.
-        TextView footer = text("免费开源 · 唯一官方来源 github.com/Ashena1017/zombie-farm-touchhle-cn · 付费购买请联系退款",
+        TextView footer = text("免费开源 · 唯一官方来源 github.com/Ashena1017/zombie-farm-touchhle-cn\n交流群 QQ 1185712984 · 付费购买请联系退款",
             10, MUTED, false);
         footer.setGravity(Gravity.CENTER); footer.setPadding(dp(4), dp(6), dp(4), dp(10));
         footer.setOnClickListener(v -> showProjectNotice(false));
@@ -564,18 +566,20 @@ public class ManagerActivity extends Activity {
     // --- free / open-source statement --------------------------------------
 
     private void showNoticeIfNeeded() {
-        String seen = getPreferences(MODE_PRIVATE).getString("notice_version", "");
-        if (NOTICE_VERSION.equals(seen)) return;
+        boolean firstRun = !NOTICE_VERSION.equals(getPreferences(MODE_PRIVATE).getString("notice_version", ""));
         // Recorded before showing, so a crash while the dialog is up does not
-        // make it reappear on every launch.
+        // make the next launch present itself as the first one again. The
+        // preference no longer decides whether the dialog appears -- that is
+        // every launch, see the note beside NOTICE_VERSION.
         getPreferences(MODE_PRIVATE).edit().putString("notice_version", NOTICE_VERSION).apply();
-        showProjectNotice(true);
+        showProjectNotice(firstRun);
     }
 
     private void showProjectNotice(boolean firstRun) {
         String message =
             "本软件完全免费、开源，任何人都可以从下面这个官方地址免费下载，不需要付款，也没有付费版。\n\n"
-            + PROJECT_URL + "\n\n"
+            + PROJECT_URL + "\n"
+            + "交流群 QQ " + QQ_GROUP + "\n\n"
             + "如果你是花钱买到这个软件包的：你买到的只是一份免费的公开文件，请尽快向卖家申请退款。"
             + "本项目不通过任何中间渠道销售，也不对转卖渠道提供任何支持。\n\n"
             + "· 基于 touchHLE 模拟器制作，非官方同人作品；模拟器部分遵循 MPL-2.0 许可。\n"

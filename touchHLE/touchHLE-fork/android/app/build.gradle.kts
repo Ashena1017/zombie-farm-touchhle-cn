@@ -85,7 +85,9 @@ android {
         applicationId = "org.touchhle.zombiefarm"
         // 5: free/open-source statement (first-run dialog + permanent footer)
         // and the signing-certificate self-check.
-        versionCode = 6
+        // 6: title-screen watermark + window title.
+        // 7: the statement now appears on every launch, plus the QQ group.
+        versionCode = 7
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }

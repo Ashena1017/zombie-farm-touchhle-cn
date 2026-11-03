@@ -74,15 +74,41 @@ $script:NightMode = if (Test-Path -LiteralPath $script:NightModeFile -PathType L
 # The project is given away; copies of it do turn up for sale on marketplaces.
 # A buyer can only be protected by knowing, from inside the software itself,
 # that this is a free download and where the original lives. So the statement
-# is shown once per install and then stays visible as a footer link.
+# is shown on EVERY launch -- a seller who runs the manager once before handing
+# the folder over must not be able to make it disappear for the buyer -- and it
+# stays visible afterwards as a footer link.
 #
-# The marker is keyed on the install folder, but notice changes are announced
-# again by bumping $script:NoticeVersion rather than by deleting the file.
-# ZFR_MANAGER_NO_NOTICE=1 suppresses the first-run dialog for automation
+# The marker file is no longer a gate. It only records that this install has
+# been started once, so the first launch can still say "welcome"; the version
+# number in it is informational (support reports, and telling old markers from
+# new ones).
+# ZFR_MANAGER_NO_NOTICE=1 suppresses the dialog for automation
 # (see _analysis\_notice_probe.ps1), which otherwise runs against a fresh copy.
 $script:ProjectUrl = 'https://github.com/Ashena1017/zombie-farm-touchhle-cn'
-$script:NoticeVersion = '1'
+$script:QqGroup = '1185712984'
+$script:NoticeVersion = '2'
 $script:NoticeFile = Join-Path $script:Root 'launcher_notice_seen.txt'
+
+# Fingerprints of the official build.
+#
+# These are NOT a security boundary -- this file is plain text and anybody can
+# edit it. They exist so that a replaced or patched program is *visible*: the
+# manager says so in red on the 文件校验 page and again every time it starts,
+# and the player can compare against the numbers published with the release.
+#
+# The IPA half is the one that matters. The free-software notice on the title
+# screen is painted into an image inside that IPA, so swapping the IPA is how
+# somebody would try to strip the notice and resell the result. touchHLE itself
+# refuses to run a mismatched IPA (src/zfr_integrity.rs); this is the manager's
+# own, independent copy of the same check.
+#
+# Updated with every release. _analysis\_build_release.ps1 reads these two
+# values and refuses to package a bundle that does not match them.
+$script:PinnedExeSha256 = 'ABE3883682AE7814E3F3073A965E0F530306301C3AA67D95D17189CE2239296D'
+$script:PinnedIpaSha256 = '7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC'
+
+# Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.
+$script:IntegrityRows = @()
 
 # NOTE: this manager is self-contained. It does NOT call
 # StartZombieFarmNextHour.ps1 or SetZombieFarmCurrency.ps1 -- the launching and
@@ -2268,6 +2294,9 @@ $font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9.5)
 $fontBold = New-Object System.Drawing.Font('Microsoft YaHei UI', 10.5, [System.Drawing.FontStyle]::Bold)
 $fontTitle = New-Object System.Drawing.Font('Microsoft YaHei UI', 15, [System.Drawing.FontStyle]::Bold)
 $fontSmall = New-Object System.Drawing.Font('Microsoft YaHei UI', 8.5)
+# Hashes read much better in a fixed-width face: 16 hex digits in YaHei are
+# painful to compare against the numbers on the release page.
+$fontMono = New-Object System.Drawing.Font('Consolas', 8.5)
 if ($script:NightMode) {
     $ink = [System.Drawing.Color]::FromArgb(232, 237, 234)
     $grey = [System.Drawing.Color]::FromArgb(165, 179, 173)
@@ -2866,6 +2895,126 @@ $lblSaveHint.Font = $fontSmall
 $lblSaveHint.ForeColor = $grey
 $tabSave.Controls.Add($lblSaveHint)
 
+# --- verify tab -------------------------------------------------------------
+#
+# Publishing a SHA-256 next to the release only helps if the player can see the
+# local one. This page puts them side by side and says outright which file does
+# not match -- a hash nobody can find is not a check.
+#
+# GameManager.ps1 is listed but not pinned: its expected hash cannot live inside
+# the file being hashed. It is shown so it can be compared with the release
+# notes, which is the one number an editor of this file cannot forge.
+
+$tabVerify = New-Object System.Windows.Forms.TabPage
+$tabVerify.Text = '  文件校验  '
+$tabVerify.UseVisualStyleBackColor = $false
+$tabVerify.BackColor = $paper
+$tabs.Controls.Add($tabVerify)
+
+$grpVerify = New-Object PaletteGroupBox
+$grpVerify.Text = '官方文件指纹'
+$grpVerify.Location = New-Object System.Drawing.Point(14, 8)
+$grpVerify.Size = New-Object System.Drawing.Size(892, 172)
+$grpVerify.Font = $font
+$tabVerify.Controls.Add($grpVerify)
+
+$script:VerifyHeaderLabels = New-Object System.Collections.ArrayList
+foreach ($h in @(
+    @{ Text = '文件';                     X = 14;  W = 214 },
+    @{ Text = '官方 SHA-256（前 16 位）'; X = 232; W = 190 },
+    @{ Text = '本机实际（前 16 位）';     X = 430; W = 190 },
+    @{ Text = '结果';                     X = 628; W = 254 }
+)) {
+    $lbl = New-Object System.Windows.Forms.Label
+    $lbl.Text = $h.Text
+    $lbl.Location = New-Object System.Drawing.Point($h.X, 24)
+    $lbl.Size = New-Object System.Drawing.Size($h.W, 18)
+    $lbl.Font = $fontSmall
+    $lbl.ForeColor = $grey
+    $grpVerify.Controls.Add($lbl)
+    [void]$script:VerifyHeaderLabels.Add($lbl)
+}
+
+# Filled in by Update-IntegrityDisplay, which is defined further down with the
+# other hash helpers. The controls exist now so the page can be laid out before
+# anything is hashed.
+$script:VerifyRowControls = New-Object System.Collections.ArrayList
+for ($row = 0; $row -lt 3; $row++) {
+    $top = 48 + ($row * 32)
+    $entry = @{}
+    foreach ($spec in @(
+        @{ Key = 'Name';    X = 14;  W = 214; Font = $fontSmall },
+        @{ Key = 'Expect';  X = 232; W = 190; Font = $fontMono },
+        @{ Key = 'Actual';  X = 430; W = 190; Font = $fontMono },
+        @{ Key = 'Verdict'; X = 628; W = 254; Font = $fontSmall }
+    )) {
+        $lbl = New-Object System.Windows.Forms.Label
+        $lbl.Text = ''
+        $lbl.Location = New-Object System.Drawing.Point($spec.X, $top)
+        $lbl.Size = New-Object System.Drawing.Size($spec.W, 20)
+        $lbl.Font = $spec.Font
+        $grpVerify.Controls.Add($lbl)
+        $entry[$spec.Key] = $lbl
+    }
+    [void]$script:VerifyRowControls.Add($entry)
+}
+
+$lblVerifyNote = New-Object System.Windows.Forms.Label
+$lblVerifyNote.Text = '「官方」这一列是发版时写进管理器的固定值；「本机实际」在每次启动、以及点「重新校验」时重算。两者不一样，就说明这个文件不是官方发布的那一份。'
+$lblVerifyNote.Location = New-Object System.Drawing.Point(14, 186)
+$lblVerifyNote.Size = New-Object System.Drawing.Size(892, 34)
+$lblVerifyNote.Font = $fontSmall
+$lblVerifyNote.ForeColor = $grey
+$tabVerify.Controls.Add($lblVerifyNote)
+
+$btnVerify = New-Object System.Windows.Forms.Button
+$btnVerify.Text = '重新校验'
+$btnVerify.Location = New-Object System.Drawing.Point(14, 228)
+$btnVerify.Size = New-Object System.Drawing.Size(120, 30)
+$btnVerify.FlatStyle = 'Flat'
+$tabVerify.Controls.Add($btnVerify)
+
+$lblVerifyState = New-Object System.Windows.Forms.Label
+$lblVerifyState.Text = ''
+$lblVerifyState.Location = New-Object System.Drawing.Point(146, 234)
+$lblVerifyState.Size = New-Object System.Drawing.Size(760, 20)
+$lblVerifyState.Font = $fontSmall
+$lblVerifyState.ForeColor = $grey
+$tabVerify.Controls.Add($lblVerifyState)
+
+$grpChannels = New-Object PaletteGroupBox
+$grpChannels.Text = '官方渠道'
+$grpChannels.Location = New-Object System.Drawing.Point(14, 268)
+$grpChannels.Size = New-Object System.Drawing.Size(892, 80)
+$grpChannels.Font = $font
+$tabVerify.Controls.Add($grpChannels)
+
+$lblChannelUrl = New-Object System.Windows.Forms.Label
+$lblChannelUrl.Text = ('项目主页：{0}' -f $script:ProjectUrl)
+$lblChannelUrl.Location = New-Object System.Drawing.Point(14, 24)
+$lblChannelUrl.Size = New-Object System.Drawing.Size(860, 20)
+$lblChannelUrl.Font = $fontSmall
+$lblChannelUrl.ForeColor = $grey
+$grpChannels.Controls.Add($lblChannelUrl)
+
+$lblChannelQq = New-Object System.Windows.Forms.Label
+$lblChannelQq.Text = ('交流群：QQ {0}（免费使用；遇到问题、想反馈都可以来群里说）' -f $script:QqGroup)
+$lblChannelQq.Location = New-Object System.Drawing.Point(14, 48)
+$lblChannelQq.Size = New-Object System.Drawing.Size(860, 20)
+$lblChannelQq.Font = $fontSmall
+$lblChannelQq.ForeColor = $grey
+$grpChannels.Controls.Add($lblChannelQq)
+
+$btnVerify.Add_Click({
+    $headline = Invoke-IntegrityCheck
+    $lblVerifyState.Text = ('校验完成 {0} · {1}' -f (Get-Date -Format 'HH:mm:ss'), $headline.Text)
+    $lblVerifyState.ForeColor = switch ($headline.Level) {
+        'bad'   { $script:Red }
+        'warn'  { $script:Amber }
+        default { $script:Sage }
+    }
+})
+
 # --- status ----------------------------------------------------------------
 
 $status = New-Object System.Windows.Forms.Label
@@ -2881,8 +3030,8 @@ $form.Controls.Add($status)
 # whole line is one link that opens the statement.
 
 $noticeLink = New-Object System.Windows.Forms.LinkLabel
-$noticeLink.Text = ('免费开源 · 唯一官方来源 {0} · 付费购买请联系退款（点此查看声明）' -f
-    $script:ProjectUrl.Replace('https://', ''))
+$noticeLink.Text = ('免费开源 · 唯一官方来源 {0} · 交流群 {1} · 付费购买请联系退款（点此查看声明）' -f
+    $script:ProjectUrl.Replace('https://', ''), $script:QqGroup)
 $noticeLink.Font = $fontSmall
 $noticeLink.LinkBehavior = [System.Windows.Forms.LinkBehavior]::HoverUnderline
 $noticeLink.TabStop = $false
@@ -3338,6 +3487,22 @@ function Start-GameProcess {
     }
     if (-not (Test-Path -LiteralPath $paths.Ipa)) {
         throw "找不到游戏 IPA：$($paths.Ipa)"
+    }
+
+    # Independent check of the two files that are about to run. touchHLE refuses
+    # a mismatched IPA by itself (src/zfr_integrity.rs); this catches the other
+    # half -- a replaced touchHLE.exe -- and says so while the manager window is
+    # still on screen, instead of after the game window has covered it.
+    #
+    # It warns, it does not block: a mismatched hash is not proof of anything on
+    # its own (the player may be running a build of their own), and a manager
+    # that refuses to start the game is worse than one that tells the truth.
+    $integrity = Invoke-IntegrityCheck -IpaPath $paths.Ipa
+    if ($integrity.Level -ne 'ok') {
+        Write-ManagerLog ('integrity check: {0}' -f $integrity.Text)
+        [void][System.Windows.Forms.MessageBox]::Show(
+            ($integrity.Text + "`r`n`r`n" + '详细对比在管理器的「文件校验」页。'),
+            '文件校验', 'OK', 'Warning')
     }
 
     # Cumulative offset bookkeeping, same as the command-line launcher.
@@ -3963,14 +4128,14 @@ $btnIpaBrowse.Add_Click({
 # always modal. The dialog title deliberately avoids "Zombie Farm": the
 # automation in _analysis\ finds the manager window by that phrase.
 
-function Test-NoticeDue {
-    if ($env:ZFR_MANAGER_NO_NOTICE -eq '1') { return $false }
-    if (-not (Test-Path -LiteralPath $script:NoticeFile -PathType Leaf)) { return $true }
-    try {
-        return ([System.IO.File]::ReadAllText($script:NoticeFile).Trim() -ne $script:NoticeVersion)
-    } catch {
-        return $true
-    }
+function Test-NoticeSuppressed {
+    return ($env:ZFR_MANAGER_NO_NOTICE -eq '1')
+}
+
+# Only decides the wording ("欢迎使用" vs plain), not whether the dialog appears:
+# it appears on every launch now. See the note beside $script:NoticeVersion.
+function Test-NoticeFirstRun {
+    return -not (Test-Path -LiteralPath $script:NoticeFile -PathType Leaf)
 }
 
 function Set-NoticeSeen {
@@ -4012,6 +4177,151 @@ function Get-ManagerFingerprint {
     }
 }
 
+# --- official-file fingerprints ---------------------------------------------
+#
+# One row per file that can be pinned to a known-good hash. The expected values
+# come from $script:PinnedExeSha256 / $script:PinnedIpaSha256 near the top and
+# are refreshed with every release.
+#
+# Cost: about 90 MB of reads (exe 29 MB + IPA 59 MB), once at startup and once
+# per 重新校验. That is a fraction of a second on any disk from the last decade.
+
+function Get-PinnedIpaPath {
+    $fallback = Join-Path $script:IpaDir 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
+    if (Test-Path -LiteralPath $fallback -PathType Leaf) { return $fallback }
+    return $null
+}
+
+function Test-BundledIpa {
+    param([string]$Path)
+
+    $pinned = Get-PinnedIpaPath
+    if (-not $Path -or -not $pinned) { return $false }
+    try {
+        return ([System.IO.Path]::GetFullPath($Path) -eq [System.IO.Path]::GetFullPath($pinned))
+    } catch {
+        return $false
+    }
+}
+
+# State is one of:
+#   ok      the file exists and matches the pinned hash
+#   bad     the file exists but does not match
+#   missing the file is not there at all
+#   info    no pinned value: GameManager.ps1 itself, or a custom IPA
+function New-IntegrityRow {
+    param([string]$Name, [string]$Path, [string]$Expected)
+
+    $actual = $null
+    if ($Path -and (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        try { $actual = Get-Sha256Hex $Path } catch { $actual = $null }
+    }
+
+    $state = if (-not $actual) { 'missing' }
+             elseif (-not $Expected) { 'info' }
+             elseif ($actual -eq $Expected) { 'ok' }
+             else { 'bad' }
+
+    return [pscustomobject]@{
+        Name     = $Name
+        Path     = $Path
+        Expected = $Expected
+        Actual   = $actual
+        State    = $state
+    }
+}
+
+function Get-IntegrityReport {
+    param([string]$IpaPath)
+
+    if (-not $IpaPath) { $IpaPath = Get-DefaultIpaPath }
+
+    $rows = New-Object System.Collections.ArrayList
+    [void]$rows.Add((New-IntegrityRow 'touchHLE.exe' `
+        (Join-Path $script:HleDir 'touchHLE.exe') $script:PinnedExeSha256))
+
+    $isBundled = Test-BundledIpa $IpaPath
+    $ipaExpected = if ($isBundled) { $script:PinnedIpaSha256 } else { $null }
+    $ipaLabel = if ($isBundled) { '游戏 IPA（内置）' } else { '游戏 IPA（自定义）' }
+    [void]$rows.Add((New-IntegrityRow $ipaLabel $IpaPath $ipaExpected))
+
+    [void]$rows.Add((New-IntegrityRow 'GameManager.ps1（管理器自身）' `
+        (Join-Path $script:Root 'GameManager.ps1') $null))
+    return @($rows)
+}
+
+# One line the notice dialog and the status bar can both show.
+function Get-IntegrityHeadline {
+    param($Rows)
+
+    $bad = @($Rows | Where-Object { $_.State -eq 'bad' -or $_.State -eq 'missing' })
+    if ($bad.Count -gt 0) {
+        return [pscustomobject]@{
+            Level = 'bad'
+            Text  = ('文件校验：{0} 与官方发布不一致，可能被替换过（详见「文件校验」页）' -f
+                (($bad | ForEach-Object { $_.Name }) -join '、'))
+        }
+    }
+    $custom = @($Rows | Where-Object { $_.State -eq 'info' -and $_.Name -like '游戏 IPA*' })
+    if ($custom.Count -gt 0) {
+        return [pscustomobject]@{
+            Level = 'warn'
+            Text  = '文件校验：当前用的是自定义 IPA，没有和官方版本比对（touchHLE 会拒绝启动它）'
+        }
+    }
+    return [pscustomobject]@{
+        Level = 'ok'
+        Text  = '文件校验：touchHLE.exe 与游戏 IPA 均与官方发布一致'
+    }
+}
+
+function Update-IntegrityDisplay {
+    if (-not $script:VerifyRowControls -or $script:VerifyRowControls.Count -eq 0) { return }
+
+    $rows = @($script:IntegrityRows)
+    for ($i = 0; $i -lt $script:VerifyRowControls.Count; $i++) {
+        $ui = $script:VerifyRowControls[$i]
+        if ($i -ge $rows.Count -or $null -eq $rows[$i]) {
+            $ui.Name.Text = ''
+            $ui.Expect.Text = ''
+            $ui.Actual.Text = ''
+            $ui.Verdict.Text = ''
+            continue
+        }
+
+        $row = $rows[$i]
+        $ui.Name.Text = $row.Name
+        $ui.Expect.Text = if ($row.Expected) { $row.Expected.Substring(0, 16) + '…' } else { '（无固定值）' }
+        $ui.Actual.Text = if ($row.Actual) { $row.Actual.Substring(0, 16) + '…' } else { '（找不到文件）' }
+        switch ($row.State) {
+            'ok'      { $ui.Verdict.Text = '✓ 与官方一致';   $ui.Verdict.ForeColor = $script:Forest }
+            'bad'     { $ui.Verdict.Text = '✗ 与官方不一致'; $ui.Verdict.ForeColor = $script:Red }
+            'missing' { $ui.Verdict.Text = '✗ 文件不存在';   $ui.Verdict.ForeColor = $script:Red }
+            default   { $ui.Verdict.Text = '仅显示 · 与 Release 说明比对'; $ui.Verdict.ForeColor = $script:Grey }
+        }
+    }
+}
+
+# Recompute everything and refresh the page. Returns the headline, so callers do
+# not have to look inside $script:IntegrityRows.
+function Invoke-IntegrityCheck {
+    param([string]$IpaPath)
+
+    if (-not $IpaPath) {
+        # $script:CurrentIpa is the whole IPA record (Path, AppId, ...), not a
+        # path string. Stringifying it produces "@{Path=...}" and every Test-Path
+        # on it fails, which made the page report the game IPA as missing.
+        if ($null -ne $script:CurrentIpa -and $script:CurrentIpa.Path) {
+            $IpaPath = $script:CurrentIpa.Path
+        } else {
+            $IpaPath = Get-DefaultIpaPath
+        }
+    }
+    $script:IntegrityRows = @(Get-IntegrityReport -IpaPath $IpaPath)
+    Update-IntegrityDisplay
+    return (Get-IntegrityHeadline $script:IntegrityRows)
+}
+
 function Open-ProjectUrl {
     try {
         [System.Diagnostics.Process]::Start($script:ProjectUrl) | Out-Null
@@ -4023,7 +4333,20 @@ function Open-ProjectUrl {
 }
 
 function Show-ProjectNotice {
-    param([switch]$FirstRun)
+    param(
+        [switch]$FirstRun,
+        # The headline from Invoke-IntegrityCheck. Callers that already have it
+        # pass it in; the footer link does not, so it is computed on demand.
+        $Integrity
+    )
+
+    if (-not $Integrity) {
+        if (@($script:IntegrityRows).Count -gt 0) {
+            $Integrity = Get-IntegrityHeadline $script:IntegrityRows
+        } else {
+            $Integrity = Invoke-IntegrityCheck
+        }
+    }
 
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = if ($FirstRun) { '欢迎使用 · 免费开源声明' } else { '免费开源声明' }
@@ -4050,6 +4373,7 @@ function Show-ProjectNotice {
         '任何人都可以从下面的官方地址免费下载，不需要付款，也没有付费版。'
         ''
         ('官方地址：{0}' -f $script:ProjectUrl)
+        ('交流群：QQ {0}（免费使用；遇到问题、想反馈都可以来群里说）' -f $script:QqGroup)
         ''
         '如果你是花钱买到这个软件包的：你买到的只是一份免费的公开文件，'
         '请尽快向卖家申请退款，并向平台举报那条商品。本项目不通过任何中间渠道销售，'
@@ -4072,10 +4396,25 @@ function Show-ProjectNotice {
     $fingerprint.Size = New-Object System.Drawing.Size(516, 20)
     $dlg.Controls.Add($fingerprint)
 
+    # The same verdict the 文件校验 page gives, in one line. It is here because
+    # this dialog is the one screen every launch cannot skip: if the program has
+    # been tampered with, the player finds out before playing, not after.
+    $verifyLine = New-Object System.Windows.Forms.Label
+    $verifyLine.Text = $Integrity.Text
+    $verifyLine.Font = $fontSmall
+    $verifyLine.Location = New-Object System.Drawing.Point(24, 334)
+    $verifyLine.Size = New-Object System.Drawing.Size(516, 20)
+    $verifyLine.ForeColor = switch ($Integrity.Level) {
+        'bad'   { $script:Red }
+        'warn'  { $script:Amber }
+        default { $script:Forest }
+    }
+    $dlg.Controls.Add($verifyLine)
+
     $btnOpen = New-Object System.Windows.Forms.Button
     $btnOpen.Text = '打开项目主页'
     $btnOpen.Size = New-Object System.Drawing.Size(122, 34)
-    $btnOpen.Location = New-Object System.Drawing.Point(22, 344)
+    $btnOpen.Location = New-Object System.Drawing.Point(22, 358)
     $btnOpen.FlatStyle = 'Flat'
     $btnOpen.BackColor = $script:Forest
     $btnOpen.ForeColor = [System.Drawing.Color]::White
@@ -4086,7 +4425,7 @@ function Show-ProjectNotice {
     $btnCopy = New-Object System.Windows.Forms.Button
     $btnCopy.Text = '复制链接'
     $btnCopy.Size = New-Object System.Drawing.Size(96, 34)
-    $btnCopy.Location = New-Object System.Drawing.Point(156, 344)
+    $btnCopy.Location = New-Object System.Drawing.Point(156, 358)
     $btnCopy.FlatStyle = 'Flat'
     $btnCopy.BackColor = $script:SoftGreen
     # Secondary buttons follow the main window's rule: the lighter sage reads on
@@ -4108,7 +4447,7 @@ function Show-ProjectNotice {
     $btnClose = New-Object System.Windows.Forms.Button
     $btnClose.Text = if ($FirstRun) { '我知道了，开始使用' } else { '关闭' }
     $btnClose.Size = New-Object System.Drawing.Size(158, 34)
-    $btnClose.Location = New-Object System.Drawing.Point(380, 344)
+    $btnClose.Location = New-Object System.Drawing.Point(380, 358)
     $btnClose.FlatStyle = 'Flat'
     $btnClose.BackColor = $script:SoftGreen
     $btnClose.ForeColor = if ($script:NightMode) { $script:Sage } else { $script:Forest }
@@ -4119,7 +4458,9 @@ function Show-ProjectNotice {
     $dlg.CancelButton = $btnClose
 
     $dlg.Add_FormClosed({
-        if ($FirstRun) { Set-NoticeSeen }
+        # Written on every close now: the dialog itself is not gated any more,
+        # the marker only tells the next launch that this is no longer install #1.
+        Set-NoticeSeen
         $dlg.Dispose()
     })
 
@@ -4149,7 +4490,15 @@ $form.Add_Shown({
     $script:UiReady = $true
     Update-Status '就绪。改动会立即保存。' 'info'
     Set-ManagerPalette -Night $script:NightMode
-    if (Test-NoticeDue) { Show-ProjectNotice -FirstRun }
+    # Hash the shipped files once, so the dialog and the 文件校验 page can both
+    # report on it without hashing twice.
+    $headline = Invoke-IntegrityCheck
+    if (-not (Test-NoticeSuppressed)) {
+        # -FirstRun:( ... ) and not -FirstRun ( ... ): a switch does not take a
+        # space-separated value, it silently becomes true and the expression is
+        # dropped. That made every launch show the "welcome" title.
+        Show-ProjectNotice -FirstRun:(Test-NoticeFirstRun) -Integrity $headline
+    }
 })
 
 $form.Add_FormClosing({
@@ -4250,12 +4599,22 @@ function Set-ManagerPalette {
     $lblCurrencyState.ForeColor = $script:Grey
     $lblSaveInfo.ForeColor = $script:Grey
     $lblSaveHint.ForeColor = $script:Grey
+    $lblVerifyNote.ForeColor = $script:Grey
+    $lblVerifyState.ForeColor = $script:Grey
+    $lblChannelUrl.ForeColor = $script:Grey
+    $lblChannelQq.ForeColor = $script:Grey
+    foreach ($lbl in $script:VerifyHeaderLabels) { $lbl.ForeColor = $script:Grey }
     $status.ForeColor = $script:Grey
     $noticeLink.LinkColor = $script:Sage
     $noticeLink.ActiveLinkColor = $script:Amber
     $noticeLink.VisitedLinkColor = $script:Sage
     $noticeLink.ForeColor = $script:Grey
     $noticeLink.BackColor = $script:Paper
+
+    # The 文件校验 verdicts carry their own colours (green / red), which the
+    # generic walk above just overwrote with ink. Re-apply them now that the
+    # palette is current.
+    Update-IntegrityDisplay
 
     foreach ($button in @(
         $btnIpaBrowse, $btnStartSkip, $btnApplyCurrency, $btnBackup, $btnRestore,
@@ -4337,13 +4696,17 @@ $gameNeeded = [Math]::Max(
     ($btnStartSkip.Top + $btnStartSkip.Height))
 $settingsNeeded = $grpSettings.Top + $grpSettings.Height
 $saveNeeded = $lblSaveHint.Top + $lblSaveHint.Height
+# The verify page ends at the 官方渠道 box. Nothing on it grows, so it gets no
+# slack -- it is simply shorter than the save tab and the window shrinks to fit.
+$verifyNeeded = $grpChannels.Top + $grpChannels.Height
 
 $script:GameContentHeight = $gameNeeded + $bottomMargin
 $script:SettingsContentHeight = $settingsNeeded + $bottomMargin
 $script:SaveContentHeight = $saveNeeded + $bottomMargin
+$script:VerifyContentHeight = $verifyNeeded + $bottomMargin
 $contentHeight = [Math]::Max(
     [Math]::Max($script:GameContentHeight, $script:SettingsContentHeight),
-    $script:SaveContentHeight)
+    [Math]::Max($script:SaveContentHeight, $script:VerifyContentHeight))
 
 # Give any leftover height to the save list, so the shorter tab fills the space
 # instead of showing a gap. The list is the only element there that benefits from
@@ -4361,6 +4724,7 @@ if ($slack -gt 0) {
 function Update-WindowForSelectedTab {
     if ($tabs.SelectedIndex -eq 2) { $pageHeight = $script:SaveContentHeight }
     elseif ($tabs.SelectedIndex -eq 1) { $pageHeight = $script:SettingsContentHeight }
+    elseif ($tabs.SelectedIndex -eq 3) { $pageHeight = $script:VerifyContentHeight }
     else { $pageHeight = $script:GameContentHeight }
     $tabs.Height = $pageHeight + $tabHeaderAllowance
     $status.Top = $tabs.Top + $tabs.Height + 6

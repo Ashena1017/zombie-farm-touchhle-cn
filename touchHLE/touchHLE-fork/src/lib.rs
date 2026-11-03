@@ -50,6 +50,7 @@ mod options;
 mod paths;
 mod stack;
 mod window;
+mod zfr_integrity;
 mod zfr_profile;
 mod zombie_farm_debug;
 
@@ -223,6 +224,15 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
     #[cfg(windows)]
     if let Some(fixed) = bundle_path.to_str().and_then(|s| s.strip_suffix('"')) {
         log!("Warning: The bundle path has a trailing quotation mark! This often happens accidentally on Windows when tab-completing, because '\\\"' gets interpreted by Rust in the wrong way. Did you meant to write {:?}?", fixed);
+    }
+
+    // 僵尸农场中文移植：只运行官方发行版的 IPA。
+    //
+    // 标题画面上的免费声明是画在 IPA 里的图片上的，换一份干净的包就没了；
+    // 所以这里按哈希核对，不一致就拒绝启动，而不是记一条日志了事。
+    // `--info` 只是读元数据、不运行游戏，跳过以便排查问题。
+    if !just_info {
+        zfr_integrity::verify_bundle_path(&bundle_path)?;
     }
 
     let bundle_data = fs::BundleData::open_any(&bundle_path)
