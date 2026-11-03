@@ -812,7 +812,7 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 
 1. **主人这轮要什么**：①「改成每次启动的时候都弹窗开源免费」；②「还有什么校验的手段能加进去吗」；③ 追加要求「touchHLE 检测到内置的 IPA 没有了就拒绝启动，并且加多重校验尽量防止更改 .exe 文件」；④「游戏管理内加上交流 QQ 群号 1185712984」。当时给了选项清单：弹窗时机选了**每次打开管理器**（不是每次启动游戏），校验手段选了 1（启动前哈希校验）、2（`SHA256SUMS.txt` + `校验.bat`）、3（管理器加「文件校验」页）。
 
-2. **三道校验的分工（别混）**：
+2. **三道校验的分工（别混）**（**注意：这一条已被 §41 修订**——内置 IPA 的检查从「按哈希比对」放宽成「只看在不在」）：
    - `src/zfr_integrity.rs`：**唯一会阻断**的一道。启动时按 SHA-256 + 字节数核对内置 IPA，不一致直接 `Err` 并弹 Windows 消息框；`ZFR_ALLOW_ANY_IPA=1` 供开发绕过，**刻意不写进拒绝提示**——那等于把绕过方法印在受害者面前。
    - 管理器：`文件校验`页 + 声明弹窗最下面那一行 + 点「启动游戏」前再核对一次，**只警告不阻断**（玩家可能用自己编译的版本，管理器不该替人做决定）。
    - Android：`verifySignature()` 是 v5 就有的，本轮没动。
@@ -830,3 +830,18 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 5. **验证**：① `_notice_probe.ps1` 全绿——每次启动都弹、第二次标题是「免费开源声明」而不是「欢迎使用」、弹窗带 QQ 群与「均与官方发布一致」、校验页三行全对且没有「文件不存在」、`ZFR_MANAGER_NO_NOTICE=1` 抑制且不写标记、日夜亮度 45 → 227；② IPA 门禁三态实测：假 IPA（2197 B）→ `Official IPA check failed … 2197 bytes, expected 59570028` + 消息框；`ZFR_ALLOW_ANY_IPA=1` → 跳过检查、随后按普通错误失败；真 IPA → `Official Zombie Farm IPA verified (sha256 7bb21449…)` 并正常加载；③ `_verify_release.ps1` 45.0 s PASS（**跑完必须重新 `_build_release.ps1` 再打包**，这是老坑）；④ `_verify_android_package.ps1` PASS、`aapt2` 读到 `versionCode='7'`、`keytool -printcert` 证书不变。
 6. **已发布（2026-11-03 10:04）**：tag `v29fix-verify` → `aab396e0486b872589e95e2a460bfa18aed52fc4`（annotated tag 对象 `aec448b21ebb094cf85007cedd4017b961e0eba8`），Release id `432194463`，`draft=false`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-verify`，正文 1,839 字符，`/releases/latest` 已指向本版。上传后用 `--verify --recheck` 全量重新下载核对。
 7. **验证边界（照实说，别夸大）**：Android 侧**本轮没有**在 MuMu 上重装实测（只做了包级校验；主人上一轮验过的是 `versionCode 6` 的包）；「文件校验」页的红字分支（哈希真的对不上）本轮没有伪造被改文件去触发；「签名不匹配」的 Android 提示仍未用重签名包触发过；游戏内容与存档格式未改动。**这些检查不是 DRM**：能反编译的人可以把校验删掉，也能换一个完全不同的包；真正无法伪造的是标题画面上的水印和 GitHub 上公布的哈希。
+
+## 41. 交接后追加（2026-11-03，放宽内置 IPA 校验 → v29fix-verify2）
+
+1. **主人一句话推翻上一版的设计**：「非官方ipa启动不了还是改一下吧，只是内置ipa别被删掉就行」。§40 把检查做成了「按 SHA-256 比对**你要运行的那个包**」，等价于「只许跑官方包」——把「用自己的备份 / 别的版本 / 自己调试的包」这些正常需求一起堵死了。**教训：校验该拦的是「这已经不是我们的发行包了」，不是「你想跑哪个包」。**
+2. **现在的规则（三句话）**：
+   - 任何 IPA 都能启动，不比对被运行包的哈希。
+   - 官方发行版自带的那个 IPA **被删掉** → touchHLE 拒绝启动并弹窗说明（`src/zfr_integrity.rs`）。
+   - 它还在、但被**同名覆盖**成别的包 → 照常启动，管理器的「文件校验」页标红。这一条是故意只标红不拦的：用户可能自己重打了包。
+3. **怎么找「官方包」**：`candidate_paths()` 依次试 `工作目录/zombie_farm_ipa/`、`工作目录/../zombie_farm_ipa/`、`可执行文件目录/zombie_farm_ipa/`、`可执行文件目录/../zombie_farm_ipa/`，Android 再加 `user_data_base_path()/touchHLE_apps/`。发行包与开发树都是「`touchHLE\` 与 `zombie_farm_ipa\` 平级」，`../zombie_farm_ipa` 那条两种布局都能命中。**Android 的文件名不同**：安装到 apps 目录时叫 `Zombie_Farm_v29fix.ipa`（资产名冻结），Windows 是长名，用 `#[cfg(target_os = "android")]` 分开。
+4. **只查存在、不读内容**：`metadata().len()` 和官方字节数比一下只为打一条 warning，不阻断。理由：读 59 MB 只为一次启动前的判断不划算，而「内容被换」这件事管理器已经用哈希回答了。
+5. **管理器跟着改**：`Get-IntegrityReport` 现在**固定**看三样（`touchHLE.exe`、内置游戏 IPA、`GameManager.ps1`），不再跟着当前选择变；页面上多一行「当前选择：…」，明确告诉玩家自定义包可以正常跑，上面三行说的是官方文件本身。`Get-IntegrityHeadline` 里的 `warn`（自定义包）分支删掉了——自定义包不再是异常。
+6. **产物**：`touchHLE.exe` `28,892,672 B` / `54705B0511E69D2DB34709DF2FF340B969AB5D1BC3B260ECFB55FC25B048E865`；ZIP `95,990,421 B` / `DF4BC1A4BA8C430A4F92378E20B83F5DE092D5188D66391DCD49ACE93D1D0324`（45 文件）；APK `97,332,989 B` / `025A863015B5308A9991C6D575E2F420A7762FD7AFFC1E350DA3EADEE6C1CB13`，`versionCode 8`，证书不变。IPA 未改动（`7BB21449…82ffc`）。
+7. **验证（三态实测，新 exe）**：① 官方包在 + 运行另一个 IPA（`v29fix.ipa`）→ 日志 `Bundled Zombie Farm IPA present: …` 并正常进游戏；② 临时副本里删掉官方包、只放一个干净 IPA → 日志「官方发行版自带的那个游戏包不在了，已停止启动。」+ 消息框，进程停在弹窗（设计行为）；③ 同②加 `ZFR_ALLOW_ANY_IPA=1` → 跳过检查、正常加载。管理器侧 `_notice_probe.ps1` 仍全绿（含「当前选择：官方内置的游戏包」那行）。`_verify_android_package.ps1` PASS、`aapt2` 读到 `versionCode='8'`、证书不变。
+8. **已发布（2026-11-03 10:35 前后）**：tag `v29fix-verify2` → `a839ea5c6ee88aaa282590a47147255a119fb739`（annotated tag 对象 `c081582ac15c3c212c8dc11c570debf3dca66096`），Release id `432206236`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-verify2`。`--verify --recheck` 全量重下载一致。按惯例把 `v29fix-verify` 的 2 个附件下架，**9 条 Release 里只剩 `v29fix-verify2` 有附件**。
+9. **边界**：这一道只防「删掉带水印的包」，**防不住同名覆盖**（只标红）。要真防住得给 exe 做代码签名，本项目没有证书。Android 仍只做到包级校验，本轮没有设备实测。
