@@ -807,3 +807,26 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 8. **已发布（2026-11-02 20:09）**：tag `v29fix-notice` → `23162e650933f6fe4f3261685c65d8f309b120a4`（annotated tag 对象 `00a23b7c1d95b9e11dd67122c39e18c3420c4cbb`），Release id `431416332`，`draft=false`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-notice`。两个资产上传后又用 `--verify --recheck` **全量重新下载**核对 SHA-256，均一致。主人已在 MuMu 上实测新 APK 可用。发布后补记：正文里那句「本轮未在 Android 设备重装实测」已按主人的实测结果改成「由作者在 MuMu 上安装并启动实测通过」，用 `_analysis\_update_release_body.mjs` PATCH 并回读一致（2,692 字符，2 个资产仍在），本地 `RELEASE_NOTES_v29fix-notice.md` 已同步——**改了正文就要两边一起改，否则下次 `--verify` 会报正文不一致**。
 9. **历史附件已下架（主人要求）**：用 `_analysis\_prune_release_assets.mjs`（走技能 `lib.mjs` 的凭据与 `createApi`，令牌不进日志）删除了 6 条旧 Release 的 **11 个资产**——`v29fix-free-notice`、`v29fix-running-detect`、`v29fix-save-selection`、`v29fix-invasion-fix`、`v29fix-platforms`、`v29fix`。**Release 记录、正文与 tag 全部保留**，删完回读确认：7 条 Release 里只有 `v29fix-notice` 还有 2 个附件，其余 6 条为 0 附件。理由：旧版没有启动画面水印，任何人点两下就能拿到无水印包再转卖。注意三点：① 已经下载过的人、fork 与第三方转存不受影响，这不是撤回，只是不再提供便利；② 旧版页面正文里的下载表与哈希仍在，点进去会 404，按技能约定**没有擅自改旧版说明**，要补「已下架」提示需另行授权；③ 一旦新版出问题没有现成回滚包，但 IPA 与全部构建脚本都在本机，可重建任意旧版。
 10. **README 增补**：下载表下方加了一句「仓库里只保留最新版的下载附件，历史 Release 仅作记录」，免得有人看到旧页面以为下架是意外。
+
+## 40. 交接后追加（2026-11-03，声明每次启动 + 文件校验 + 内置 IPA 拦截）
+
+1. **主人这轮要什么**：①「改成每次启动的时候都弹窗开源免费」；②「还有什么校验的手段能加进去吗」；③ 追加要求「touchHLE 检测到内置的 IPA 没有了就拒绝启动，并且加多重校验尽量防止更改 .exe 文件」；④「游戏管理内加上交流 QQ 群号 1185712984」。当时给了选项清单：弹窗时机选了**每次打开管理器**（不是每次启动游戏），校验手段选了 1（启动前哈希校验）、2（`SHA256SUMS.txt` + `校验.bat`）、3（管理器加「文件校验」页）。
+
+2. **三道校验的分工（别混）**：
+   - `src/zfr_integrity.rs`：**唯一会阻断**的一道。启动时按 SHA-256 + 字节数核对内置 IPA，不一致直接 `Err` 并弹 Windows 消息框；`ZFR_ALLOW_ANY_IPA=1` 供开发绕过，**刻意不写进拒绝提示**——那等于把绕过方法印在受害者面前。
+   - 管理器：`文件校验`页 + 声明弹窗最下面那一行 + 点「启动游戏」前再核对一次，**只警告不阻断**（玩家可能用自己编译的版本，管理器不该替人做决定）。
+   - Android：`verifySignature()` 是 v5 就有的，本轮没动。
+   - **为什么拦 IPA 而不是拦 exe**：水印画在 IPA 的图片里，换包是最省事的偷法；而「防止改 exe」在没有代码签名证书的前提下只能提高门槛，做不到拦死。`_analysis\_check_pinned_hashes.ps1` 在打包前把 `PinnedExeSha256` / `PinnedIpaSha256` 与实物比对，对不上直接构建失败——**这两个常量是手工维护的，忘了改就会发出一个自己跟自己打架的包**（管理器红字 + 游戏拒绝启动）。
+3. **本轮五个坑（全踩了，别再踩）**：
+   - **编辑工具会吃掉 BOM**。`GameManager.ps1`、`_analysis\_build_release.ps1`、`_analysis\_notice_probe.ps1` 改完都会变成无 BOM；PowerShell 5.1 对无 BOM 文件按 ANSI(936) 解码，中文全变乱码，`_build_release.ps1` 直接报 `Unexpected token 'echo.'`。**每次改完补 BOM**，判据是 `git show HEAD:<path>` 的前三字节是不是 `EF BB BF`；补法 `[System.IO.File]::WriteAllText($p, [System.IO.File]::ReadAllText($p), (New-Object System.Text.UTF8Encoding($true)))`。README / HANDOVER / process / 发行说明反过来必须**无** BOM。
+   - **`[switch]` 参数不吃空格分隔的值**。`Show-ProjectNotice -FirstRun (Test-NoticeFirstRun)` 里 `-FirstRun` 恒为 true、括号表达式被静默丢弃，于是每次启动都显示「欢迎使用」。要写 `-FirstRun:(Test-NoticeFirstRun)`。自己验：`function f([switch]$s){$s}; f -s $false` 返回 True。
+   - **`$script:CurrentIpa` 是记录对象不是路径**（`Path` / `AppId` / …）。把它 `[string]` 化会得到 `@{Path=…}`，`Test-Path` 全失败，校验页把内置 IPA 报成「自定义 / 找不到文件」。要取 `$script:CurrentIpa.Path`（`Get-LaunchPaths` 附近就是既有写法）。
+   - **跨进程发 `TCM_GETITEMRECT` 会打死管理器**。控件消息里的指针不做跨进程编组，sender 传的是自己进程里的地址，目标写 RECT 时 `AccessViolationException`，栈停在 `PaletteTabControl.WndProc`（实测复现）。要切标签页就 PostMessage 方向键，或者让测试直接从目标标签页启动。
+   - **探针的竞态**：校验页的标签在 `Shown` 里才填，等到静态表头「官方 SHA-256」出现就断言会拍到空值，要等「与官方一致」。另外 `PaletteTabControl` 的窗口类是 `WindowsForms10.SysTabControl32.app.0.<pid>_r9_ad1`，`FindWindowEx("SysTabControl32")` 永远返回 0，得按片段匹配。
+4. **产物**：
+   - Windows `touchHLE.exe` `28,891,648 B` / `ABE3883682AE7814E3F3073A965E0F530306301C3AA67D95D17189CE2239296D`（比上一版大 12,800 B，新增了整块校验代码；`sha2` 本来就在 `Cargo.toml` 里，没有新增依赖）。`SDL_MESSAGEBOX_ERROR` 在 rust-sdl2 的 sys 绑定里**没有导出**，用 `0x0000_0010` 字面量。拒绝启动时进程会停在消息框上——那是设计行为，不是卡死。
+   - Windows ZIP `zombie-farm-windows-x64-v29fix-verify.zip` `95,991,291 B` / `2F547265195FC872615129F13846F29D05960954D7EF2908E432F5E4B4C0F705`，**45 文件**（上一版 43 + `校验.bat` + `SHA256SUMS.txt`），单一同名顶层目录、无日志与 sandbox。`校验.bat` 是 **GBK** 写的（cmd 用 OEM 代码页读 .bat，UTF-8 会乱码），判定词用 ASCII 的 `[ OK ]` / `[FAIL]` / `[MISS]` 兜底；实测五个文件全 OK。
+   - Android APK `zombie-farm-android-arm64-v29fix-verify.apk` `97,354,853 B` / `3CDED90B2C1EA3E6939E3C3833504F9EB70B1CA1853825CC6B190C7D24A3C009`，`versionCode 7`，证书不变（`c2ddca91…4ca6f`）。IPA 本轮未改动，仍是 `7BB21449…82ffc` / `59,570,028 B`。
+5. **验证**：① `_notice_probe.ps1` 全绿——每次启动都弹、第二次标题是「免费开源声明」而不是「欢迎使用」、弹窗带 QQ 群与「均与官方发布一致」、校验页三行全对且没有「文件不存在」、`ZFR_MANAGER_NO_NOTICE=1` 抑制且不写标记、日夜亮度 45 → 227；② IPA 门禁三态实测：假 IPA（2197 B）→ `Official IPA check failed … 2197 bytes, expected 59570028` + 消息框；`ZFR_ALLOW_ANY_IPA=1` → 跳过检查、随后按普通错误失败；真 IPA → `Official Zombie Farm IPA verified (sha256 7bb21449…)` 并正常加载；③ `_verify_release.ps1` 45.0 s PASS（**跑完必须重新 `_build_release.ps1` 再打包**，这是老坑）；④ `_verify_android_package.ps1` PASS、`aapt2` 读到 `versionCode='7'`、`keytool -printcert` 证书不变。
+6. **已发布（2026-11-03 10:04）**：tag `v29fix-verify` → `aab396e0486b872589e95e2a460bfa18aed52fc4`（annotated tag 对象 `aec448b21ebb094cf85007cedd4017b961e0eba8`），Release id `432194463`，`draft=false`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-verify`，正文 1,839 字符，`/releases/latest` 已指向本版。上传后用 `--verify --recheck` 全量重新下载核对。
+7. **验证边界（照实说，别夸大）**：Android 侧**本轮没有**在 MuMu 上重装实测（只做了包级校验；主人上一轮验过的是 `versionCode 6` 的包）；「文件校验」页的红字分支（哈希真的对不上）本轮没有伪造被改文件去触发；「签名不匹配」的 Android 提示仍未用重签名包触发过；游戏内容与存档格式未改动。**这些检查不是 DRM**：能反编译的人可以把校验删掉，也能换一个完全不同的包；真正无法伪造的是标题画面上的水印和 GitHub 上公布的哈希。
