@@ -98,17 +98,20 @@ $script:NoticeFile = Join-Path $script:Root 'launcher_notice_seen.txt'
 #
 # The IPA half is the one that matters. The free-software notice on the title
 # screen is painted into an image inside that IPA, so swapping the IPA is how
-# somebody would try to strip the notice and resell the result. touchHLE itself
-# refuses to run a mismatched IPA (src/zfr_integrity.rs); this is the manager's
-# own, independent copy of the same check.
+# somebody would try to strip the notice and resell the result. touchHLE refuses
+# to start when that file has been *deleted* (src/zfr_integrity.rs); running some
+# other IPA is explicitly allowed, so this row is what distinguishes "replaced"
+# from "removed".
 #
 # Updated with every release. _analysis\_build_release.ps1 reads these two
 # values and refuses to package a bundle that does not match them.
-$script:PinnedExeSha256 = 'ABE3883682AE7814E3F3073A965E0F530306301C3AA67D95D17189CE2239296D'
+$script:PinnedExeSha256 = '54705B0511E69D2DB34709DF2FF340B969AB5D1BC3B260ECFB55FC25B048E865'
 $script:PinnedIpaSha256 = '7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC'
 
 # Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.
 $script:IntegrityRows = @()
+# One line describing which IPA is currently selected, for the 文件校验 page.
+$script:IntegritySelection = ''
 
 # NOTE: this manager is self-contained. It does NOT call
 # StartZombieFarmNextHour.ps1 or SetZombieFarmCurrency.ps1 -- the launching and
@@ -2959,6 +2962,16 @@ for ($row = 0; $row -lt 3; $row++) {
     [void]$script:VerifyRowControls.Add($entry)
 }
 
+# Which IPA is selected right now. Running a different one is allowed, so this
+# is informational: it explains what the three rows above are actually about.
+$script:LblVerifySelection = New-Object System.Windows.Forms.Label
+$script:LblVerifySelection.Text = ''
+$script:LblVerifySelection.Location = New-Object System.Drawing.Point(14, 140)
+$script:LblVerifySelection.Size = New-Object System.Drawing.Size(860, 20)
+$script:LblVerifySelection.Font = $fontSmall
+$script:LblVerifySelection.ForeColor = $grey
+$grpVerify.Controls.Add($script:LblVerifySelection)
+
 $lblVerifyNote = New-Object System.Windows.Forms.Label
 $lblVerifyNote.Text = '「官方」这一列是发版时写进管理器的固定值；「本机实际」在每次启动、以及点「重新校验」时重算。两者不一样，就说明这个文件不是官方发布的那一份。'
 $lblVerifyNote.Location = New-Object System.Drawing.Point(14, 186)
@@ -3489,10 +3502,11 @@ function Start-GameProcess {
         throw "找不到游戏 IPA：$($paths.Ipa)"
     }
 
-    # Independent check of the two files that are about to run. touchHLE refuses
-    # a mismatched IPA by itself (src/zfr_integrity.rs); this catches the other
-    # half -- a replaced touchHLE.exe -- and says so while the manager window is
-    # still on screen, instead of after the game window has covered it.
+    # Independent check of the two files the release ships. touchHLE refuses to
+    # start when the bundled IPA is gone (src/zfr_integrity.rs); this is the
+    # manager's own look at the same files, and it also covers the other half --
+    # a replaced touchHLE.exe -- while the manager window is still on screen,
+    # instead of after the game window has covered it.
     #
     # It warns, it does not block: a mismatched hash is not proof of anything on
     # its own (the player may be running a build of their own), and a manager
@@ -4231,20 +4245,38 @@ function New-IntegrityRow {
     }
 }
 
+# The three files reported on the 文件校验 page, whatever IPA is selected: the
+# emulator, the game package that shipped with this release, and the manager.
+#
+# The bundled IPA is reported from its own path rather than from the selection,
+# because running a different IPA is a normal thing to do and must not make the
+# official file look missing. What is being watched is the shipped file, not the
+# player's choice of what to run.
 function Get-IntegrityReport {
     param([string]$IpaPath)
 
-    if (-not $IpaPath) { $IpaPath = Get-DefaultIpaPath }
+    if (-not $IpaPath) {
+        if ($null -ne $script:CurrentIpa -and $script:CurrentIpa.Path) {
+            $IpaPath = $script:CurrentIpa.Path
+        } else {
+            $IpaPath = Get-DefaultIpaPath
+        }
+    }
+
+    $bundled = Get-PinnedIpaPath
+    $script:IntegritySelection = if (-not $IpaPath) {
+        '当前选择：没有可用的游戏包'
+    } elseif (Test-BundledIpa $IpaPath) {
+        '当前选择：官方内置的游戏包'
+    } else {
+        ('当前选择：{0}　（不是官方内置包；运行它是允许的，上面的校验针对官方文件本身）' -f
+            (Split-Path -Leaf $IpaPath))
+    }
 
     $rows = New-Object System.Collections.ArrayList
     [void]$rows.Add((New-IntegrityRow 'touchHLE.exe' `
         (Join-Path $script:HleDir 'touchHLE.exe') $script:PinnedExeSha256))
-
-    $isBundled = Test-BundledIpa $IpaPath
-    $ipaExpected = if ($isBundled) { $script:PinnedIpaSha256 } else { $null }
-    $ipaLabel = if ($isBundled) { '游戏 IPA（内置）' } else { '游戏 IPA（自定义）' }
-    [void]$rows.Add((New-IntegrityRow $ipaLabel $IpaPath $ipaExpected))
-
+    [void]$rows.Add((New-IntegrityRow '内置游戏 IPA' $bundled $script:PinnedIpaSha256))
     [void]$rows.Add((New-IntegrityRow 'GameManager.ps1（管理器自身）' `
         (Join-Path $script:Root 'GameManager.ps1') $null))
     return @($rows)
@@ -4262,16 +4294,9 @@ function Get-IntegrityHeadline {
                 (($bad | ForEach-Object { $_.Name }) -join '、'))
         }
     }
-    $custom = @($Rows | Where-Object { $_.State -eq 'info' -and $_.Name -like '游戏 IPA*' })
-    if ($custom.Count -gt 0) {
-        return [pscustomobject]@{
-            Level = 'warn'
-            Text  = '文件校验：当前用的是自定义 IPA，没有和官方版本比对（touchHLE 会拒绝启动它）'
-        }
-    }
     return [pscustomobject]@{
         Level = 'ok'
-        Text  = '文件校验：touchHLE.exe 与游戏 IPA 均与官方发布一致'
+        Text  = '文件校验：touchHLE.exe 与内置游戏 IPA 均与官方发布一致'
     }
 }
 
@@ -4300,6 +4325,8 @@ function Update-IntegrityDisplay {
             default   { $ui.Verdict.Text = '仅显示 · 与 Release 说明比对'; $ui.Verdict.ForeColor = $script:Grey }
         }
     }
+
+    if ($script:LblVerifySelection) { $script:LblVerifySelection.Text = $script:IntegritySelection }
 }
 
 # Recompute everything and refresh the page. Returns the headline, so callers do
@@ -4603,6 +4630,7 @@ function Set-ManagerPalette {
     $lblVerifyState.ForeColor = $script:Grey
     $lblChannelUrl.ForeColor = $script:Grey
     $lblChannelQq.ForeColor = $script:Grey
+    if ($script:LblVerifySelection) { $script:LblVerifySelection.ForeColor = $script:Grey }
     foreach ($lbl in $script:VerifyHeaderLabels) { $lbl.ForeColor = $script:Grey }
     $status.ForeColor = $script:Grey
     $noticeLink.LinkColor = $script:Sage

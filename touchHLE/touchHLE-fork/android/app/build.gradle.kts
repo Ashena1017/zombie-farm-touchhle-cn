@@ -87,7 +87,8 @@ android {
         // and the signing-certificate self-check.
         // 6: title-screen watermark + window title.
         // 7: the statement now appears on every launch, plus the QQ group.
-        versionCode = 7
+        // 8: launching any IPA is allowed again; only the bundled one is watched.
+        versionCode = 8
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }
