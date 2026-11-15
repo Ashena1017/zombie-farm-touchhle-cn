@@ -8,7 +8,7 @@
 
 ## 0. 一句话现状
 
-> **2026-11-15 当前状态**：用户已确认原受影响玩家实测 **v12 商店黑框已修复**，并授权发布最新 Windows / Android。正在准备 `v29fix-clock-rendering`：两端模拟时间显示与快进预览，Android 昼夜光照、云手机启动、空文字纹理兼容修复及默认 iPhone ×3。发布前公开版仍是 `v29fix-verify2` / v8；进展看 §46，技术证据看 §42～§45。
+> **2026-11-15 当前状态**：双平台新版 **`v29fix-clock-rendering` 已公开发布并确认为 GitHub latest**（Release id `445999220`，发布目标 `8a02902`）。用户已确认原受影响玩家实测 v12 商店黑框修复有效；两端模拟时间显示与快进预览、Android 昼夜光照/云手机启动修复和默认 iPhone ×3 均已发布。两端资产完整下载的 SHA-256 一致，首页与 Release 渲染通过；详见 §46。
 
 > **2026-11-15 云手机启动修复**：Android v9 在用户的 Android 11 云手机启动时报 `1280 != 0`。已查明是 GLES1 附件查询触发 `GL_INVALID_ENUM`，并串到画面合成上下文。修复后 APK **versionCode 10** 在同一云手机已覆盖安装并实测到“开始游戏”界面。原数据 6 个文件哈希一致。当前本地 APK 为 v10，MuMu 的三时段结果来自 v9；公开 GitHub 仍是 `v29fix-verify2` / v8。详见 §43。
 
@@ -894,3 +894,8 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 1. 用户明确反馈「玩家实测修好了」，将 §45 的黑框兼容候选升级为原受影响玩家验证通过。验证由用户转述，没有新增该手机的 GPU 日志；可以报告黑框修复已验证，不能据此补写具体驱动内部行为。
 2. 用户授权将最新 Windows / Android 发布 GitHub。版本选用 `v29fix-clock-rendering`，Android 直接发布已由玩家验证的 versionCode 12 同字节 APK；Windows 重建管理器发行目录并独立启动校验。两端模拟时间、Android 默认 iPhone ×3 与 v9～v12 累积修复均纳入。
 3. 只提交本轮产品改动、专项测试和相关报告；保留工作区既有技能/交接文件删除与其他未跟踪材料。沿用 master 直接推送与个人 git-hosting 技能，manifest 钉住成品 SHA-256。发布后补记实际 commit、Release 和下载校验结果。
+
+4. **已发布**：`v29fix-clock-rendering` → `8a02902cf23c641fa03994aae06dfb550bdfd017`，Release id **445999220**，`draft=false` / `prerelease=false`，`/releases/latest` 已确认。链接：https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-clock-rendering。源码已按 26 文件授权清单推送 master；既有未提交删除与其他未跟踪文件保持原状。
+5. **资产**：Windows `zombie-farm-windows-x64-v29fix-clock-rendering.zip`，**95,462,195 B** / `8052A971793A872BCCACC5141E87A10AC063865486F6A3FDB838FBD65FCCE6A8`；Android `zombie-farm-android-arm64-v29fix-clock-rendering.apk`，**97,353,660 B** / `6F43969BC01BBEB6CD32859C73B8950DEAABFA1F751D4AE5671D996504CA8183`，versionCode **12**。APK 与玩家验证的测试包逐字节一致，证书和 IPA 未变。Windows 包 45 文件、单一同名顶层目录，SHA256SUMS 44 项全匹配，无存档和日志；包内管理器与发布 commit 的 Git blob 字节相同。
+6. **放行验证**：本轮 Windows SelfTest（含真实存档未改守卫）、发行布局、独立运行 20.1 秒、ZIP CRC/45 文件逐字节检查 PASS；Android 4+9+6 项专项、包内容、默认选项及签名 PASS。Release 正文与本地说明逐字符一致，两个资产都完整下载并核对 SHA-256 通过，首页五处下载/版本链接、Release 正文与附件页面实际 HTML 已验证。未再次进行 Windows 65 项库测试、MuMu 三时段或云手机游戏测试，既有场景结果见 §42～§45；本轮未操作 Android 设备存档。
+7. **传输记录**：Node 的整包下载连接停滞，系统 curl 直连整包速度过低，已停止对应下载进程并回读同一草稿。最终继续使用个人 git-hosting `runRelease` 的完整发布/元数据/哈希检查，仅将下载传输替换为 curl 小范围读取（8 连接、256 KiB 分段，失败读取有界重试），使用命令级 `--resolve` 选择实际 DNS 返回的 GitHub CDN 地址，TLS 校验保持开启。分段仅复用此前实际下载的数据，全部取齐后顺序拼接，再计算整包 SHA-256；没有用本地产物替代下载。没有修改系统代理/DNS或个人技能，没有重复上传已确认的 Windows 资产。网页直连超时后查询仓库已有 Git 代理为 http://127.0.0.1:7890，最终仅在网页 curl 请求上复用该代理，完成首页和 Release HTML 验证；后续发布应优先复用该现有配置，避免继续用已失效的 10808 记录。最终日志、完整下载文件和 manifest 位于 `_analysis/dumps/release-clock-rendering-20261115/`。未重复下载做第二遍验收，未改旧 tag / Release / 附件。
