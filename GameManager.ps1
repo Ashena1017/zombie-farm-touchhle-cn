@@ -1096,6 +1096,25 @@ function Read-TimeOffset {
     return $value
 }
 
+function Format-SimulatedTime {
+    param([int64]$Offset, [DateTimeOffset]$Base)
+
+    $simulated = $Base.AddSeconds($Offset)
+    $epoch = $simulated.ToUnixTimeSeconds()
+    if ($epoch -lt 0 -or $epoch -gt [int]::MaxValue) {
+        throw '模拟时间超出游戏支持范围。'
+    }
+    return $simulated.ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Get-SimulatedTimeBase {
+    [int64]$fixedTime = 0
+    if ([int64]::TryParse($env:TOUCHHLE_FAKE_UNIX_TIME, [ref]$fixedTime)) {
+        return [DateTimeOffset]::FromUnixTimeSeconds($fixedTime)
+    }
+    return [DateTimeOffset]::UtcNow
+}
+
 function Write-TimeOffset {
     param(
         [Parameter(Mandatory = $true)][int64]$Value,
@@ -1502,6 +1521,23 @@ if ($Set) {
         Write-Host ("Saved for {0}: {1}" -f $script:AppId, (Get-OptionsLine -Lines (Read-OptionsFile).Lines))
     }
     exit 0
+}
+
+# Use .NET so hashing works even when another PowerShell overrides PSModulePath.
+# This helper is also used before the WinForms UI is initialized.
+function Get-Sha256Hex {
+    param([string]$Path)
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $stream = $null
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        $bytes = $sha.ComputeHash($stream)
+        return ([System.BitConverter]::ToString($bytes)).Replace('-', '')
+    } finally {
+        if ($stream) { $stream.Dispose() }
+        $sha.Dispose()
+    }
 }
 
 if ($SelfTest) {
@@ -2516,6 +2552,13 @@ $btnStartSkip.BackColor = $softGreen
 $btnStartSkip.ForeColor = $forest
 $tabGame.Controls.Add($btnStartSkip)
 
+$lblSimulatedTime = New-Object System.Windows.Forms.Label
+$lblSimulatedTime.Text = '模拟时间：读取中…'
+$lblSimulatedTime.Location = New-Object System.Drawing.Point(16, 153)
+$lblSimulatedTime.Size = New-Object System.Drawing.Size(870, 21)
+$lblSimulatedTime.Font = $fontSmall
+$tabGame.Controls.Add($lblSimulatedTime)
+
 # --- settings tab ---------------------------------------------------------
 
 # Rows are laid out at a fixed pitch and the group box height is derived from the
@@ -2680,7 +2723,7 @@ foreach ($key in $script:SettingDefs.Keys) {
 
 $grpCurrency = New-Object PaletteGroupBox
 $grpCurrency.Text = '金币与脑子'
-$grpCurrency.Location = New-Object System.Drawing.Point(14, 158)
+$grpCurrency.Location = New-Object System.Drawing.Point(14, 183)
 $grpCurrency.Size = New-Object System.Drawing.Size(892, 112)
 $tabGame.Controls.Add($grpCurrency)
 
@@ -3195,6 +3238,21 @@ $script:UiTimer.Add_Tick({
 })
 $script:UiTimer.Start()
 
+function Update-SimulatedTimeLabel {
+    try {
+        $clock = Format-SimulatedTime -Offset (Read-TimeOffset) -Base (Get-SimulatedTimeBase)
+        $lblSimulatedTime.Text = "模拟时间：$clock"
+    } catch {
+        $lblSimulatedTime.Text = '模拟时间：无法读取（请检查累计时间偏移）'
+    }
+}
+
+$clockTimer = New-Object System.Windows.Forms.Timer
+$clockTimer.Interval = 1000
+$clockTimer.Add_Tick({ if ($tabs.SelectedTab -eq $tabGame) { Update-SimulatedTimeLabel } })
+$form.Add_Shown({ Update-SimulatedTimeLabel; $clockTimer.Start() })
+$tabs.Add_SelectedIndexChanged({ if ($tabs.SelectedTab -eq $tabGame) { Update-SimulatedTimeLabel } })
+
 function Load-SettingsIntoUi {
     $settings = Get-CurrentSettings
     foreach ($key in $script:SettingDefs.Keys) {
@@ -3520,19 +3578,13 @@ function Start-GameProcess {
     }
 
     # Cumulative offset bookkeeping, same as the command-line launcher.
-    [int64]$offset = 0
-    if (Test-Path -LiteralPath $paths.OffsetFile) {
-        $saved = (Get-Content -LiteralPath $paths.OffsetFile -Raw).Trim()
-        if ($saved -and -not [int64]::TryParse($saved, [ref]$offset)) {
-            throw "时间偏移文件内容无效：$($paths.OffsetFile)"
-        }
-    }
-    if ($offset -lt 0 -or $SkipSeconds -gt ([int64]::MaxValue - $offset)) {
+    $offset = Read-TimeOffset -Path $paths.OffsetFile
+    if ($SkipSeconds -gt ([int64]::MaxValue - $offset)) {
         throw '累计时间偏移会超出 Int64 范围。'
     }
     if ($SkipSeconds -gt 0) {
         $offset += $SkipSeconds
-        [System.IO.File]::WriteAllText($paths.OffsetFile, [string]$offset)
+        Write-TimeOffset -Value $offset -Path $paths.OffsetFile
     }
 
     # Diagnostic fingerprint: which IPA build actually ran.
@@ -3710,7 +3762,7 @@ $btnStartSkip.Add_Click({
 
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = '跳过时间'
-    $dlg.ClientSize = New-Object System.Drawing.Size(344, 150)
+    $dlg.ClientSize = New-Object System.Drawing.Size(344, 194)
     $dlg.StartPosition = 'CenterParent'
     $dlg.FormBorderStyle = 'FixedDialog'
     $dlg.MaximizeBox = $false
@@ -3762,9 +3814,14 @@ $btnStartSkip.Add_Click({
     $lM.ForeColor = $script:Ink
     $dlg.Controls.Add($lM)
 
+    $preview = New-Object System.Windows.Forms.Label
+    $preview.Location = New-Object System.Drawing.Point(20, 82)
+    $preview.Size = New-Object System.Drawing.Size(310, 54)
+    $dlg.Controls.Add($preview)
+
     $okBtn = New-Object System.Windows.Forms.Button
     $okBtn.Text = '开始'
-    $okBtn.Location = New-Object System.Drawing.Point(142, 100)
+    $okBtn.Location = New-Object System.Drawing.Point(142, 144)
     $okBtn.Size = New-Object System.Drawing.Size(86, 30)
     $okBtn.DialogResult = 'OK'
     $okBtn.FlatStyle = 'Flat'
@@ -3775,7 +3832,7 @@ $btnStartSkip.Add_Click({
 
     $cancelBtn = New-Object System.Windows.Forms.Button
     $cancelBtn.Text = '取消'
-    $cancelBtn.Location = New-Object System.Drawing.Point(238, 100)
+    $cancelBtn.Location = New-Object System.Drawing.Point(238, 144)
     $cancelBtn.Size = New-Object System.Drawing.Size(86, 30)
     $cancelBtn.DialogResult = 'Cancel'
     $cancelBtn.FlatStyle = 'Flat'
@@ -3787,7 +3844,35 @@ $btnStartSkip.Add_Click({
     $dlg.AcceptButton = $okBtn
     $dlg.CancelButton = $cancelBtn
 
-    $result = $dlg.ShowDialog($form)
+    $updatePreview = {
+        $current = '无法读取'
+        $after = '请输入有效的快进时间'
+        $okBtn.Enabled = $false
+        try {
+            $base = Get-SimulatedTimeBase
+            $offset = Read-TimeOffset
+            $current = Format-SimulatedTime -Offset $offset -Base $base
+            if ($numH.Text.Trim() -match '^[0-9]{1,4}$' -and $numM.Text.Trim() -match '^[0-9]{1,2}$') {
+                $hours = [int]$numH.Text.Trim()
+                $minutes = [int]$numM.Text.Trim()
+                if ($minutes -le 59 -and ($hours -gt 0 -or $minutes -gt 0)) {
+                    $after = Format-SimulatedTime -Offset ($offset + $hours * 3600 + $minutes * 60) -Base $base
+                    $okBtn.Enabled = $true
+                }
+            }
+        } catch {
+            $after = '模拟时间不可用或超出游戏支持范围'
+        }
+        $preview.Text = "当前模拟时间：$current" + [Environment]::NewLine + "快进后：$after"
+    }
+    $numH.Add_TextChanged($updatePreview)
+    $numM.Add_TextChanged($updatePreview)
+    $previewTimer = New-Object System.Windows.Forms.Timer
+    $previewTimer.Interval = 1000
+    $previewTimer.Add_Tick($updatePreview)
+    & $updatePreview
+    $previewTimer.Start()
+    try { $result = $dlg.ShowDialog($form) } finally { $previewTimer.Dispose() }
     $hoursText = $numH.Text.Trim()
     $minutesText = $numM.Text.Trim()
     $dlg.Dispose()
@@ -4163,26 +4248,6 @@ function Set-NoticeSeen {
 # notes, so "is this file the one they shipped" has an answer that does not
 # depend on trusting whoever handed them the folder.
 #
-# Hashing goes through .NET rather than Get-FileHash: that cmdlet lives in the
-# Microsoft.PowerShell.Utility module, and it is genuinely missing when the
-# manager is started by a shell whose PSModulePath points at another
-# PowerShell's module tree (seen here, not hypothetical). Launch and currency
-# code hash files too, so the same helper is used everywhere.
-function Get-Sha256Hex {
-    param([string]$Path)
-
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    $stream = $null
-    try {
-        $stream = [System.IO.File]::OpenRead($Path)
-        $bytes = $sha.ComputeHash($stream)
-        return ([System.BitConverter]::ToString($bytes)).Replace('-', '')
-    } finally {
-        if ($stream) { $stream.Dispose() }
-        $sha.Dispose()
-    }
-}
-
 function Get-ManagerFingerprint {
     try {
         return (Get-Sha256Hex (Join-Path $script:Root 'GameManager.ps1')).Substring(0, 16)
@@ -4623,6 +4688,7 @@ function Set-ManagerPalette {
     $btnTheme.Invalidate()
     $headerRule.BackColor = $script:Amber
     $lblIpaInfo.ForeColor = $script:Grey
+    $lblSimulatedTime.ForeColor = $script:Ink
     $lblCurrencyState.ForeColor = $script:Grey
     $lblSaveInfo.ForeColor = $script:Grey
     $lblSaveHint.ForeColor = $script:Grey
@@ -4766,4 +4832,5 @@ $tabs.Add_SelectedIndexChanged({ Update-WindowForSelectedTab })
 Update-WindowForSelectedTab
 
 [void]$form.ShowDialog()
+$clockTimer.Dispose()
 $form.Dispose()

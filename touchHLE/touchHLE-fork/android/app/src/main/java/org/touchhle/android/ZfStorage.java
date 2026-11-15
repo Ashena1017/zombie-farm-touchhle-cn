@@ -15,6 +15,9 @@ import java.util.zip.*;
 /** Manager operations share an exclusive lock with the separate game process. */
 public final class ZfStorage {
     public static final String BUNDLED = "Zombie_Farm_v29fix.ipa";
+    static final String DEFAULT_FAMILY = "iphone";
+    static final String DEFAULT_SCALE = "3";
+    static final long MAX_GAME_EPOCH = 2147483000L;
     public final File root, apps;
     private final Context context;
     private final File lockFile;
@@ -153,9 +156,9 @@ public final class ZfStorage {
         } catch (NumberFormatException e) { throw new IllegalArgumentException("倍率请填 1～3 的小数或分数，例如 1.5、3/2"); }
     }
     private static void validate(JSONObject app) throws Exception {
-        if (!Arrays.asList("iphone", "ipad").contains(app.optString("family", "iphone")))
+        if (!Arrays.asList("iphone", "ipad").contains(app.optString("family", DEFAULT_FAMILY)))
             throw new IllegalArgumentException("设备类型无效");
-        scale(app.optString("scale", "1"));
+        scale(app.optString("scale", DEFAULT_SCALE));
         String fps = app.optString("fps", "60");
         if (!fps.equals("off")) {
             int number = Integer.parseInt(fps);
@@ -166,7 +169,7 @@ public final class ZfStorage {
     public long advance(String id, long seconds) throws Exception {
         JSONObject app = settings(id); long before = app.optLong("offset", 0);
         if (seconds < 0 || before < 0 || seconds > Long.MAX_VALUE - before
-                || seconds + before > 2147483000L - System.currentTimeMillis() / 1000)
+                || seconds + before > MAX_GAME_EPOCH - System.currentTimeMillis() / 1000)
             throw new IllegalArgumentException("累计时间超出游戏支持范围");
         app.put("offset", before + seconds); settings(id, app); return before + seconds;
     }
@@ -266,7 +269,7 @@ public final class ZfStorage {
                 throw new IOException("请选择当前游戏版本的 ZF 存档备份");
             ZfSave.read(bytes(new File(incoming, "Documents/saveGame.bin2")));
             long offset = metadata.optLong("offset", -1);
-            if (offset < 0 || offset > 2147483000L - System.currentTimeMillis() / 1000)
+            if (offset < 0 || offset > MAX_GAME_EPOCH - System.currentTimeMillis() / 1000)
                 throw new IOException("备份的累计时间无效");
             File current = sandbox(id); mkdir(current.getParentFile());
             if (current.exists()) {

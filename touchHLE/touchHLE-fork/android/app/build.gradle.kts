@@ -88,7 +88,8 @@ android {
         // 6: title-screen watermark + window title.
         // 7: the statement now appears on every launch, plus the QQ group.
         // 8: launching any IPA is allowed again; only the bundled one is watched.
-        versionCode = 8
+        // 12: empty Cocos text textures keep zero layout with transparent backing.
+        versionCode = 12
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }

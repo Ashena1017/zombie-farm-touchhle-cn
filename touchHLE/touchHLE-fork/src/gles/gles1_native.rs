@@ -21,11 +21,59 @@ use crate::window::{GLContext, GLVersion, Window};
 use std::ffi::CStr;
 use std::marker::PhantomData;
 
+#[cfg(target_os = "android")]
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
 pub struct GLES1NativeContext {
     gl_ctx: GLContext,
     is_loaded: bool,
+    #[cfg(target_os = "android")]
+    bindings: NativeBindings,
 }
+
+#[cfg(target_os = "android")]
+#[derive(Default)]
+struct NativeBindings {
+    // Keep these queries independent of drivers that report zero even after
+    // binding a nonzero FBO/RBO (observed on MuMu's GLES1 translator).
+    framebuffer: GLuint,
+    renderbuffer: GLuint,
+    shared: Rc<RefCell<SharedFramebuffers>>,
+    local: HashMap<GLuint, (GLuint, u64)>,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Default)]
+struct SharedFramebuffers {
+    next_name: GLuint,
+    objects: HashMap<GLuint, SharedFramebuffer>,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Default)]
+struct SharedFramebuffer {
+    instantiated: bool,
+    revision: u64,
+    attachments: HashMap<GLenum, FramebufferAttachment>,
+}
+
+#[cfg(target_os = "android")]
+#[derive(Clone, Copy)]
+enum FramebufferAttachment {
+    Texture(GLenum, GLuint, GLint),
+    Renderbuffer(GLenum, GLuint),
+}
+
 impl GLESContext for GLES1NativeContext {
+    #[cfg(target_os = "android")]
+    fn as_any(&self) -> &dyn std::any::Any { self }
+
+    #[cfg(target_os = "android")]
+    fn share_with(&mut self, other: &dyn GLESContext) {
+        if let Some(other) = other.as_any().downcast_ref::<Self>() {
+            self.bindings.shared = Rc::clone(&other.bindings.shared);
+        }
+    }
     fn description() -> &'static str {
         "Native OpenGL ES 1.1"
     }
@@ -34,6 +82,8 @@ impl GLESContext for GLES1NativeContext {
         Ok(Self {
             gl_ctx: window.create_gl_context(GLVersion::GLES11)?,
             is_loaded: false,
+            #[cfg(target_os = "android")]
+            bindings: NativeBindings::default(),
         })
     }
 
@@ -44,6 +94,8 @@ impl GLESContext for GLES1NativeContext {
         if self.gl_ctx.is_current() && self.is_loaded {
             return Box::new(GLES1Native {
                 _gl_lifetime: PhantomData,
+                #[cfg(target_os = "android")]
+                bindings: &mut self.bindings,
             });
         }
 
@@ -52,9 +104,16 @@ impl GLESContext for GLES1NativeContext {
         }
         gles11::load_with(|s| window.gl_get_proc_address(s));
         self.is_loaded = true;
-        Box::new(GLES1Native {
+        let mut native = GLES1Native {
             _gl_lifetime: PhantomData,
-        })
+            #[cfg(target_os = "android")]
+            bindings: &mut self.bindings,
+        };
+        #[cfg(target_os = "android")]
+        unsafe {
+            native.bind_shared_framebuffer(native.bindings.framebuffer);
+        }
+        Box::new(native)
     }
 
     unsafe fn make_current_unchecked_for_window<'gl_ctx>(
@@ -65,20 +124,82 @@ impl GLESContext for GLES1NativeContext {
         if self.gl_ctx.is_current() && self.is_loaded {
             return Box::new(GLES1Native {
                 _gl_lifetime: PhantomData,
+                #[cfg(target_os = "android")]
+                bindings: &mut self.bindings,
             });
         }
 
         make_current_fn(&self.gl_ctx);
         gles11::load_with(loader_fn);
         self.is_loaded = true;
-        Box::new(GLES1Native {
+        let mut native = GLES1Native {
             _gl_lifetime: PhantomData,
-        })
+            #[cfg(target_os = "android")]
+            bindings: &mut self.bindings,
+        };
+        #[cfg(target_os = "android")]
+        native.bind_shared_framebuffer(native.bindings.framebuffer);
+        Box::new(native)
     }
 }
 
 pub struct GLES1Native<'gl_ctx> {
     _gl_lifetime: PhantomData<&'gl_ctx ()>,
+    #[cfg(target_os = "android")]
+    bindings: &'gl_ctx mut NativeBindings,
+}
+
+#[cfg(target_os = "android")]
+impl GLES1Native<'_> {
+    unsafe fn bind_shared_framebuffer(&mut self, name: GLuint) {
+        // GLES framebuffer containers are local to a host context. EAGL's
+        // sharegroup must nevertheless keep the guest's FBO names/attachments
+        // consistent when a loading thread creates a render texture and the
+        // main thread uses it. Textures and renderbuffers are already shared.
+        let shared = &mut *self.bindings.shared.borrow_mut();
+        self.bindings.local.retain(|guest, (host, _)| {
+            if shared.objects.contains_key(guest) { true } else {
+                gles11::DeleteFramebuffersOES(1, host);
+                false
+            }
+        });
+        if name == 0 {
+            gles11::BindFramebufferOES(gles11::FRAMEBUFFER_OES, 0);
+        } else {
+            shared.next_name = shared.next_name.max(name);
+            let object = shared.objects.entry(name).or_default();
+            object.instantiated = true;
+            let local = self.bindings.local.entry(name).or_insert_with(|| {
+                let mut host = 0;
+                gles11::GenFramebuffersOES(1, &mut host);
+                (host, u64::MAX)
+            });
+            gles11::BindFramebufferOES(gles11::FRAMEBUFFER_OES, local.0);
+            if local.1 != object.revision {
+                for (&attachment, &value) in &object.attachments {
+                    match value {
+                        FramebufferAttachment::Texture(target, texture, level) =>
+                            gles11::FramebufferTexture2DOES(gles11::FRAMEBUFFER_OES, attachment, target, texture, level),
+                        FramebufferAttachment::Renderbuffer(target, renderbuffer) =>
+                            gles11::FramebufferRenderbufferOES(gles11::FRAMEBUFFER_OES, attachment, target, renderbuffer),
+                    }
+                }
+                local.1 = object.revision;
+            }
+        }
+        self.bindings.framebuffer = name;
+    }
+
+    fn remember_framebuffer_attachment(&mut self, attachment: GLenum, value: FramebufferAttachment) {
+        let mut shared = self.bindings.shared.borrow_mut();
+        if let Some(object) = shared.objects.get_mut(&self.bindings.framebuffer) {
+            object.attachments.insert(attachment, value);
+            object.revision += 1;
+            if let Some(local) = self.bindings.local.get_mut(&self.bindings.framebuffer) {
+                local.1 = object.revision;
+            }
+        }
+    }
 }
 
 /// Solve M^T * eye_plane = object_plane for the column-major modelview M.
@@ -190,6 +311,18 @@ impl GLES for GLES1Native<'_> {
         gles11::GetFloatv(pname, params)
     }
     unsafe fn GetIntegerv(&mut self, pname: GLenum, params: *mut GLint) {
+        #[cfg(target_os = "android")]
+        match pname {
+            gles11::FRAMEBUFFER_BINDING_OES => {
+                params.write_unaligned(self.bindings.framebuffer as GLint);
+                return;
+            }
+            gles11::RENDERBUFFER_BINDING_OES => {
+                params.write_unaligned(self.bindings.renderbuffer as GLint);
+                return;
+            }
+            _ => {}
+        }
         gles11::GetIntegerv(pname, params)
     }
     unsafe fn GetTexEnviv(&mut self, target: GLenum, pname: GLenum, params: *mut GLint) {
@@ -843,21 +976,43 @@ impl GLES for GLES1Native<'_> {
 
     // OES_framebuffer_object -> EXT_framebuffer_object
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint) {
-        gles11::GenFramebuffersOES(n, framebuffers)
+        #[cfg(target_os = "android")]
+        if n >= 0 {
+            let mut shared = self.bindings.shared.borrow_mut();
+            for index in 0..n as usize {
+                shared.next_name = shared.next_name.checked_add(1).expect("Framebuffer names exhausted");
+                let name = shared.next_name;
+                shared.objects.insert(name, SharedFramebuffer::default());
+                framebuffers.add(index).write_unaligned(name);
+            }
+            return;
+        }
+        gles11::GenFramebuffersOES(n, framebuffers);
     }
     unsafe fn GenRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *mut GLuint) {
         gles11::GenRenderbuffersOES(n, renderbuffers)
     }
     unsafe fn IsFramebufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
+        #[cfg(target_os = "android")]
+        return self.bindings.shared.borrow().objects.get(&renderbuffer)
+            .is_some_and(|object| object.instantiated) as GLboolean;
+        #[cfg(not(target_os = "android"))]
         gles11::IsFramebufferOES(renderbuffer)
     }
     unsafe fn IsRenderbufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
         gles11::IsRenderbufferOES(renderbuffer)
     }
     unsafe fn BindFramebufferOES(&mut self, target: GLenum, framebuffer: GLuint) {
+        #[cfg(target_os = "android")]
+        if target == gles11::FRAMEBUFFER_OES {
+            self.bind_shared_framebuffer(framebuffer);
+            return;
+        }
         gles11::BindFramebufferOES(target, framebuffer)
     }
     unsafe fn BindRenderbufferOES(&mut self, target: GLenum, renderbuffer: GLuint) {
+        #[cfg(target_os = "android")]
+        if target == gles11::RENDERBUFFER_OES { self.bindings.renderbuffer = renderbuffer; }
         gles11::BindRenderbufferOES(target, renderbuffer)
     }
     unsafe fn RenderbufferStorageOES(
@@ -876,7 +1031,12 @@ impl GLES for GLES1Native<'_> {
         renderbuffertarget: GLenum,
         renderbuffer: GLuint,
     ) {
-        gles11::FramebufferRenderbufferOES(target, attachment, renderbuffertarget, renderbuffer)
+        gles11::FramebufferRenderbufferOES(target, attachment, renderbuffertarget, renderbuffer);
+        #[cfg(target_os = "android")]
+        if target == gles11::FRAMEBUFFER_OES && renderbuffertarget == gles11::RENDERBUFFER_OES {
+            self.remember_framebuffer_attachment(attachment,
+                FramebufferAttachment::Renderbuffer(renderbuffertarget, renderbuffer));
+        }
     }
     unsafe fn FramebufferTexture2DOES(
         &mut self,
@@ -886,7 +1046,12 @@ impl GLES for GLES1Native<'_> {
         texture: GLuint,
         level: i32,
     ) {
-        gles11::FramebufferTexture2DOES(target, attachment, textarget, texture, level)
+        gles11::FramebufferTexture2DOES(target, attachment, textarget, texture, level);
+        #[cfg(target_os = "android")]
+        if target == gles11::FRAMEBUFFER_OES && textarget == gles11::TEXTURE_2D && level == 0 {
+            self.remember_framebuffer_attachment(attachment,
+                FramebufferAttachment::Texture(textarget, texture, level));
+        }
     }
     unsafe fn GetFramebufferAttachmentParameterivOES(
         &mut self,
@@ -895,6 +1060,34 @@ impl GLES for GLES1Native<'_> {
         pname: GLenum,
         params: *mut GLint,
     ) {
+        #[cfg(target_os = "android")]
+        if target == gles11::FRAMEBUFFER_OES && self.bindings.framebuffer != 0
+            && matches!(attachment, gles11::COLOR_ATTACHMENT0_OES
+                | gles11::DEPTH_ATTACHMENT_OES | gles11::STENCIL_ATTACHMENT_OES)
+        {
+            // Use the sharegroup's attachment descriptors for these queries.
+            // Some Android GLES1 encoders fail to track renderbuffer attachments
+            // and reject a valid OBJECT_NAME query with GL_INVALID_ENUM.
+            let shared = self.bindings.shared.borrow();
+            if let Some(object) = shared.objects.get(&self.bindings.framebuffer) {
+                let (object_type, name) = match object.attachments.get(&attachment) {
+                    Some(&FramebufferAttachment::Texture(_, name, _)) if name != 0 =>
+                        (gles11::TEXTURE, name),
+                    Some(&FramebufferAttachment::Renderbuffer(_, name)) if name != 0 =>
+                        (gles11::RENDERBUFFER_OES, name),
+                    _ => (0, 0), // GL_NONE
+                };
+                let value = match pname {
+                    gles11::FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE_OES => Some(object_type),
+                    gles11::FRAMEBUFFER_ATTACHMENT_OBJECT_NAME_OES if name != 0 => Some(name),
+                    _ => None,
+                };
+                if let Some(value) = value {
+                    params.write_unaligned(value as GLint);
+                    return;
+                }
+            }
+        }
         gles11::GetFramebufferAttachmentParameterivOES(target, attachment, pname, params)
     }
     unsafe fn GetRenderbufferParameterivOES(
@@ -909,9 +1102,29 @@ impl GLES for GLES1Native<'_> {
         gles11::CheckFramebufferStatusOES(target)
     }
     unsafe fn DeleteFramebuffersOES(&mut self, n: GLsizei, framebuffers: *const GLuint) {
+        #[cfg(target_os = "android")]
+        if n >= 0 {
+            for index in 0..n as usize {
+                let name = framebuffers.add(index).read_unaligned();
+                self.bindings.shared.borrow_mut().objects.remove(&name);
+                if let Some((host, _)) = self.bindings.local.remove(&name) {
+                    gles11::DeleteFramebuffersOES(1, &host);
+                }
+                if name == self.bindings.framebuffer {
+                    self.bind_shared_framebuffer(0);
+                }
+            }
+            return;
+        }
         gles11::DeleteFramebuffersOES(n, framebuffers)
     }
     unsafe fn DeleteRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *const GLuint) {
+        #[cfg(target_os = "android")]
+        for index in 0..n.max(0) as usize {
+            if renderbuffers.add(index).read_unaligned() == self.bindings.renderbuffer {
+                self.bindings.renderbuffer = 0;
+            }
+        }
         gles11::DeleteRenderbuffersOES(n, renderbuffers)
     }
     unsafe fn GenerateMipmapOES(&mut self, target: GLenum) {

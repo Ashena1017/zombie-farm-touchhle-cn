@@ -7111,6 +7111,52 @@ fn zombie_farm_percent_encode(value: &str) -> String {
     encoded
 }
 
+#[cfg(target_os = "android")]
+fn zombie_farm_normalize_empty_text_texture(
+    env: &mut Environment,
+    receiver: id,
+    selector: SEL,
+    selector_name: &str,
+) -> bool {
+    if selector_name != "initWithData:pixelFormat:pixelsWide:pixelsHigh:contentSize:"
+        || !matches!(env.bundle.bundle_identifier(),
+            "com.playforge.ZombieFarm.ZFR" | "com.playforge.ZFR.LZ54D2GT3D")
+        || env.bundle.bundle_version() != "1.0"
+        || env.cpu.regs()[3] != 3 // Cocos kCCTexture2DPixelFormat_A8
+        || zombie_farm_object_class_name(env, receiver) != Some("CCTexture2D")
+    {
+        return false;
+    }
+    let stack = ConstPtr::<u32>::from_bits(env.cpu.regs()[Cpu::SP]);
+    let width = env.mem.read(stack);
+    let height = env.mem.read(stack + 1);
+    let content_size: CGSize = env.mem.read((stack + 2).cast());
+    if width != 0 || height != 0 || content_size.width != 0.0 || content_size.height != 0.0 {
+        return false;
+    }
+
+    // Empty shop descriptions create 0x0 A8 textures. Cocos then divides the
+    // zero content size by those dimensions, leaving NaN texture coordinates.
+    // Keep the empty layout, but give the guest a transparent 1x1 backing so
+    // both its texture metadata and the native GLES1 upload remain valid.
+    // Changing only glTexImage2D would leave the guest's divisions by zero.
+    let pixel = env.mem.alloc(1);
+    env.mem.write(pixel.cast::<u8>(), 0);
+    let texture: id = msg_send_no_type_checking(
+        env,
+        (receiver, selector, pixel.cast_const(), 3u32, 1u32, 1u32, content_size),
+    );
+    // initWithData uploads synchronously and does not retain the input buffer.
+    // The caller still owns its original allocation, which was not changed.
+    env.mem.free(pixel);
+    env.cpu.regs_mut()[0] = texture.to_bits();
+    static REPORTED: AtomicBool = AtomicBool::new(false);
+    if !REPORTED.swap(true, Ordering::Relaxed) {
+        log!("ZombieFarm workaround: transparent 1x1 backing for empty Cocos text textures");
+    }
+    true
+}
+
 pub(super) fn zombie_farm_pre_dispatch_workarounds(
     env: &mut Environment,
     receiver: id,
@@ -7120,6 +7166,11 @@ pub(super) fn zombie_farm_pre_dispatch_workarounds(
     let _profile = crate::zfr_profile::scope(crate::zfr_profile::Category::ZombiePreDispatch);
     if !zombie_farm_uses_playforge_bundle(env) {
         return false;
+    }
+
+    #[cfg(target_os = "android")]
+    if zombie_farm_normalize_empty_text_texture(env, receiver, selector, selector_name) {
+        return true;
     }
 
     if zombie_farm_sprite_trace_enabled() {
@@ -7408,6 +7459,11 @@ pub(super) fn zombie_farm_needs_pre_dispatch_workarounds(
 ) -> bool {
     if !zombie_farm_uses_playforge_bundle(env) {
         return false;
+    }
+
+    #[cfg(target_os = "android")]
+    if selector_name == "initWithData:pixelFormat:pixelsWide:pixelsHigh:contentSize:" {
+        return true;
     }
 
     if zombie_farm_sprite_trace_enabled()

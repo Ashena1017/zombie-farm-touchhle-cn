@@ -30,12 +30,14 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-verify2/zombie-farm-windows-x64-v29fix-verify2.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-verify2/zombie-farm-android-arm64-v29fix-verify2.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-windows-x64-v29fix-clock-rendering.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-android-arm64-v29fix-clock-rendering.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
-两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-verify2)查看。
+两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-clock-rendering)查看。
 
-> **仓库里只保留最新版的下载附件**。历史 Release 页面的说明与版本号都还在，但附件已下架——旧版没有启动画面水印，也没有文件校验，谁都能直接下走再转卖。要下载请认准上面的「最新 Release」，那里永远是当前版本。
+> **请优先下载最新 Release 的附件**。历史版本仅作参考，部分旧附件已下架；当前版本保留免费开源声明、水印与文件校验。
+
+**2026-11-15 模拟时间与 Android 渲染修复**：Windows / Android 游戏页显示当前模拟时间，快进窗口实时预览调整后的日期与时间。Android 修复农场始终白天、部分云手机启动时出现 `1280 != 0`、部分真机商店物品被异常黑块遮挡的问题；商店修复已由原受影响玩家实测确认。Android 新安装默认 iPhone ×3（1440×960），保留已有显示设置；`versionCode` 12，签名不变，可覆盖安装。
 
 **2026-11-03 免费声明每次启动 + 文件校验**：上一版把声明印在了标题画面上，但换一个干净的 IPA，水印就没了；而管理器里那份完整声明，卖家只要事先打开过一次，买家就再也看不到。这一版：① 免费开源声明**每次打开管理器都弹**，不再是首次一次，弹窗最下面一行直接给出文件校验的结论；② 新增「文件校验」页，把 `touchHLE.exe`、内置游戏 IPA、管理器自身的官方 SHA-256 与本机实际值并排列出，对不上标红；③ **官方发行版自带的那个 IPA 被删掉就拒绝启动**——任何别的 IPA 都照常能跑；④ 发行包新增 `校验.bat`（双击核对，只用系统自带的 certutil，不联网）和 `SHA256SUMS.txt`；⑤ 底部脚注、声明弹窗、说明书都加上了交流群 QQ 1185712984。Android `versionCode` 升到 8，签名证书不变，可覆盖安装。**这些不是 DRM**：能反编译的人仍然绕得过去，它们的作用是让「拿本项目的包改一改再卖」变贵、变显眼，并让买家有办法自己核对。
 
@@ -52,7 +54,7 @@
 **2026-10-13 入侵修复更新**：Windows 与 Android 已同步修复 touchHLE 的小堆内存释放错误，并补充 Cocos 调度器同步保护。旧分配器可能在加载战斗纹理时覆盖仍在使用的游戏对象，导致入侵闪退；此次修复不需要修改游戏 IPA 或存档。此前稳定闪退的单次 Windows 海盗入侵已由用户确认完成，日志正常退出；Android 已重新构建并通过包校验，本次尚未进行设备端入侵实测。更新前建议先在管理器里备份存档，Android 可直接覆盖安装。
 
 Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows 包面向 Windows 10/11 x64。
-两个版本首次启动管理器时都默认使用夜间模式。Android 默认按 iPhone 原生画面运行并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
+两个版本首次启动管理器时都默认使用夜间模式。Android 新安装默认 iPhone ×3（1440×960）并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
 交付包不包含任何玩家 sandbox 存档；首次进入游戏后会为玩家创建新存档。
 
 <p align="center">
@@ -191,19 +193,19 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-verify2/zombie-farm-windows-x64-v29fix-verify2.zip) 并解压；
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-windows-x64-v29fix-clock-rendering.zip) 并解压；
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 
-Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时间、金币/脑子和存档管理。新建的备份会同时保存存档与累计跳过时间；旧备份恢复时保留当前累计时间。
+Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时间、金币/脑子和存档管理。游戏页显示当前模拟时间，快进窗口会预览调整后的时间。新建的备份会同时保存存档与累计跳过时间；旧备份恢复时保留当前累计时间。
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-verify2/zombie-farm-android-arm64-v29fix-verify2.apk)；
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-android-arm64-v29fix-clock-rendering.apk)；
 2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。最新 v29fix IPA 已内置，首次启动自动校验安装，不需要手动复制 `data` 文件。
 
-Android 管理器还支持按需从系统文件选择器导入 IPA、iPhone/iPad 画面、帧率与修复选项、跳过时间、金币/脑子和存档管理。触屏缩放直接使用游戏的两指捏合手势；默认横屏、iPhone 原生画面与 60 FPS。
+Android 管理器还支持按需从系统文件选择器导入 IPA、iPhone/iPad 画面、帧率与修复选项、模拟时间显示与快进预览、金币/脑子和存档管理。触屏缩放直接使用游戏的两指捏合手势；默认横屏、iPhone ×3（1440×960）与 60 FPS。已保存的分辨率设置会保留。
 
 ### 从源码构建
 

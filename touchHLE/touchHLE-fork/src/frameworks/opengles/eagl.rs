@@ -138,6 +138,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let mut gles1_ins = create_gles1_ctx(env);
 
+    #[cfg(target_os = "android")]
+    gles1_ins.share_with(
+        env.objc.borrow::<EAGLContextHostObject>(group).gles_ctx.as_ref().unwrap().as_ref()
+    );
+
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
         let gles1_ctx = gles1_ins.make_current(window);

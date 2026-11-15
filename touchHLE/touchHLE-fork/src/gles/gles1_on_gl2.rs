@@ -399,6 +399,9 @@ pub struct GLES1OnGL2Context {
     is_loaded: bool,
 }
 impl GLESContext for GLES1OnGL2Context {
+    #[cfg(target_os = "android")]
+    fn as_any(&self) -> &dyn std::any::Any { self }
+
     fn description() -> &'static str {
         "OpenGL ES 1.1 via touchHLE GLES1-on-GL2 layer"
     }

@@ -22,12 +22,14 @@ import android.widget.*;
 import org.json.JSONObject;
 import java.io.*;
 import java.security.MessageDigest;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 
 /** Native touch-first launcher; the emulator runs in the separate :game process. */
 public class ManagerActivity extends Activity {
     private static final int IMPORT_IPA = 10, IMPORT_SAVE = 11, EXPORT_SAVE = 12;
+    private static final String[] SCALE_PRESETS = {"1", "1.25", "1.5", "1.75", "2", "3"};
 
     // Free / open-source statement.
     //
@@ -69,8 +71,12 @@ public class ManagerActivity extends Activity {
     private final Handler settingsHandler = new Handler(Looper.getMainLooper());
     private Runnable settingsSaveRequest;
     private TextView settingsStatus;
+    private TextView simulatedClock;
+    private Runnable skipPreview;
     private final Runnable statusCheck = new Runnable() {
         @Override public void run() {
+            if (simulatedClock != null) updateSimulatedClock();
+            if (skipPreview != null) skipPreview.run();
             // Resume can precede the game process releasing its lease on exit.
             if (storage != null && !busy && running != storage.gameRunning()) refresh(false);
             statusHandler.postDelayed(this, 1000);
@@ -208,6 +214,7 @@ public class ManagerActivity extends Activity {
     }
     private boolean editable() { return !busy && !running && selected != null; }
     private void render() {
+        simulatedClock = null;
         shell = vertical(); shell.setBackgroundColor(BACKGROUND); shell.setPadding(dp(14), dp(12), dp(14), 0);
         FrameLayout hero = new FrameLayout(this); hero.setBackground(shape(SOFT, 8)); hero.setClipToOutline(true);
         LinearLayout titles = vertical(); titles.setPadding(dp(17), dp(17), 0, 0);
@@ -308,6 +315,8 @@ public class ManagerActivity extends Activity {
         version.addView(text("游戏版本 " + selected.version + " · " + String.format(Locale.ROOT, "%.1f MB", selected.file.length() / 1048576.0), 12, MUTED, false));
         Button importButton = button("导入 IPA", false, () -> chooseFile(IMPORT_IPA)); importButton.setEnabled(editable()); addButton(version, importButton);
         LinearLayout launch = card("开始游戏", "累计跳过 " + duration(settings.optLong("offset", 0)));
+        simulatedClock = text("", 15, INK, true);
+        launch.addView(simulatedClock); updateSimulatedClock();
         if (running) {
             addButton(launch, button("返回正在运行的游戏", true, () -> startActivity(new Intent(this, MainActivity.class))));
             addButton(launch, button("退出游戏并返回管理器", false, () -> startActivity(new Intent(this, MainActivity.class)
@@ -342,6 +351,22 @@ public class ManagerActivity extends Activity {
         money.addView(text("每次修改前自动备份，可在“存档”页恢复。", 12, MUTED, false));
     }
     private String duration(long seconds) { return (seconds / 3600) + " 小时 " + ((seconds / 60) % 60) + " 分钟"; }
+    private static String formatSimulatedTime(long now, long offset) {
+        if (offset < 0 || offset > ZfStorage.MAX_GAME_EPOCH - now / 1000)
+            throw new IllegalArgumentException("模拟时间超出游戏支持范围");
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(new Date(now + offset * 1000));
+    }
+    private void updateSimulatedClock() {
+        String current;
+        try { current = formatSimulatedTime(System.currentTimeMillis(), settings.optLong("offset", 0)); }
+        catch (IllegalArgumentException e) { current = e.getMessage(); }
+        simulatedClock.setText("模拟时间：" + current);
+    }
+    private static long skipSeconds(long hours, int minutes) {
+        if (hours < 0 || hours > 100000 || minutes < 0 || minutes > 59 || hours + minutes == 0)
+            throw new IllegalArgumentException("请输入小时与 0～59 的分钟，时间需大于零");
+        return hours * 3600 + minutes * 60;
+    }
     private void launch(long seconds) {
         String id = selected.appId;
         task(() -> {
@@ -353,37 +378,75 @@ public class ManagerActivity extends Activity {
         LinearLayout content = vertical(); content.setPadding(dp(24), dp(8), dp(24), dp(8));
         EditText hours = number("小时", settings.optString("skipHours", "6"), false);
         EditText minutes = number("分钟", settings.optString("skipMinutes", "0"), false);
-        pair(content, hours, minutes); content.addView(text("跳过时间会累加，普通启动继续使用累计值。", 13, MUTED, false));
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("启动并跳过时间").setView(content)
+        LinearLayout hourField = vertical(), minuteField = vertical();
+        TextView hourLabel = text("小时", 13, MUTED, false), minuteLabel = text("分钟", 13, MUTED, false);
+        hours.setId(View.generateViewId()); hourLabel.setLabelFor(hours.getId());
+        minutes.setId(View.generateViewId()); minuteLabel.setLabelFor(minutes.getId());
+        hourField.addView(hourLabel); hourField.addView(hours);
+        minuteField.addView(minuteLabel); minuteField.addView(minutes);
+        pair(content, hourField, minuteField);
+        content.addView(text("跳过时间会累加，普通启动继续使用累计值。", 13, MUTED, false));
+        TextView preview = text("", 14, INK, false); content.addView(preview);
+        AlertDialog.Builder builder = nightMode
+            ? new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            : new AlertDialog.Builder(this);
+        AlertDialog dialog = builder.setTitle("启动并跳过时间").setView(content)
             .setNegativeButton("取消", null).setPositiveButton("启动", null).create();
+        skipPreview = () -> {
+            long now = System.currentTimeMillis(), offset = settings.optLong("offset", 0);
+            String current = "无法读取", after;
+            boolean valid = false;
+            try {
+                current = formatSimulatedTime(now, offset);
+                long seconds = skipSeconds(Long.parseLong(hours.getText().toString()), Integer.parseInt(minutes.getText().toString()));
+                after = formatSimulatedTime(now, offset + seconds);
+                valid = true;
+            } catch (NumberFormatException e) { after = "请输入有效的快进时间"; }
+            catch (IllegalArgumentException e) { after = e.getMessage(); }
+            preview.setText("当前模拟时间：" + current + "\n快进后：" + after);
+            Button start = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            if (start != null) start.setEnabled(valid);
+        };
+        android.text.TextWatcher previewOnEdit = new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (skipPreview != null) skipPreview.run();
+            }
+            public void afterTextChanged(android.text.Editable e) {}
+        };
+        hours.addTextChangedListener(previewOnEdit); minutes.addTextChangedListener(previewOnEdit);
+        dialog.setOnDismissListener(d -> skipPreview = null);
         dialog.setOnShowListener(d -> dialog.getButton(-1).setOnClickListener(v -> {
             try {
                 long h = Long.parseLong(hours.getText().toString()); int m = Integer.parseInt(minutes.getText().toString());
-                if (h < 0 || h > 100000 || m < 0 || m > 59 || h * 3600 + m * 60 == 0) throw new IllegalArgumentException();
-                String id = selected.appId; long seconds = h * 3600 + m * 60;
+                String id = selected.appId; long seconds = skipSeconds(h, m);
                 JSONObject app = new JSONObject(settings.toString()).put("skipHours", h).put("skipMinutes", m);
                 dialog.dismiss(); task(() -> {
                     storage.settings(id, app); storage.advance(id, seconds);
                     return null;
                 }, () -> startActivity(new Intent(this, MainActivity.class)));
             } catch (Exception e) { toast("请输入小时与 0～59 的分钟，时间需大于零"); }
-        })); dialog.show();
+        })); dialog.show(); skipPreview.run();
     }
     private void settingsPage() {
         LinearLayout display = card("画面设置", "按当前版本记忆设置；游戏画面保持比例并适配屏幕。");
         display.addView(text("设备类型", 13, MUTED, false)); family = spinner(new String[]{"iPhone（推荐）", "iPad"});
-        family.setSelection(settings.optString("family", "iphone").equals("ipad") ? 1 : 0); display.addView(family); family.setEnabled(editable());
+        family.setSelection(settings.optString("family", ZfStorage.DEFAULT_FAMILY).equals("ipad") ? 1 : 0); display.addView(family); family.setEnabled(editable());
         display.addView(text("渲染倍率", 13, MUTED, false));
-        scale = spinner(new String[]{"×1", "×1.25", "×1.5", "×1.75", "×2", "自定义"});
-        String[] values = {"1", "1.25", "1.5", "1.75", "2"}; String current = settings.optString("scale", "1");
-        int index = Arrays.asList(values).indexOf(current); scale.setSelection(index < 0 ? 5 : index); display.addView(scale); scale.setEnabled(editable());
+        String[] scaleChoices = new String[SCALE_PRESETS.length + 1];
+        for (int i = 0; i < SCALE_PRESETS.length; i++) scaleChoices[i] = "×" + SCALE_PRESETS[i];
+        scaleChoices[SCALE_PRESETS.length] = "自定义";
+        scale = spinner(scaleChoices);
+        String current = settings.optString("scale", ZfStorage.DEFAULT_SCALE);
+        int index = Arrays.asList(SCALE_PRESETS).indexOf(current);
+        scale.setSelection(index < 0 ? SCALE_PRESETS.length : index); display.addView(scale); scale.setEnabled(editable());
         customScale = number("小数或分数，例如 1.5、3/2", current, true); display.addView(customScale);
         customScale.setVisibility(index < 0 ? View.VISIBLE : View.GONE); customScale.setEnabled(editable());
         resolution = text("", 13, LAVENDER, true); display.addView(resolution);
         AdapterView.OnItemSelectedListener sizes = new AdapterView.OnItemSelectedListener() {
             public void onNothingSelected(AdapterView<?> p) {}
             public void onItemSelected(AdapterView<?> p, View v, int position, long id) {
-                customScale.setVisibility(scale.getSelectedItemPosition() == 5 ? View.VISIBLE : View.GONE);
+                customScale.setVisibility(scale.getSelectedItemPosition() == SCALE_PRESETS.length ? View.VISIBLE : View.GONE);
                 updateResolution(); queueSettingsSave();
             }
         }; family.setOnItemSelectedListener(sizes); scale.setOnItemSelectedListener(sizes);
@@ -392,7 +455,7 @@ public class ManagerActivity extends Activity {
             public void onTextChanged(CharSequence s, int a, int b, int c) { updateResolution(); queueSettingsSave(); }
             public void afterTextChanged(android.text.Editable e) {}
         }); updateResolution();
-        display.addView(text("Android 默认 iPhone ×1。较高倍率增加渲染负担；两指缩放由游戏处理。", 12, MUTED, false));
+        display.addView(text("默认 iPhone ×3（1440 × 960）。画面卡顿时可调低倍率；两指缩放由游戏处理。", 12, MUTED, false));
         LinearLayout timing = card("帧率设置", null);
         fps = spinner(new String[]{"30 FPS", "60 FPS（推荐）", "90 FPS", "120 FPS", "不限帧率", "自定义"});
         String[] rates = {"30", "60", "90", "120", "off"}; current = settings.optString("fps", "60");
@@ -451,8 +514,8 @@ public class ManagerActivity extends Activity {
             app = new JSONObject(settings.toString())
                 .put("family", family.getSelectedItemPosition() == 1 ? "ipad" : "iphone")
                 .put("scale", scaleText).put("fps", fpsText).put("fix", fix.isChecked());
-            if (app.optString("family").equals(settings.optString("family", "iphone"))
-                    && app.optString("scale").equals(settings.optString("scale", "1"))
+            if (app.optString("family").equals(settings.optString("family", ZfStorage.DEFAULT_FAMILY))
+                    && app.optString("scale").equals(settings.optString("scale", ZfStorage.DEFAULT_SCALE))
                     && app.optString("fps").equals(settings.optString("fps", "60"))
                     && app.optBoolean("fix", true) == settings.optBoolean("fix", true)) return;
         } catch (Exception e) {
@@ -480,7 +543,10 @@ public class ManagerActivity extends Activity {
             });
         });
     }
-    private String scaleValue() { String[] v = {"1", "1.25", "1.5", "1.75", "2"}; return scale.getSelectedItemPosition() == 5 ? customScale.getText().toString().trim() : v[scale.getSelectedItemPosition()]; }
+    private String scaleValue() {
+        int index = scale.getSelectedItemPosition();
+        return index == SCALE_PRESETS.length ? customScale.getText().toString().trim() : SCALE_PRESETS[index];
+    }
     private String fpsValue() { String[] v = {"30", "60", "90", "120", "off"}; return fps.getSelectedItemPosition() == 5 ? customFps.getText().toString().trim() : v[fps.getSelectedItemPosition()]; }
     private void updateResolution() {
         try {

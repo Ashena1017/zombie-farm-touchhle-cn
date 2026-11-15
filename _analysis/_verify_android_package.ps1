@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $ipaPath = Join-Path $root 'zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
-$expectedOptions = 'com.playforge.ZombieFarm.ZFR: --landscape-right --fps-limit=60 --device-family=iphone --non-blocking-zero-timeout-run-loop'
+$expectedOptions = 'com.playforge.ZombieFarm.ZFR: --landscape-right --fps-limit=60 --device-family=iphone --scale-hack=3 --non-blocking-zero-timeout-run-loop'
 $expectedLibcxxBytes = 1794776
 $expectedLibcxxSha256 = 'F9992C4BA6B7C5A716E3A202FCEB1CE029D6A2B0605838AC6B3219F489DD7970'
 
@@ -63,8 +63,8 @@ try {
     try { $options = $reader.ReadToEnd() }
     finally { $reader.Dispose(); $optionsStream.Dispose() }
     if (-not $options.Contains($expectedOptions)) { throw 'Android default options do not enable the expected ZFR fixes.' }
-    if ($options.Contains('--zf-wheel-zoom-step=') -or $options.Contains('--scale-hack=')) {
-        throw 'Android defaults must use touch pinch zoom and native iPhone scale.'
+    if ($options.Contains('--zf-wheel-zoom-step=')) {
+        throw 'Android defaults must use touch pinch zoom.'
     }
 
     $managerSource = Join-Path $root 'touchHLE\touchHLE-fork\android\app\src\main\java\org\touchhle\android\ManagerActivity.java'

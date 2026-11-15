@@ -19,6 +19,13 @@ use super::gles11_raw::types::*;
 /// from this trait. It can be made active from [GLESContext::make_current].
 #[allow(clippy::upper_case_acronyms)]
 pub trait GLESContext {
+    #[cfg(target_os = "android")]
+    fn as_any(&self) -> &dyn std::any::Any;
+
+    /// Preserve EAGL sharegroup objects not shared by the host GLES driver.
+    #[cfg(target_os = "android")]
+    fn share_with(&mut self, _other: &dyn GLESContext) {}
+
     /// Get a human-friendly description of this implementation.
     fn description() -> &'static str
     where

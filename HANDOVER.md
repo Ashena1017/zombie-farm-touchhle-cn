@@ -8,6 +8,12 @@
 
 ## 0. 一句话现状
 
+> **2026-11-15 当前状态**：用户已确认原受影响玩家实测 **v12 商店黑框已修复**，并授权发布最新 Windows / Android。正在准备 `v29fix-clock-rendering`：两端模拟时间显示与快进预览，Android 昼夜光照、云手机启动、空文字纹理兼容修复及默认 iPhone ×3。发布前公开版仍是 `v29fix-verify2` / v8；进展看 §46，技术证据看 §42～§45。
+
+> **2026-11-15 云手机启动修复**：Android v9 在用户的 Android 11 云手机启动时报 `1280 != 0`。已查明是 GLES1 附件查询触发 `GL_INVALID_ENUM`，并串到画面合成上下文。修复后 APK **versionCode 10** 在同一云手机已覆盖安装并实测到“开始游戏”界面。原数据 6 个文件哈希一致。当前本地 APK 为 v10，MuMu 的三时段结果来自 v9；公开 GitHub 仍是 `v29fix-verify2` / v8。详见 §43。
+
+> **2026-11-15 最新增补**：Android 农场始终白天的问题已修复，MuMu 正式包在模拟时间 12:00 / 18:00 / 23:00 的亮度与提灯光照均实测通过。修复 EAGL sharegroup 跨上下文的 FBO 名称/附件映射及绑定查询，APK versionCode **9** 已在本机构建并覆盖安装；**尚未提交或发布 GitHub，线上仍是 `v29fix-verify2`**。Android 原存档/设置的 8 个文件已按快照逐字节还原，并恢复应用 UID 权限；Windows exe 与 IPA 未改。详情先看 §42。
+
 > **2026-10-21 当前增补**：Windows 管理器修复了「闪退后误报游戏仍在运行」——运行状态改为读 `touchHLE\zfr_running.json` 的 pid + 启动时间 + exe 路径三元校验（失配即自愈），启动参数加 `--no-error-popup` 消除崩溃后的隐形模态框，等待改成切片并加看门狗，另加 `zfr_manager.log` 取证日志。源码已推送 `master`（`8a6e477` 修复、`e0abbd0` 文档），并已发布新版本 `v29fix-running-detect`（release id `419529614`，latest 已确认，两端资产经代理下载核对）。Android 未改动，其同类判定由 `zf_game.lock` 文件锁保证，结构上不会出现该误报。接手先看 §35～§36。
 
 > **2026-10-13 当前增补**：Windows 管理器的存档选中高亮已修复并发布为 latest `v29fix-save-selection`，GitHub `master` 为 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d`。两端附件的实际下载哈希、发布页面与首页链接均核验通过；Android APK 沿用 versionCode `4` 的入侵修复包。此前稳定闪退的单次 Windows 入侵已用修复版完成，正常退出码 `0`，生产库 65 项测试通过；重复入侵、死亡后补队和 Android 游戏场景尚未验证。接手先看 §31～§34；GitHub 大文件使用主人明确代理 `http://127.0.0.1:10808`，不要重新搜索环境或反复尝试直连。
@@ -845,3 +851,46 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 7. **验证（三态实测，新 exe）**：① 官方包在 + 运行另一个 IPA（`v29fix.ipa`）→ 日志 `Bundled Zombie Farm IPA present: …` 并正常进游戏；② 临时副本里删掉官方包、只放一个干净 IPA → 日志「官方发行版自带的那个游戏包不在了，已停止启动。」+ 消息框，进程停在弹窗（设计行为）；③ 同②加 `ZFR_ALLOW_ANY_IPA=1` → 跳过检查、正常加载。管理器侧 `_notice_probe.ps1` 仍全绿（含「当前选择：官方内置的游戏包」那行）。`_verify_android_package.ps1` PASS、`aapt2` 读到 `versionCode='8'`、证书不变。
 8. **已发布（2026-11-03 10:35 前后）**：tag `v29fix-verify2` → `a839ea5c6ee88aaa282590a47147255a119fb739`（annotated tag 对象 `c081582ac15c3c212c8dc11c570debf3dca66096`），Release id `432206236`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-verify2`。`--verify --recheck` 全量重下载一致。按惯例把 `v29fix-verify` 的 2 个附件下架，**9 条 Release 里只剩 `v29fix-verify2` 有附件**。
 9. **边界**：这一道只防「删掉带水印的包」，**防不住同名覆盖**（只标红）。要真防住得给 exe 做代码签名，本项目没有证书。Android 已由主人在 MuMu 上安装并启动实测通过（2026-11-03，未留截图）；签名不匹配的提示路径仍未被触发过。
+
+## 42. 交接后追加（2026-11-15，Android 昼夜光照修复）
+
+1. 玩家反馈仅 Android 无昼夜亮度变化。MuMu `127.0.0.1:7555` 上用管理器累计 offset 把 touchHLE 模拟时间设到 23:00：角色已提灯、`DayCycle.currentState=6`，但背景仍亮，证明时间与昼夜逻辑已生效。未改系统时钟。
+2. 根因是后台加载线程在共享 EAGLContext 中创建 `CCRenderTexture`，宿主 GLES 的 FBO 容器却不跨上下文共享；旧实现直接透传名称，使后台的遮罩 FBO 1 在主上下文中撞上屏幕 FBO 1。MuMu 另有绑定查询返回 0 的问题，只修查询仍不足以恢复夜景。完整取证与修复见 `_analysis/reports/Android_昼夜光照修复_20261115.md`。
+3. Android native GLES 后端新增 sharegroup 共用的虚拟 FBO 名称/附件表、每个上下文各自的宿主对象映射，并在绑定及切换上下文时同步附件；跟踪 FBO/RBO 查询。EAGL 创建共享上下文时传递对象关系。代码仅启用 Android 分支，未改 IPA、Windows exe 或存档格式。临时抓帧、Inspector 和日志探针全部撤销。
+4. 正式无探针包已通过 MuMu 三时段农场实测：**12:00、18:00、23:00** 逐渐变暗，夜间局部提灯光照正常；同一块草地亮度 **131.54 / 114.28 / 98.82**。图片为 `_analysis/dumps/android-daynight-20261115/final-daynight-comparison.png`。真实 Rust 适配层 6 项专项回归、Windows 生产库 65 项、APK 包级及签名检查通过。真实 Android 手机、连续跨时段边界、战斗和长时稳定性尚未覆盖。
+5. 本地 APK 仍在 `touchHLE-zombiefarm-android-arm64/touchHLE-zombiefarm-android-arm64-fixed.apk`，**97,350,519 B** / SHA-256 `0CC8077275B84B74C98869FF6B22F065808DC12CD9F3E34125E454FC4FFDD505`，versionCode **9**，证书不变。设备 `base.apk` 与本地逐字节相同。**未提交、未推送、未发布新 Release**；公开最新仍为 §41 的 v8。
+6. Android 存档、设置、偏好、锁文件共 **8 文件**与测试前快照哈希完全一致，offset 已恢复 0；测试包与诊断文件已移除，最终游戏停止。不能用 adb shell 直接 tar 解外部快照：会把 owner 改成 shell；run-as 又无法访问 MuMu 的外部 FUSE 路径。最终用临时 instrumentation 在应用 UID 写回并验证 owner 为 `u0_a64`，原测试 runner 源码已原字节恢复。复用 `_android_daynight_probe.py restore` 的应用 UID 恢复流程；快照和核验记录都在上述 dumps 目录，不要拿旧快照替换玩家进度。Windows 开发档仍是 **881 B** / `12AFE4B0E81568E7B8EE5FB16F962703A89C28964A2689933DDA1D499EF09DD9`。
+7. TEMP 工具链再次缺失，SDK 已补齐到永久目录 `C:/Haven/Tools/android-sdk`，原 `zfr-android-toolchain/android` 等路径通过 junction 兼容。继续用 `_build_android_local.ps1 -Offline`；新版 Android CLI 使用斜杠包名（`ndk/27.2.12479018` 等）。新增测试入口 `_analysis/_test_android_framebuffers.py`；产品源码变动仅 4 个 Rust 文件及 versionCode，旧的技能/交接提示词删除和其他初始未跟踪文件均保留。
+
+## 43. 交接后追加（2026-11-15，Android 云手机启动崩溃）
+
+1. `1280` 是 OpenGL `0x0500 / GL_INVALID_ENUM`。云手机日志定位 `src/frameworks/core_animation/composition.rs:369` 的 `GetError() == 0` 断言。独立 x86_64 EGL 探针证明：空 FBO 查询附件 NAME 依法报错；全新 FBO 挂 renderbuffer 后 TYPE 合法，但 NAME 仍被云端 GLES1 编码器误拒绝；错误会被同线程另一个独立上下文读出。只修空附件查询的 APK 仍崩溃。
+2. `gles_guest.rs` 先查 TYPE，只有需要名称时再查；调试 trace 避开默认 FBO 和空附件。`gles1_native.rs` 在 Android 从共享 FBO 附件描述回答合法 TYPE/NAME，保留其他宿主验证及原合成器断言。新增 `_analysis/_android_cloud_gles_probe.c` 和 `_analysis/_test_framebuffer_scale_queries.py`，扩展原 FBO 测试。
+3. 正式 APK v10 已在同一云手机实测到“开始游戏”界面，无 `0x500` 或 panic。专项 **9 + 6** 项、Windows 生产库 **65** 项、APK 包级与证书检查通过，设备 `base.apk` SHA-256 与本地相同。未在 v10 进入农场或重跑 MuMu 三时段；Windows exe 和 IPA 未替换。
+4. 现有输出 `touchHLE-zombiefarm-android-arm64/touchHLE-zombiefarm-android-arm64-fixed.apk` 已更新至 **97,346,209 B** / `44540F139F86063618370D267424916C496CAF02FFF69B6080DE18F27B94D60D`。v9 旧 APK 备份在 `_analysis/dumps/android-cloud-20261115/before-v9.apk`。未提交、推送或发 Release。
+5. 云手机在测试前没有 `saveGame.bin2`。启动自动修改的资料和偏好仅用当次快照原位还原，保留 inode、属主与权限，6 个原文件哈希一致。该设备 root ADB 推入的外部文件会被 FUSE 拒绝，MuMu instrumentation 方法未能读取恢复包；最终用已有的 root ADB 原位回写两个变化文件，**不要复用历史快照**。测试 APK 和设备探针已清除，游戏已停止。详见 `_analysis/reports/Android_云手机启动崩溃_20261115.md`。
+
+## 44. 交接后追加（2026-11-15，管理器模拟时间与 Android 默认倍率）
+
+1. Windows / Android 游戏页新增每秒刷新的模拟时间，按系统时间加已存累计 offset、使用本地时区显示；快进窗口增加当前与调整后日期时间预览，编辑立即更新，取消不落盘。Windows 同时识别既有开发环境变量 `TOUCHHLE_FAKE_UNIX_TIME`；SHA-256 helper 提前定义，修复 SelfTest 先调用尚未定义函数的旧问题。
+2. Android 新默认 iPhone ×3（1440×960）；×3 加入预设，Java 启动、设置与校验、IPA 默认选项一致，已有显式设置保留。快进窗口补充小时/分钟标签和适配夜间的弹窗颜色。APK versionCode **11**，未改 IPA / Windows touchHLE.exe / 本轮 Rust 渲染代码。
+3. Windows SelfTest、真实 WinForms 快进跨午夜（23:55:12 + 30 分 = 次日 00:25:12）、非法分钟禁用、取消保留 offset 通过；Release 45 文件且无存档，独立运行 20.2 秒通过。Android 正式包实测 iPhone ×3，6 小时 15 分跨午夜预览，启动日志 `scale=3/1, time_offset=22500`，角色提灯的夜间农场及商店正常；取消预览后普通启动保留 22500 秒。MuMu 临时用户 10 测试，随后切回用户 0、删除测试用户；原用户游戏未启动，MuMu 程序保留 v11。
+4. APK **97,347,588 B** / `1BC10CC29B118931306F6310DA9B77B398C73B881D9D47A7A2264A968F089577`，设备 base.apk 哈希一致、证书不变。Windows `Release/` 已同步；ZIP 在 `_analysis/dumps/android-shop-clock-20261115/zombie-farm-windows-x64-manager-clock.zip`，**95,544,432 B** / `32246BEA1188DA4720982193DBFFDE6DF01E06A501680E6A8732641ED4B31ACB`。未提交、推送或发布。
+5. **商店黑框仍待真机取证**：用户明确 MuMu 原本就不复现、未解锁剪影正常；不要将其混为黑色方块或以 MuMu 正常作为修复证据。`C:/Users/Loner/Desktop/download.jpg` 不存在，未读取到原图；已问受影响手机型号 / Android / APK 版本，需原图与其日志继续定位。详情 `_analysis/reports/管理器模拟时间与Android默认倍率_20261115.md`，证据在同名 dumps 文件夹。本轮未在云手机更新 v11、未重复三时段光照测试。
+6. **真机信息补充**：用户确认仅部分手机复现；其中一台 HONOR 100 Pro（MAA-AN10），骁龙 8 Gen 2，MagicOS 10.0 / Android 16，系统 `10.0.0.175(C00E170R6P1)`。新附件为“关于手机”，不是异常商店图；仍缺原 bug 图和真机 `touchHLE_log.txt`。APK 只是用户推测“当前这个”，确切 versionCode 未知，不能认定已用本地 v11。该 SoC 对应 Adreno 740，实际驱动需日志确认；MuMu 报的 Adreno 640 不能代替。已复核 Android native GLES1 与 Windows GL2 路径、共用 PVRTC 软件解码、已有 Driver info 日志，尚不能确定纹理/透明度/FBO 中的具体原因。本次仅更新取证记录，未改渲染、重打包或操作设备/存档。
+7. 用户进一步回答异常黑框“每次都是同一位置”。尚未确定是同一物品位置还是固定屏幕坐标，已异步追问滑动列表时是否跟随物品。随物品移动则优先定位物品贴图/alpha；固定屏幕则优先面板/裁剪/合成区域。固定性仅调整排查优先级，不能排除内存/加载问题；仍未复现、定位或修复，未改产品源码。
+
+## 45. 交接后追加（2026-11-15，商店黑框空文字纹理候选）
+
+1. 用户补充四张异常商店图和聊天图，并回答“固定在屏幕同一位置”。不同页的黑块商品格并不完全相同。西红柿、星星果、彩虹草及四种脑子礼包对应空附加说明；带快速/永不枯萎说明的卡片正常。附件已保存到 `_analysis/dumps/android-shop-black-20261115/player-*`，不再缺原图；仍缺受影响真机日志。
+2. MuMu 独立包 iPad ×1.5 抓取空标签布局 0×0、实际 A8 上传 0×0；游戏纹理初始化随后用内容尺寸除像素尺寸得到 NaN。Android 的 `objc/messages/zombie_farm.rs` 在已知 bundle 1.0 的 `CCTexture2D` 空 A8 初始化前，调用原 guest 方法改用透明 1×1 存储，内容尺寸保持零；临时像素同步上传后释放。仅改宿主 GL 上传不足以修复 guest 元数据，故未做通用纹理格式替换。
+3. **候选状态**：已修正这个可证实的空纹理/非有限坐标路径，尚未在 HONOR 100 Pro 验证黑框是否消失。MuMu 原本不复现，不能把正常截图当真机修复证明。完整取证、调用站点与边界在 `_analysis/reports/Android_商店黑框_空文字纹理_20261115.md`。
+4. 专项真实生产函数 4 项、既有 FBO 9 项与缩放查询 6 项 PASS。诊断候选原 5 次零尺寸上传全变透明 1×1，空布局保持零；同商店 357,112 像素前后完全相同。正式包无临时探针，完整构建/包校验/签名 PASS；用正式 classes.dex、native lib、IPA 字节相同的独立 manifest 克隆，以默认 iPhone ×3 验证农场、作物和脑子页，无 panic。
+5. 交付 APK versionCode **12**，**97,353,660 B** / `6F43969BC01BBEB6CD32859C73B8950DEAABFA1F751D4AE5671D996504CA8183`；原固定输出已更新，同内容测试名 `_analysis/dumps/android-shop-black-20261115/zombie-farm-android-arm64-v12-shop-test.apk`。证书和 IPA 不变，未改 Windows exe / 包。未提交、推送或发布，线上仍 v8。
+6. 临时用户 11 因外置存储不可用未进入游戏，已移除；实际测试在本轮创建的独立应用 `org.touchhle.zombiefarm.shopprobe`，结束已卸载。当前用户 0，原 MuMu 应用仍 v11，本轮未启动原应用游戏或操作其存档。`final-result.json` 记录清理及包信息。不要恢复本轮诊断快照到原应用。两次 Python 启动 PS5.1 的构建在事后 Get-FileHash 校验失败，但 Gradle 成功；最终直接用当前 PowerShell 运行固定入口，完整构建和校验成功。
+
+## 46. 交接后追加（2026-11-15，玩家确认与双平台发布）
+
+1. 用户明确反馈「玩家实测修好了」，将 §45 的黑框兼容候选升级为原受影响玩家验证通过。验证由用户转述，没有新增该手机的 GPU 日志；可以报告黑框修复已验证，不能据此补写具体驱动内部行为。
+2. 用户授权将最新 Windows / Android 发布 GitHub。版本选用 `v29fix-clock-rendering`，Android 直接发布已由玩家验证的 versionCode 12 同字节 APK；Windows 重建管理器发行目录并独立启动校验。两端模拟时间、Android 默认 iPhone ×3 与 v9～v12 累积修复均纳入。
+3. 只提交本轮产品改动、专项测试和相关报告；保留工作区既有技能/交接文件删除与其他未跟踪材料。沿用 master 直接推送与个人 git-hosting 技能，manifest 钉住成品 SHA-256。发布后补记实际 commit、Release 和下载校验结果。

@@ -209,14 +209,17 @@ fn zfr_gl_framebuffer_is_scaled(gles: &mut dyn GLES, context: usize) -> bool {
             0x8cd0, // GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE_OES
             &mut obj_type,
         );
-        gles.GetFramebufferAttachmentParameterivOES(
-            gles11::FRAMEBUFFER_OES,
-            gles11::COLOR_ATTACHMENT0_OES,
-            0x8cd1, // GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME_OES
-            &mut obj_name,
-        );
         if obj_type == 0x8d41 {
             // GL_RENDERBUFFER_OES: only a drawable-backed one is scaled.
+            // OES_framebuffer_object forbids querying OBJECT_NAME when the
+            // attachment's OBJECT_TYPE is NONE. This is common just after
+            // binding a newly created FBO, before its attachment is installed.
+            gles.GetFramebufferAttachmentParameterivOES(
+                gles11::FRAMEBUFFER_OES,
+                gles11::COLOR_ATTACHMENT0_OES,
+                0x8cd1, // GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME_OES
+                &mut obj_name,
+            );
             zfr_gl_renderbuffer_is_drawable_backed(context, obj_name as GLuint)
         } else if obj_type == 0x1702 {
             // GL_TEXTURE: an app-owned texture, which we cannot enlarge.
@@ -1631,7 +1634,7 @@ fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLui
             std::sync::OnceLock::new();
         let seen = SEEN.get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()));
         let fresh = seen.lock().map(|mut s| s.insert(framebuffer)).unwrap_or(false);
-        if fresh && zfr_gl_trace_enabled() {
+        if fresh && zfr_gl_trace_enabled() && target == gles11::FRAMEBUFFER_OES && framebuffer != 0 {
             let mut obj_type: GLint = 0;
             let mut obj_name: GLint = 0;
             gles.GetFramebufferAttachmentParameterivOES(
@@ -1640,12 +1643,14 @@ fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLui
                 0x8cd0, // GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE_OES
                 &mut obj_type,
             );
-            gles.GetFramebufferAttachmentParameterivOES(
-                target,
-                gles11::COLOR_ATTACHMENT0_OES,
-                0x8cd1, // GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME_OES
-                &mut obj_name,
-            );
+            if obj_type == 0x8d41 || obj_type == 0x1702 {
+                gles.GetFramebufferAttachmentParameterivOES(
+                    target,
+                    gles11::COLOR_ATTACHMENT0_OES,
+                    0x8cd1, // GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME_OES
+                    &mut obj_name,
+                );
+            }
             // 0x8D41 == GL_RENDERBUFFER_OES, 0x1702 == GL_TEXTURE
             let detail;
             if obj_type == 0x8d41 {

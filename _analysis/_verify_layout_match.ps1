@@ -36,7 +36,7 @@ $relNames = Get-Names $release
 # source; they appear only after someone runs the manager.
 $devOnly = @(
     'TECHNICAL.md', 'process.md', 'HANDOVER.md', '交接提示词.md', 'README.md',
-    'launcher_selected_ipa.txt', 'launcher_skip_memory.txt', 'launcher_night_mode.txt',
+    'launcher_selected_ipa.txt', 'launcher_skip_memory.txt', 'launcher_night_mode.txt', 'launcher_notice_seen.txt',
     'StartZombieFarmNextHour.ps1', 'RestoreTestSave.ps1', 'SetZombieFarmCurrency.ps1',
     '运行游戏.bat', '选择跳过时间并启动.bat', '使用教程.txt',
     'StartZombieFarmNextHour.ps1.backup-20260919-204040',
@@ -44,7 +44,7 @@ $devOnly = @(
 )
 
 # Present in the bundle but generated at build time (so not a source file).
-$relGenerated = @('使用说明.html')
+$relGenerated = @('使用说明.html', '校验.bat', 'SHA256SUMS.txt')
 
 Write-Host "=== development root ==="
 foreach ($n in $devNames) {
