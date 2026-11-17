@@ -8,9 +8,7 @@
 
 ## 0. 一句话现状
 
-> **2026-11-17 用户验收与发布准备**：用户已明确确认 Windows / Android 三项修改均成功，并授权发布新 Release `v29fix-farmers-scroll`。沿用已验收二进制；APK 保持原字节，Windows ZIP 仅更改顶层目录名。发布完成记录见 §48。
-
-> **2026-11-17 本地测试版**：两端倍率上限已扩展到 ×6，九个付费农场主改为本地 15 脑子确认购买，并修正列表筛选谓词导致的反复清空/重建。Windows / Android v13 测试包已构建，生产测试、局部真实 guest、签名和发行校验通过；**完整游戏内购买/重启解锁、变异页与 iPhone 入侵队列的滑动体感待用户实测**。未推送或发布 GitHub，公开 latest 仍为下述 `v29fix-clock-rendering`。先看 §47。
+> **2026-11-17 当前状态**：Windows / Android 三项修改已由用户实测确认成功，双平台新版 **`v29fix-farmers-scroll` 已公开发布并确认为 GitHub latest**（Release id **447957589**，目标 `fe62d1e31583244097775ed5a61f9b25ebea8ecd`）。包含分辨率 ×6、九种农场主各 15 脑子购买和列表滑动修复；沿用已验收二进制，两端完整下载 SHA-256 与本地一致，首页及 Release 页面验证通过。详见 §48。
 
 > **2026-11-15 当前状态**：双平台新版 **`v29fix-clock-rendering` 已公开发布并确认为 GitHub latest**（Release id `445999220`，发布目标 `8a02902`）。用户已确认原受影响玩家实测 v12 商店黑框修复有效；两端模拟时间显示与快进预览、Android 昼夜光照/云手机启动修复和默认 iPhone ×3 均已发布。两端资产完整下载的 SHA-256 一致，首页与 Release 渲染通过；详见 §46。
 
@@ -909,12 +907,17 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 1. 用户反馈三项：倍率最多 ×3；停服后付费农场主无法购买，希望统一 15 脑子；变异页和入侵编队滑动长时间卡顿，两端都有。用户确认倍率扩展到 **×6**。两端管理器限制已放宽，Android 预设加入 4/5/6，默认不改。Windows 通过自定义可设 6（iPhone 2880×1920 / iPad 6144×4608），小数/分数继续可用。
 2. 九种付费农场主在 `objc/messages/zombie_farm/farmers.rs` 接管 `buyHead:`，只匹配当前 ZFR 1.0：按钮显示价格，使用原 Cocos 确认窗，确认后调用正常资源扣费 API 扣 15 脑子、OR 原 `fflags` 单位、走原选择方法并保存。已解锁免费选择、取消不扣费、余额不足与重复回调均处理。原 IPA 两个 slice 的 18 个产品/flag 对应已独立核验；不改 IPA 和存档格式。
 3. 卡顿的直接代码原因：`CCTableView _evictCell` 用 `idx < %i` / `idx > %i` 筛出屏幕外格子，旧 `NSPredicate` 只支持等号、其余 `AlwaysTrue`，将可见内容也清掉；旧 hook 又强制 `dequeueCell=nil`。现在补齐严格 idx 比较与 signed 参数，当前 ZFR 恢复原复用和 `setZombie:` 重建，避免回收格子的 node 已清空却被旧“重复赋值跳过”误判。没有调整列表内容、偏移和裁剪。
-4. **验证范围**：最终生产库 68 PASS + 1 个可选 ignored 集成测试；该集成测试另以当前水印 IPA、只读 FS 实际执行并 PASS（28 个原生格子的编号和生产谓词/数组/varargs，未运行游戏循环）。购买生产 hook 10 项、原二进制绑定 18 条、Android scale 的 8 有效/9 无效输入、Windows SelfTest/尺寸往返、BOM/语法/布局及 `diff --check` PASS。Windows 独立发行目录启动 20.4 秒有窗口、无 panic、空发行 sandbox 已还原。Android 完整构建/包结构/原证书通过，versionCode **13**。**尚无完整菜单滚动帧耗时、真实购买后读档与手机 UI 场景结果，留给用户按 TECHNICAL §6.5 实测；不能报成这些场景已经验证修好。**
+4. **验证范围**：最终生产库 68 PASS + 1 个可选 ignored 集成测试；该集成测试另以当前水印 IPA、只读 FS 实际执行并 PASS（28 个原生格子的编号和生产谓词/数组/varargs，未运行游戏循环）。购买生产 hook 10 项、原二进制绑定 18 条、Android scale 的 8 有效/9 无效输入、Windows SelfTest/尺寸往返、BOM/语法/布局及 `diff --check` PASS。Windows 独立发行目录启动 20.4 秒有窗口、无 panic、空发行 sandbox 已还原。Android 完整构建/包结构/原证书通过，versionCode **13**。**初次交付时游戏内场景待用户实测；随后用户确认两端三项修改全部成功，见 §48。没有额外测量完整菜单滚动帧耗时。**
 5. **本地成品**都在 `_analysis/dumps/farmer-scroll-20261117/`：Windows `zombie-farm-windows-x64-v13-farmers-scroll-test.zip` **95,463,501 B** / `BE5FFA735AAC78455336AB9CEEEB9B19295561F30AA41E7F4A40E51AFEDA4C2B`；Android `zombie-farm-android-arm64-v13-farmers-scroll-test.apk` **97,348,980 B** / `B10B909B2EDBC2809447E0DBA92106D539536238AC67D1BB18BF625FA350D780`。Windows 45 文件、44 项 SHA256SUMS、ZIP CRC 与全部文件回读通过，无存档/日志；开发树 exe / fork exe / Release exe 已同步为 **28,894,208 B** / `120653FAE5B17E5CABAAC55BA754C648E6BB4C7E7E44241DF5033E31BB42AF37`，管理器固定哈希也已同步。原 Windows exe 备份为同目录 `before-touchHLE.exe`。Android 固定输出已更新，证书 SHA-256 仍 `c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f`，IPA 仍 `7BB21449…82FFC`。APK versionName 继承当前 Git describe，不要靠它区分版本，读 versionCode 13 / 包哈希。
-6. **数据与工作区**：本轮不操作 Android 设备或其存档。Windows 当前真实存档已变为 **3238 B** / `C5271064CFC0E9445A0D152363DBB7A302F5A014C966D714077432880322C0D1`，最后写于 2026-11-17 08:01:11；本轮 SelfTest 与收尾哈希均一致。旧快照绝不可覆盖这个现场。既有删除/分析材料保持原状，本批源码未提交、未推送、未发布。后续从 `_analysis/reports/ZFR_倍率农场主与列表卡顿_20261117.md` 和本批 dumps 继续，测试入口 `_test_farmer_scroll_guest.ps1` / `_test_farmer_purchase.py` / `_verify_farmer_bindings.py` / `_test_resolution_scale.py`。独立运行 guest 测试程序时 cwd 必须含 `touchHLE_dylibs`（例如 `touchHLE/`）；第一次从仓库根直接运行缺 libz，改用正确 cwd 后通过，误写的根日志已保留移入本批 dumps。
+6. **数据与工作区**：本轮不操作 Android 设备或其存档。Windows 当前真实存档已变为 **3238 B** / `C5271064CFC0E9445A0D152363DBB7A302F5A014C966D714077432880322C0D1`，最后写于 2026-11-17 08:01:11；本轮 SelfTest 与收尾哈希均一致。旧快照绝不可覆盖这个现场。既有删除/分析材料保持原状；初次测试包交付时本批源码未提交、未推送、未发布，后续用户验收及发布结果见 §48。修复取证从 `_analysis/reports/ZFR_倍率农场主与列表卡顿_20261117.md` 和本批 dumps 继续，测试入口 `_test_farmer_scroll_guest.ps1` / `_test_farmer_purchase.py` / `_verify_farmer_bindings.py` / `_test_resolution_scale.py`。独立运行 guest 测试程序时 cwd 必须含 `touchHLE_dylibs`（例如 `touchHLE/`）；第一次从仓库根直接运行缺 libz，改用正确 cwd 后通过，误写的根日志已保留移入本批 dumps。
 
 ## 48. 交接后追加（2026-11-17，三项实测通过与双平台发布）
 
 1. 用户明确确认 Windows / Android 的倍率、15 脑子购买农场主和列表滑动三项修改全部成功，授权发布到其 GitHub。此前 §47 的游戏内待实测状态已结束；没有额外测量滚动帧耗时。
-2. 版本 `v29fix-farmers-scroll`，沿用验收通过的 v13 APK 与 Windows 包内全部 45 个文件，不重新编译。Windows 仅重新命名 ZIP 顶层目录，44 项文件哈希、CRC 和全部成员逐字节回读通过。APK 签名、内置 IPA 和存档格式保持。发布目标、资产及下载校验结果完成后补记。
+2. 版本 `v29fix-farmers-scroll`，沿用验收通过的 v13 APK 与 Windows 包内全部 45 个文件，不重新编译。Windows 仅重新命名 ZIP 顶层目录，44 项文件哈希、CRC 和全部成员逐字节回读通过。APK 签名、内置 IPA 和存档格式保持。已公开发布，结果见下。
 3. 沿用个人 git-hosting 技能和 master 精确文件清单推送；保留既有删除与其它未跟踪资料。发布材料位于 `_analysis/dumps/release-farmers-scroll-20261117/`。
+
+4. **已发布**：`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-farmers-scroll`，Release id **447957589**，`draft=false` / `prerelease=false`，`/releases/latest` 已确认本版。tag 解析到源码提交 **`fe62d1e31583244097775ed5a61f9b25ebea8ecd`**，22 文件授权清单已按个人技能预演、推送并回读远端 SHA；发布记录另补文档提交，不移动 tag。
+5. **正式资产**：Windows `zombie-farm-windows-x64-v29fix-farmers-scroll.zip`，**95,463,321 B** / SHA-256 `6EBD790D8446B74F4F994AE001771E857F6CF53B4CE4CD916B70A323C9781F3F`，asset id `757241690`；Android `zombie-farm-android-arm64-v29fix-farmers-scroll.apk`，**97,348,980 B** / `B10B909B2EDBC2809447E0DBA92106D539536238AC67D1BB18BF625FA350D780`，asset id `757242640`，versionCode **13**。APK 与用户验收包逐字节一致；Windows 包内 45 文件全部与验收 ZIP 一致，仅顶层目录从测试名换为正式名；包内管理器与发布 commit 的 Git blob 逐字节一致。
+6. **验证完成**：个人 `github-release.mjs --apply --publish` 在草稿阶段对两端资产各完整下载一次并核对 SHA-256，全部一致后公开；公开后仅回读元数据，没有重复下载。Release 标题/正文与本地说明逐字符相同；tag、latest、首页五处下载/版本链接、Release 两个文件名/哈希与附件 HTML 均通过。本轮沿用已完成的构建与测试证据，不重复编译已由用户验收的程序。
+7. **传输与数据**：本轮直接使用标准个人技能，Node 24 `--use-env-proxy` 与进程级 `HTTPS_PROXY=http://127.0.0.1:7890` 复用已有 Git 代理配置；上传和完整下载顺利，不需要旧的 10808 或分段下载 helper。没有改系统代理/DNS、旧 Release/tag/附件、Windows/Android 玩家存档，也没有安装应用。`release-result.json`、`public-result.json`、固定完整 SHA 的 `manifest.json` 和正式包均在本批 dumps；既有三个删除和无关未跟踪文件保持。
