@@ -29,7 +29,7 @@ import java.util.concurrent.*;
 /** Native touch-first launcher; the emulator runs in the separate :game process. */
 public class ManagerActivity extends Activity {
     private static final int IMPORT_IPA = 10, IMPORT_SAVE = 11, EXPORT_SAVE = 12;
-    private static final String[] SCALE_PRESETS = {"1", "1.25", "1.5", "1.75", "2", "3"};
+    private static final String[] SCALE_PRESETS = {"1", "1.25", "1.5", "1.75", "2", "3", "4", "5", "6"};
 
     // Free / open-source statement.
     //

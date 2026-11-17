@@ -105,7 +105,7 @@ $script:NoticeFile = Join-Path $script:Root 'launcher_notice_seen.txt'
 #
 # Updated with every release. _analysis\_build_release.ps1 reads these two
 # values and refuses to package a bundle that does not match them.
-$script:PinnedExeSha256 = '54705B0511E69D2DB34709DF2FF340B969AB5D1BC3B260ECFB55FC25B048E865'
+$script:PinnedExeSha256 = '120653FAE5B17E5CABAAC55BA754C648E6BB4C7E7E44241DF5033E31BB42AF37'
 $script:PinnedIpaSha256 = '7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC'
 
 # Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.
@@ -531,7 +531,7 @@ $script:SettingDefs = [ordered]@{
         # written back unchanged instead of being silently rounded to a preset.
         CustomKind  = 'scale'
         CustomMin   = 1.0
-        CustomMax   = 3.0
+        CustomMax   = 6.0
         CustomLabel = ''
         # Start the custom box at a value that is NOT one of the presets, so a box
         # reading "1.5" next to a ×1.5 preset cannot look like the same setting
@@ -1712,9 +1712,11 @@ if ($SelfTest) {
             @{ K = 'window_scale'; V = '1.75';  Want = $true;  Note = 'a preset' }
             @{ K = 'window_scale'; V = '13/8';  Want = $true;  Note = 'equivalent fraction' }
             @{ K = 'window_scale'; V = '1';     Want = $true;  Note = 'lower bound' }
-            @{ K = 'window_scale'; V = '3';     Want = $true;  Note = 'upper bound' }
+            @{ K = 'window_scale'; V = '6';     Want = $true;  Note = 'upper bound' }
+            @{ K = 'window_scale'; V = '4.5';   Want = $true;  Note = 'high decimal' }
+            @{ K = 'window_scale'; V = '9/2';   Want = $true;  Note = 'high fraction' }
             @{ K = 'window_scale'; V = '0.5';   Want = $false; Note = 'below range' }
-            @{ K = 'window_scale'; V = '4';     Want = $false; Note = 'above range' }
+            @{ K = 'window_scale'; V = '6.01';  Want = $false; Note = 'above range' }
             @{ K = 'window_scale'; V = '7/0';   Want = $false; Note = 'zero denominator' }
             @{ K = 'window_scale'; V = 'abc';   Want = $false; Note = 'not a number' }
             @{ K = 'window_scale'; V = '3/2/2'; Want = $false; Note = 'malformed fraction' }
@@ -1756,6 +1758,8 @@ if ($SelfTest) {
             @{ Fam = 'ipad';   Scale = '1';    Want = '1024 × 768' }
             @{ Fam = 'ipad';   Scale = '2';    Want = '2048 × 1536' }
             @{ Fam = 'iphone'; Scale = '1';    Want = '480 × 320' }
+            @{ Fam = 'iphone'; Scale = '6';    Want = '2880 × 1920' }
+            @{ Fam = 'ipad';   Scale = '6';    Want = '6144 × 4608' }
             @{ Fam = 'iphone'; Scale = '1.5';  Want = '720 × 480' }
             # A decimal and its fraction must give the same window, or the two
             # spellings touchHLE accepts would disagree with the readout.

@@ -5,6 +5,8 @@
  */
 //! Zombie Farm-specific Objective-C message workarounds and tracing helpers.
 
+mod farmers;
+
 use super::{autorelease, id, msg_send_no_type_checking, nil, release, retain, ObjC, SEL};
 use crate::cpu::Cpu;
 use crate::frameworks::core_foundation::time::SECS_FROM_UNIX_TO_APPLE_EPOCHS;
@@ -6019,6 +6021,14 @@ fn zombie_farm_disable_cctable_cell_reuse(
     receiver: id,
     selector_name: &str,
 ) -> bool {
+    // ZFR's original reuse works once NSPredicate implements the '<' and '>'
+    // filters used by _evictCell. The old workaround rebuilt every row while
+    // scrolling. Leave unrelated historical game versions on their old path.
+    if env.bundle.bundle_identifier() == "com.playforge.ZombieFarm.ZFR"
+        && env.bundle.bundle_version() == "1.0"
+    {
+        return false;
+    }
     if selector_name != "dequeueCell"
         || receiver == nil
         || !env
@@ -6400,6 +6410,14 @@ fn zombie_farm_skip_redundant_zombie_cell_rebuild(
         return false;
     }
     if selector_name != "setZombie:" {
+        return false;
+    }
+
+    // Recycled ZFR cells have their node cleared by _moveCellOutOfSight:.
+    // Let the original setter rebuild them, including all labels and actors.
+    if env.bundle.bundle_identifier() == "com.playforge.ZombieFarm.ZFR"
+        && env.bundle.bundle_version() == "1.0"
+    {
         return false;
     }
 
@@ -7167,6 +7185,9 @@ pub(super) fn zombie_farm_pre_dispatch_workarounds(
     if !zombie_farm_uses_playforge_bundle(env) {
         return false;
     }
+    if farmers::pre_dispatch(env, receiver, selector_name) {
+        return true;
+    }
 
     #[cfg(target_os = "android")]
     if zombie_farm_normalize_empty_text_texture(env, receiver, selector, selector_name) {
@@ -7485,6 +7506,9 @@ pub(super) fn zombie_farm_needs_pre_dispatch_workarounds(
     matches!(
         selector_name,
         "operationDone"
+            | "buyHead:"
+            | "requestProductData"
+            | "alertWindow:dismissedPositive:"
             | "objectForKey:"
             | "showUnableToVisitError:"
             | "statusMessage:cancelAfter:"
@@ -7840,11 +7864,13 @@ pub(super) fn zombie_farm_post_dispatch_workarounds(
     env: &mut Environment,
     receiver: id,
     selector_name: &str,
+    args: &[u32; 16],
 ) {
     let _profile = crate::zfr_profile::scope(crate::zfr_profile::Category::ZombiePostDispatch);
     if !zombie_farm_uses_playforge_bundle(env) {
         return;
     }
+    farmers::post_dispatch(env, receiver, selector_name, args);
 
     if zombie_farm_touch_trace_enabled() {
         zombie_farm_trace_game_interaction_return(env, receiver, selector_name);
@@ -7881,5 +7907,6 @@ pub(super) fn zombie_farm_needs_post_dispatch_workarounds(
             || matches!(
                 selector_name,
                 "handleTimeResponse:" | "statusCheckDone" | "startUpChecksComplete" | "saveGame"
+                    | "table:cellTouched:"
             ))
 }

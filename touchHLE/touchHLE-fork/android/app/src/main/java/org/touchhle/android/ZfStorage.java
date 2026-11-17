@@ -151,9 +151,9 @@ public final class ZfStorage {
                 if (denominator <= 0 || denominator > 10000 || n > 10000) throw new NumberFormatException();
                 n /= denominator;
             }
-            if (!Double.isFinite(n) || n < 1 || n > 3 || value.length() > 12) throw new NumberFormatException();
+            if (!Double.isFinite(n) || n < 1 || n > 6 || value.length() > 12) throw new NumberFormatException();
             return n;
-        } catch (NumberFormatException e) { throw new IllegalArgumentException("倍率请填 1～3 的小数或分数，例如 1.5、3/2"); }
+        } catch (NumberFormatException e) { throw new IllegalArgumentException("倍率请填 1～6 的小数或分数，例如 4、4.5、9/2"); }
     }
     private static void validate(JSONObject app) throws Exception {
         if (!Arrays.asList("iphone", "ipad").contains(app.optString("family", DEFAULT_FAMILY)))

@@ -58,7 +58,7 @@ public class ManagerTestRunner extends Instrumentation {
                     zip.putNextEntry(new ZipEntry("Payload/ZFR.app/ZFR")); zip.write(new byte[]{1}); zip.closeEntry();
                 }
                 check(ZfIpa.read(xmlIpa).version.equals("1.0"), "XML IPA plist with external DTD");
-                check(ZfStorage.hash(ipa.file).equals("e5951f945d23e88f25d0d1e7dc84e39ab524c566e28460173600ba05423c9ded"), "bundled IPA bytes unchanged");
+                check(ZfStorage.hash(ipa.file).equals("7bb214498b149e11deca49c19e5a21b9aa7f763646537206b85cbbab86582ffc"), "bundled IPA bytes unchanged");
                 JSONObject app = new JSONObject().put("family", "ipad").put("scale", "3/2").put("fps", "120").put("fix", false);
                 store.settings(id, app);
                 JSONObject roundtrip = store.settings(id);
@@ -69,6 +69,8 @@ public class ManagerTestRunner extends Instrumentation {
                 reject(() -> store.advance(id, Long.MAX_VALUE), "clock overflow refused");
                 reject(() -> store.settings(id, new JSONObject().put("scale", "1/0")), "invalid scale refused");
                 check(ZfStorage.scale("1.5") == ZfStorage.scale("3/2"), "fraction and decimal scale equivalent");
+                check(ZfStorage.scale("6") == 6 && ZfStorage.scale("4.5") == ZfStorage.scale("9/2"), "scale through six and high fraction accepted");
+                reject(() -> ZfStorage.scale("6.01"), "scale above six refused");
                 byte[] original = fixture(); ZfStorage.atomic(store.live(id), original);
                 File profile = new File(store.sandbox(id), "Documents/profile.txt");
                 ZfStorage.atomic(profile, "original profile".getBytes(StandardCharsets.UTF_8));

@@ -30,12 +30,14 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-windows-x64-v29fix-clock-rendering.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-android-arm64-v29fix-clock-rendering.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-farmers-scroll/zombie-farm-windows-x64-v29fix-farmers-scroll.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-farmers-scroll/zombie-farm-android-arm64-v29fix-farmers-scroll.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置最新 v29fix IPA，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
-两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-clock-rendering)查看。
+两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-farmers-scroll)查看。
 
 > **请优先下载最新 Release 的附件**。历史版本仅作参考，部分旧附件已下架；当前版本保留免费开源声明、水印与文件校验。
+
+**2026-11-17 倍率、农场主与列表滑动更新**：Windows / Android 分辨率倍率上限扩展到 ×6，继续支持小数和分数；Windows 通过「自定义」设置，Android 新增 ×4、×5、×6 预设。九种原付费农场主统一为每种 15 脑子确认购买并永久解锁。修复变异列表与 iPhone 入侵编队列表滑动长时间卡顿，两端三项修改均已由用户实测确认。Android `versionCode` 13，签名不变，可覆盖安装。
 
 **2026-11-15 模拟时间与 Android 渲染修复**：Windows / Android 游戏页显示当前模拟时间，快进窗口实时预览调整后的日期与时间。Android 修复农场始终白天、部分云手机启动时出现 `1280 != 0`、部分真机商店物品被异常黑块遮挡的问题；商店修复已由原受影响玩家实测确认。Android 新安装默认 iPhone ×3（1440×960），保留已有显示设置；`versionCode` 12，签名不变，可覆盖安装。
 
@@ -100,7 +102,7 @@ Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows �
 ### 推荐：Zombie Farm 2 Reforged
 
 > **先说清楚名字**：**「Reforged」指的是下面那个项目，不是本项目。**
-> 本仓库跑的是原版《僵尸农场》游戏本体，只打二进制补丁、不改玩法。
+> 本仓库跑的是原版《僵尸农场》游戏本体，保留原版主要玩法，并为已停服的付费农场主提供脑子购买方式。
 
 [**Zombie Farm 2 Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)
 是另一位粉丝**从零重写**的作品（TypeScript，MIT 许可）：把 ZF2 的机制与 ZF1 的大量内容
@@ -114,8 +116,8 @@ Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows �
   一个是调用默认浏览器打开的启动器，都免安装、免管理员权限。
 
 > 两个项目是**互补**的，不是竞争关系：
-> 本项目的目标是「**让原版能在电脑和 Android 设备上舒服地玩**」—— 玩法、数值、美术一律保持原样，
-> 只修崩溃、修中文、放大界面；Reforged（对面那个）的目标是「**把这游戏重做成一个现代游戏**」——
+> 本项目的目标是「**让原版能在电脑和 Android 设备上舒服地玩**」—— 保留原版主要玩法与美术，
+> 修复兼容性、中文与显示问题，并为停服的付费农场主提供本地购买方式；Reforged（对面那个）的目标是「**把这游戏重做成一个现代游戏**」——
 > 重写引擎、加入联机与社交，所以画面与手感会和原版不同。
 > 而原版的素材本来就可以直接复用（见 [技术难点](#技术难点与结论) ⑤），
 > 两边其实在同一件「别让这游戏消失」的事上。
@@ -193,7 +195,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-windows-x64-v29fix-clock-rendering.zip) 并解压；
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-farmers-scroll/zombie-farm-windows-x64-v29fix-farmers-scroll.zip) 并解压；
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 
@@ -201,7 +203,7 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-clock-rendering/zombie-farm-android-arm64-v29fix-clock-rendering.apk)；
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-farmers-scroll/zombie-farm-android-arm64-v29fix-farmers-scroll.apk)；
 2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。最新 v29fix IPA 已内置，首次启动自动校验安装，不需要手动复制 `data` 文件。
 

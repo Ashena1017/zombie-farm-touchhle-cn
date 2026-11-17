@@ -816,7 +816,9 @@ Type mismatch when sending message {} to {:?}!
                     );
                 }
                 if zombie_farm_needs_post_dispatch_workarounds(env, selector_name_for_after) {
-                    zombie_farm_post_dispatch_workarounds(env, receiver, selector_name_for_after);
+                    zombie_farm_post_dispatch_workarounds(
+                        env, receiver, selector_name_for_after, &regs_before_zombie_farm_prepare,
+                    );
                 }
                 return;
             } else {
