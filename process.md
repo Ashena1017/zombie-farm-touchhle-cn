@@ -1,5 +1,7 @@
 # 待办清单（用户反馈批次 2）
 
+> **2026-11-21 相机声明与统一游戏包（#52）**：Windows 旧 v29fix 选择自动映射到带水印的正式包，两端内置 IPA 一致。僵尸相机手动及升级自动拍照后显示免费开源声明，Windows 游戏内实测通过，Android v14 通过构建和签名核验。发布 `v29fix-camera-notice`（id `453629161`，目标 `cfe467f`），完整下载核对两端附件后公开；已删除 6 个旧附件并回读确认新版仍有两份下载。详见 HANDOVER §49。
+
 > **2026-11-17 三项用户验收与发布完成（#51）**：用户确认 Windows / Android 倍率扩展、15 脑子购买农场主与列表滑动三项均成功。`v29fix-farmers-scroll` 已公开并确认为 latest，目标 `fe62d1e`，Release id `447957589`，源码按 22 文件清单推送 master。沿用已验收 v13 APK 与 Windows 45 文件；ZIP 仅更改顶层目录名。Windows ZIP 95,463,321 B / `6EBD790D8446B74F4F994AE001771E857F6CF53B4CE4CD916B70A323C9781F3F`；Android APK 97,348,980 B / `B10B909B2EDBC2809447E0DBA92106D539536238AC67D1BB18BF625FA350D780`。标准个人技能经已有 7890 代理上传并各完整下载核验一次，全部一致；正文、tag/latest、首页下载与 Release/附件 HTML 通过。未重编、未操作玩家数据或旧版本；详见 HANDOVER §48。
 
 > **2026-11-17 三项修复本地测试版（#50）**：用户确认倍率扩展到 ×6，Windows 自定义 / Android 校验与 4/5/6 预设已完成。九种付费农场主改为原游戏确认窗 + 本地扣 15 脑子 + 原 fflags 解锁/选择/保存；原商店产品查询停止。变异与编队列表卡顿定位到 `NSPredicate` 未实现 `idx < / >` 而返回全真，使 `_evictCell` 连可见格子也清空；补齐比较并恢复当前 ZFR 复用，撤开与其冲突的旧 setZombie 跳过处理。生产库 68 项、只读原 IPA 局部 guest 1 项、购买 hook 10 项、两 slice 产品映射 18 条、scale 输入、管理器/布局/签名/包级通过；Windows 独立运行 20.4 秒无 panic。已生成 Windows ZIP / Android v13 APK，详见 HANDOVER §47。**完整购买后重启和实际两个列表滑动待用户实测，尚未提交或发布 GitHub**；Windows 真存档 3238 B / `C5271064…322C0D1` 本轮保持一致，未操作 Android 数据。

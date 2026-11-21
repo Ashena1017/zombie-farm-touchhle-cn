@@ -8,6 +8,8 @@
 
 ## 0. 一句话现状
 
+> **2026-11-21 当前状态**：双平台 **`v29fix-camera-notice`** 已公开并确认为 GitHub latest。两端内置同一份带标题水印的 IPA，Windows 管理器自动兼容记住的旧 v29fix 选择；僵尸相机成功拍照后显示免费开源声明。此前倍率 ×6、农场主购买与列表滑动修复均包含。Windows 手动与升级自动拍照已实测，Android v14 通过构建、包结构及签名校验。旧版下载附件已清空，详见 §49。
+
 > **2026-11-17 当前状态**：Windows / Android 三项修改已由用户实测确认成功，双平台新版 **`v29fix-farmers-scroll` 已公开发布并确认为 GitHub latest**（Release id **447957589**，目标 `fe62d1e31583244097775ed5a61f9b25ebea8ecd`）。包含分辨率 ×6、九种农场主各 15 脑子购买和列表滑动修复；沿用已验收二进制，两端完整下载 SHA-256 与本地一致，首页及 Release 页面验证通过。详见 §48。
 
 > **2026-11-15 当前状态**：双平台新版 **`v29fix-clock-rendering` 已公开发布并确认为 GitHub latest**（Release id `445999220`，发布目标 `8a02902`）。用户已确认原受影响玩家实测 v12 商店黑框修复有效；两端模拟时间显示与快进预览、Android 昼夜光照/云手机启动修复和默认 iPhone ×3 均已发布。两端资产完整下载的 SHA-256 一致，首页与 Release 渲染通过；详见 §46。
@@ -921,3 +923,10 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 5. **正式资产**：Windows `zombie-farm-windows-x64-v29fix-farmers-scroll.zip`，**95,463,321 B** / SHA-256 `6EBD790D8446B74F4F994AE001771E857F6CF53B4CE4CD916B70A323C9781F3F`，asset id `757241690`；Android `zombie-farm-android-arm64-v29fix-farmers-scroll.apk`，**97,348,980 B** / `B10B909B2EDBC2809447E0DBA92106D539536238AC67D1BB18BF625FA350D780`，asset id `757242640`，versionCode **13**。APK 与用户验收包逐字节一致；Windows 包内 45 文件全部与验收 ZIP 一致，仅顶层目录从测试名换为正式名；包内管理器与发布 commit 的 Git blob 逐字节一致。
 6. **验证完成**：个人 `github-release.mjs --apply --publish` 在草稿阶段对两端资产各完整下载一次并核对 SHA-256，全部一致后公开；公开后仅回读元数据，没有重复下载。Release 标题/正文与本地说明逐字符相同；tag、latest、首页五处下载/版本链接、Release 两个文件名/哈希与附件 HTML 均通过。本轮沿用已完成的构建与测试证据，不重复编译已由用户验收的程序。
 7. **传输与数据**：本轮直接使用标准个人技能，Node 24 `--use-env-proxy` 与进程级 `HTTPS_PROXY=http://127.0.0.1:7890` 复用已有 Git 代理配置；上传和完整下载顺利，不需要旧的 10808 或分段下载 helper。没有改系统代理/DNS、旧 Release/tag/附件、Windows/Android 玩家存档，也没有安装应用。`release-result.json`、`public-result.json`、固定完整 SHA 的 `manifest.json` 和正式包均在本批 dumps；既有三个删除和无关未跟踪文件保持。
+
+## 49. 交接后追加（2026-11-21，僵尸相机、统一游戏包与发布）
+
+1. ZFR 1.0 的僵尸相机可手动拍农场，开启「升级时自动拍照」后从 6 级开始触发。新增 touchHLE 相机处理：允许本地离线截图，成功后用游戏弹窗替换旧分享菜单，保留闪光、快门声及手动拍照的原奖励通知，清理相机触摸拦截。Windows iPhone 实测手动拍照、关闭弹窗恢复操作及每日 100 金币，用户实测升级自动拍照也显示声明。Android v14 的游戏内拍照尚未实测。
+2. Windows 管理器将准确匹配的无水印 v29fix 文件名视作正式包的旧别名，有正式包时隐藏重复选项。两端各含一份 IPA，SHA-256 同为 `7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC`，游戏存档仍按同一 app id 读取。Windows 自检确认了旧选择映射和真实存档未变。
+3. [`v29fix-camera-notice`](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-camera-notice) 为正式公开版本，Release id **453629161**，目标 `cfe467f96aabb67b8facbcd3e282bb2ee7c64b6c`。Windows ZIP **95,997,460 B** / `14196FFDA83C30784561FA4064D45925A4D7C6C29060D823441D082C47584AAB`，包内 45 文件和 44 项哈希通过。Android APK **97,353,992 B** / `F2E31A28DBA4C75B0D96989A8707CF6765820A73CCD04E0A9F9824203111CE7E`，versionCode **14**，证书仍为 `c2ddca91…4ca6f`。个人 git-hosting 技能在公开前完整下载核验两份附件，源码已推送 master。
+4. 新版公开并确认为 latest 后，按用户授权删除旧版剩余 **6 个下载附件**，回读确认 11 条历史 Release 记录仍在、均无上传附件，新版两个资产仍在。发布清单、下载核验与清理结果位于 `_analysis/dumps/release-camera-notice-20261121/`。
