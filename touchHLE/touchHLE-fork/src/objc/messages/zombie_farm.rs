@@ -7,6 +7,7 @@
 
 mod camera;
 mod farmers;
+mod menus;
 
 use super::{autorelease, id, msg_send_no_type_checking, nil, release, retain, ObjC, SEL};
 use crate::cpu::Cpu;
@@ -7874,6 +7875,7 @@ pub(super) fn zombie_farm_post_dispatch_workarounds(
         return;
     }
     farmers::post_dispatch(env, receiver, selector_name, args);
+    menus::post_dispatch(env, receiver, selector_name);
     if selector_name == "captured:" {
         camera::after_capture(env, receiver);
     }
@@ -7913,6 +7915,6 @@ pub(super) fn zombie_farm_needs_post_dispatch_workarounds(
             || matches!(
                 selector_name,
                 "handleTimeResponse:" | "statusCheckDone" | "startUpChecksComplete" | "saveGame"
-                    | "table:cellTouched:" | "captured:"
+                    | "table:cellTouched:" | "captured:" | "viewDidLoad" | "setProfilesData:"
             ))
 }

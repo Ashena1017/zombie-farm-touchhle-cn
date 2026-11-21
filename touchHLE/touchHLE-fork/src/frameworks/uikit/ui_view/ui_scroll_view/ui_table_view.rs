@@ -7,10 +7,11 @@
 
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::ns_array;
-use crate::frameworks::foundation::NSInteger;
+use crate::frameworks::foundation::{NSInteger, NSUInteger};
+use crate::frameworks::uikit::ui_font::UITextAlignmentCenter;
 use crate::objc::{
     id, impl_HostObject_with_superclass, msg, msg_class, msg_super, nil, objc_classes, release,
-    retain, ClassExports, NSZonePtr, SEL,
+    retain, ClassExports, NSZonePtr, ObjC, SEL,
 };
 
 type UITableViewStyle = NSInteger;
@@ -138,8 +139,19 @@ fn zombie_farm_online_table_rendering_enabled(env: &crate::Environment) -> bool 
         && std::env::var_os("TOUCHHLE_ZOMBIE_FARM_HTTP_BASE_URL").is_some()
 }
 
+fn is_zfr_farm_picker(env: &crate::Environment, table_view: id) -> bool {
+    if env.bundle.bundle_identifier() != "com.playforge.ZombieFarm.ZFR"
+        || env.bundle.bundle_version() != "1.0"
+    {
+        return false;
+    }
+    let source = env.objc.borrow::<UITableViewHostObject>(table_view).data_source;
+    source != nil
+        && env.objc.try_get_class_name(ObjC::read_isa(source, &env.mem)) == Some("AccountsMenu")
+}
+
 fn schedule_table_layout(env: &mut crate::Environment, table_view: id) {
-    if zombie_farm_online_table_rendering_enabled(env) {
+    if zombie_farm_online_table_rendering_enabled(env) || is_zfr_farm_picker(env, table_view) {
         // UIView::setNeedsLayout currently calls layoutSubviews immediately.
         // That is unsafe for Zombie Farm's social tables: acceptGift mutates
         // its model between beginUpdates/endUpdates, and a synchronous layout
@@ -179,7 +191,9 @@ fn render_pending_table_reload(env: &mut crate::Environment, table_view: id) {
             false
         }
     };
-    if render_now && zombie_farm_online_table_rendering_enabled(env) {
+    if render_now
+        && (zombie_farm_online_table_rendering_enabled(env) || is_zfr_farm_picker(env, table_view))
+    {
         render_data_source_views(env, table_view);
     }
 }
@@ -187,7 +201,7 @@ fn render_pending_table_reload(env: &mut crate::Environment, table_view: id) {
 /// Materialize the rows requested by a UITableView data source. touchHLE's
 /// historical UITableView stub only invalidated layout from reloadData, so the
 /// app could report rows without ever being asked to create a cell. Keep this
-/// initial renderer behind Zombie Farm's opt-in online mode while it matures.
+/// renderer scoped to the ZFR farm picker and Zombie Farm's opt-in online mode.
 ///
 /// Data source and delegate callbacks are UIKit work and must stay on the main
 /// thread. Zombie Farm performs network completion work on guest pthreads; if
@@ -218,6 +232,11 @@ fn render_data_source_views(env: &mut crate::Environment, table_view: id) {
     let has_header_height = responds_to(env, delegate, "tableView:heightForHeaderInSection:");
     let has_header_view = responds_to(env, delegate, "tableView:viewForHeaderInSection:");
     let has_row_height = responds_to(env, delegate, "tableView:heightForRowAtIndexPath:");
+    let farm_picker = is_zfr_farm_picker(env, table_view);
+    let profiles = farm_picker
+        .then(|| env.objc.object_lookup_ivar(&env.mem, data_source, &"profileData".to_string()))
+        .flatten()
+        .map_or(nil, |ivar| env.mem.read(ivar.cast()));
 
     let mut y = 0.0;
     let mut rendered_rows = 0;
@@ -265,6 +284,10 @@ fn render_data_source_views(env: &mut crate::Environment, table_view: id) {
                     },
                 };
                 () = msg![env; cell setFrame:frame];
+                if profiles != nil {
+                    let profile: id = msg![env; profiles objectAtIndex:(row as NSUInteger)];
+                    show_farm_preview(env, cell, profile);
+                }
                 bind_cell_to_row(env, cell, table_view, index_path);
                 remember_rendered_view(env, table_view, cell);
                 () = msg![env; table_view addSubview:cell];
@@ -273,9 +296,35 @@ fn render_data_source_views(env: &mut crate::Environment, table_view: id) {
             y += row_height.max(0.0);
         }
     }
+    if farm_picker {
+        let footer: id = msg![env; table_view tableFooterView];
+        if footer != nil {
+            let mut frame: CGRect = msg![env; footer frame];
+            frame.origin.y = y;
+            () = msg![env; footer setFrame:frame];
+            y += frame.size.height;
+        }
+    }
     let content_size = CGSize { width, height: y };
     () = msg![env; table_view setContentSize:content_size];
     log!("ZombieFarm UITableView materialized {rendered_rows} row(s) across {sections} section(s)");
+}
+
+fn show_farm_preview(env: &mut crate::Environment, cell: id, profile: id) {
+    // The guest returns an empty standard cell from its instance data-source
+    // method. Fill its label from the same preview used by the selection delegate.
+    let name: id = msg![env; profile displayName];
+    let background: id = msg_class![env; UIColor colorWithWhite:0.22_f32 alpha:1.0_f32];
+    let white: id = msg_class![env; UIColor whiteColor];
+    let bounds: CGRect = msg![env; cell bounds];
+    let content: id = msg![env; cell contentView];
+    let label: id = msg![env; cell textLabel];
+    () = msg![env; cell setBackgroundColor:background];
+    () = msg![env; content setFrame:bounds];
+    () = msg![env; label setFrame:bounds];
+    () = msg![env; label setTextColor:white];
+    () = msg![env; label setTextAlignment:UITextAlignmentCenter];
+    () = msg![env; label setText:name];
 }
 
 struct UITableViewCellHostObject {

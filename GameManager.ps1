@@ -107,7 +107,7 @@ $script:NoticeFile = Join-Path $script:Root 'launcher_notice_seen.txt'
 #
 # Updated with every release. _analysis\_build_release.ps1 reads these two
 # values and refuses to package a bundle that does not match them.
-$script:PinnedExeSha256 = '126D3B7A284760BCDC85D7B754E535E28D1E0881034FC80FF0029706ED75A77C'
+$script:PinnedExeSha256 = '7C9E2E369178D119C5D0EEE5164FB94F05A171C0BD7E72F6105653D7EE9D2259'
 $script:PinnedIpaSha256 = '7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC'
 
 # Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.

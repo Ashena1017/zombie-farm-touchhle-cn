@@ -6,13 +6,13 @@
 //! `UITextView`.
 
 use crate::frameworks::core_graphics::cg_context::CGContextSetRGBFillColor;
-use crate::frameworks::core_graphics::cg_geometry::CGPointZero;
+use crate::frameworks::core_graphics::cg_geometry::CGRectZero;
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
-use crate::frameworks::foundation::ns_string::to_rust_string;
+use crate::frameworks::foundation::ns_string::{get_static_str, to_rust_string};
 use crate::frameworks::foundation::{NSRange, NSUInteger};
 use crate::frameworks::uikit::ui_color;
 use crate::frameworks::uikit::ui_font::{
-    break_lines_with_font, UILineBreakModeTailTruncation, UILineBreakModeWordWrap, UITextAlignment,
+    break_lines_with_font, size_with_font, UILineBreakModeWordWrap, UITextAlignment,
     UITextAlignmentLeft,
 };
 use crate::frameworks::uikit::ui_graphics::UIGraphicsGetCurrentContext;
@@ -24,6 +24,7 @@ use crate::objc::{
 use crate::Environment;
 
 type UIDataDetectorTypes = NSUInteger;
+const TEXT_INSET: CGFloat = 8.0;
 
 pub struct UITextViewHostObject {
     superclass: super::UIScrollViewHostObject,
@@ -50,6 +51,13 @@ impl Default for UITextViewHostObject {
     }
 }
 
+fn text_layout_size(viewport: CGSize) -> CGSize {
+    CGSize {
+        width: (viewport.width - 2.0 * TEXT_INSET).max(0.0),
+        height: (viewport.height - 2.0 * TEXT_INSET).max(0.0),
+    }
+}
+
 // Update contentOffset and contentSize when anything that potentially affects
 // contentSize like font and text change.
 fn update_scroll(env: &mut Environment, this: id) {
@@ -59,16 +67,26 @@ fn update_scroll(env: &mut Environment, this: id) {
     let text: id = msg![env; this text];
 
     // Calculate our new contentSize
-    let calculated_size: CGSize = msg![env; text sizeWithFont:font constrainedToSize:bound_size];
+    let calculated_size = if text == nil || font == nil {
+        CGSize { width: 0.0, height: 0.0 }
+    } else {
+        let text = to_rust_string(env, text);
+        let layout_size = text_layout_size(bound_size);
+        let size = size_with_font(env, font, &text, Some((layout_size, UILineBreakModeWordWrap)));
+        CGSize {
+            width: bound_size.width,
+            height: size.height + 2.0 * TEXT_INSET,
+        }
+    };
     () = msg![env; this setContentSize:calculated_size];
 
-    // Reset contentOffset if we have now gone out of bounds of contentSize,
-    // otherwise ignore.
-    let current_content_offset: CGPoint = msg![env; this contentOffset];
-    if current_content_offset.x > calculated_size.width - bounds.size.width
-        || current_content_offset.y > calculated_size.height - bounds.size.height
-    {
-        () = msg![env; this setContentOffset:(CGPoint { x: 0.0, y: 0.0 })];
+    let offset: CGPoint = msg![env; this contentOffset];
+    let clamped = CGPoint {
+        x: offset.x.clamp(0.0, (calculated_size.width - bound_size.width).max(0.0)),
+        y: offset.y.clamp(0.0, (calculated_size.height - bound_size.height).max(0.0)),
+    };
+    if offset != clamped {
+        () = msg![env; this setContentOffset:clamped];
     }
 }
 pub const CLASSES: ClassExports = objc_classes! {
@@ -93,9 +111,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithCoder:(id)coder {
     let this: id = msg_super![env; this initWithCoder:coder];
-    // These aren't redundant, the setters fetch the real defaults.
     () = msg![env; this setFont:nil];
-    () = msg![env; this setTextColor:nil];
+
+    let text_key = get_static_str(env, "UIText");
+    let text: id = msg![env; coder decodeObjectForKey:text_key];
+    () = msg![env; this setText:text];
+    let color_key = get_static_str(env, "UITextColor");
+    let color: id = msg![env; coder decodeObjectForKey:color_key];
+    () = msg![env; this setTextColor:color];
+    let alignment_key = get_static_str(env, "UITextAlignment");
+    let alignment: UITextAlignment = msg![env; coder decodeIntForKey:alignment_key];
+    () = msg![env; this setTextAlignment:alignment];
+    let editable_key = get_static_str(env, "UIEditable");
+    let editable: bool = msg![env; coder decodeBoolForKey:editable_key];
+    () = msg![env; this setEditable:editable];
     this
 }
 
@@ -191,7 +220,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         ..
     } = env.objc.borrow_mut(this);
 
-    if range.location > msg![env; text length] {
+    if text == nil || font == nil || range.location > msg![env; text length] {
         return;
     }
 
@@ -200,7 +229,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let text = to_rust_string(env, text);
 
-    let lines = break_lines_with_font(env, font, &text, Some((bound_size, UILineBreakModeWordWrap)));
+    let layout_size = text_layout_size(bound_size);
+    let lines = break_lines_with_font(env, font, &text, Some((layout_size, UILineBreakModeWordWrap)));
 
     let mut line_count = 0;
     let mut current_position = 0;
@@ -224,12 +254,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     let line_height: CGFloat = msg![env; font lineHeight];
     let leading: CGFloat = msg![env; font leading];
 
-    let height_to_range_start = (line_count + 1) as f32 * line_height - leading;
+    let height_to_range_start = TEXT_INSET + (line_count + 1) as f32 * line_height - leading;
 
     let content_offset: CGPoint = msg![env; this contentOffset];
 
     if height_to_range_start - line_height < content_offset.y {
-        let new_scroll_y = CGPoint {x: 0.0, y: line_count as f32 * line_height};
+        let new_scroll_y = CGPoint {x: 0.0, y: TEXT_INSET + line_count as f32 * line_height};
         () = msg![env; this setContentOffset:new_scroll_y];
     }
     else if height_to_range_start > content_offset.y + bound_size.height {
@@ -264,22 +294,33 @@ pub const CLASSES: ClassExports = objc_classes! {
     let (r, g, b, a) = ui_color::get_rgba(&env.objc, text_color);
     CGContextSetRGBFillColor(env, context, r, g, b, a);
 
-    let content_offset: CGPoint = msg![env; this contentOffset];
     let rect = CGRect {
-        origin: CGPointZero,
-        // If size is not expanded by the offset,
-        // the text is rendered truncated.
+        origin: CGPoint { x: TEXT_INSET, y: TEXT_INSET },
+        // Drawing is in content coordinates. Extend the text rect to the
+        // bottom of the visible area after scrolling.
         size: CGSize {
-            width: bounds.size.width + content_offset.x,
-            height: bounds.size.height + content_offset.y,
+            width: text_layout_size(bounds.size).width,
+            height: bounds.size.height + bounds.origin.y - TEXT_INSET,
         }
     };
 
     log_dbg!("UItextView text rendering in rect {:?}", rect);
     let _size: CGSize = msg![env; text drawInRect:rect
                                          withFont:font
-                                    lineBreakMode:UILineBreakModeTailTruncation
+                                    lineBreakMode:UILineBreakModeWordWrap
                                         alignment:text_alignment];
+}
+
+@end
+
+// Legacy text views can archive a private selection overlay without geometry.
+// Keep it inert until text selection itself is implemented.
+@implementation UITextSelectionView: UIView
+
+- (id)initWithCoder:(id)_coder {
+    let this: id = msg![env; this initWithFrame:CGRectZero];
+    () = msg![env; this setUserInteractionEnabled:false];
+    this
 }
 
 @end

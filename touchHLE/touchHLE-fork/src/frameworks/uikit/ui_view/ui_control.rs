@@ -224,22 +224,31 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())touchesBegan:(id)touches // NSSet* of UITouch*
          withEvent:(id)event { // UIEvent*
+    let enabled: bool = msg![env; this isEnabled];
     let bundle_id = env.bundle.bundle_identifier();
     let is_zombie_farm = bundle_id.starts_with("com.playforge.ZombieFarm")
         || bundle_id.starts_with("com.playforge.ZFR");
-    let is_zombie_farm_start_button_ready = if is_zombie_farm
+    let offline_title_action_ready = if !enabled && is_zombie_farm
         && crate::frameworks::foundation::ns_notification_center::zombie_farm_startup_player_determined(env)
     {
-        let play_tapped = env.objc.lookup_selector("playTapped").unwrap();
+        // The original menu also waits for online startup before enabling its
+        // buttons. Play and the local ZFR options can run once the player is loaded.
         env.objc
             .borrow::<UIControlHostObject>(this)
             .action_targets
             .iter()
-            .any(|action_target| action_target.action == play_tapped)
+            .any(|action_target| match action_target.action.as_str(&env.mem) {
+                "playTapped" => true,
+                "optionsTapped" if bundle_id == "com.playforge.ZombieFarm.ZFR" => {
+                    let target_class = ObjC::read_isa(action_target.target, &env.mem);
+                    env.objc.try_get_class_name(target_class) == Some("MainMenu")
+                }
+                _ => false,
+            })
     } else {
         false
     };
-    if !msg![env; this isEnabled] && !is_zombie_farm_start_button_ready {
+    if !enabled && !offline_title_action_ready {
         if is_zombie_farm {
             log_dbg!(
                 "ZombieFarm trace: UIControl {:?} ignored touchesBegan because it is disabled",
@@ -248,9 +257,9 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         return;
     }
-    if is_zombie_farm_start_button_ready && !msg![env; this isEnabled] {
+    if offline_title_action_ready {
         log_dbg!(
-            "ZombieFarm trace: allowing Play touch on disabled control {:?} after startup player determination",
+            "ZombieFarm trace: allowing offline title action on disabled control {:?} after startup player determination",
             this,
         );
     }
