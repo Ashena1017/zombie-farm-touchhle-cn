@@ -57,6 +57,8 @@ $script:HleDir = if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'touchHLE\t
 
 $script:OptionsFile = Join-Path $script:HleDir 'touchHLE_options.txt'
 $script:IpaDir = Join-Path $script:Root 'zombie_farm_ipa'
+$script:BundledIpaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
+$script:SupersededIpaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa'
 # Records which IPA the user picked, so the choice survives a restart. Kept at the
 # top level, since it describes the manager's state rather than touchHLE's.
 $script:SelectionFile = Join-Path $script:Root 'launcher_selected_ipa.txt'
@@ -105,7 +107,7 @@ $script:NoticeFile = Join-Path $script:Root 'launcher_notice_seen.txt'
 #
 # Updated with every release. _analysis\_build_release.ps1 reads these two
 # values and refuses to package a bundle that does not match them.
-$script:PinnedExeSha256 = '120653FAE5B17E5CABAAC55BA754C648E6BB4C7E7E44241DF5033E31BB42AF37'
+$script:PinnedExeSha256 = '126D3B7A284760BCDC85D7B754E535E28D1E0881034FC80FF0029706ED75A77C'
 $script:PinnedIpaSha256 = '7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC'
 
 # Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.
@@ -352,9 +354,28 @@ function Set-CurrentIpa {
     $script:LiveSave = Join-Path $script:SaveDir 'saveGame.bin2'
 }
 
+function Get-PinnedIpaPath {
+    $path = Join-Path $script:IpaDir $script:BundledIpaName
+    if (Test-Path -LiteralPath $path -PathType Leaf) { return $path }
+    return $null
+}
+
+function Resolve-IpaSelectionPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    # The notice build replaces the old v29fix package and uses the same save.
+    if ([System.IO.Path]::GetFileName($Path) -eq $script:SupersededIpaName) {
+        $pinned = Get-PinnedIpaPath
+        if ($pinned) { return $pinned }
+    }
+    return $Path
+}
+
 function Get-IpaList {
     if (-not (Test-Path -LiteralPath $script:IpaDir)) { return @() }
+    $pinned = Get-PinnedIpaPath
     return @(Get-ChildItem -LiteralPath $script:IpaDir -Filter '*.ipa' -File |
+        Where-Object { -not $pinned -or $_.Name -ne $script:SupersededIpaName } |
         Sort-Object Name)
 }
 
@@ -369,11 +390,12 @@ function Get-DefaultIpaPath {
             } else {
                 Join-Path $script:IpaDir $saved
             }
-            if (Test-Path -LiteralPath $candidate) { return $candidate }
+            $candidate = Resolve-IpaSelectionPath -Path $candidate
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
         }
     }
-    $fallback = Join-Path $script:IpaDir 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
-    if (Test-Path -LiteralPath $fallback) { return $fallback }
+    $pinned = Get-PinnedIpaPath
+    if ($pinned) { return $pinned }
     $any = Get-IpaList | Select-Object -First 1
     if ($any) { return $any.FullName }
     return $null
@@ -4195,7 +4217,7 @@ $btnIpaBrowse.Add_Click({
     $dlg.InitialDirectory = $script:IpaDir
     if ($dlg.ShowDialog($form) -ne 'OK') { $dlg.Dispose(); return }
 
-    $chosen = $dlg.FileName
+    $chosen = Resolve-IpaSelectionPath -Path $dlg.FileName
     $dlg.Dispose()
 
     $info = Read-IpaInfo -Path $chosen
@@ -4268,12 +4290,6 @@ function Get-ManagerFingerprint {
 #
 # Cost: about 90 MB of reads (exe 29 MB + IPA 59 MB), once at startup and once
 # per 重新校验. That is a fraction of a second on any disk from the last decade.
-
-function Get-PinnedIpaPath {
-    $fallback = Join-Path $script:IpaDir 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
-    if (Test-Path -LiteralPath $fallback -PathType Leaf) { return $fallback }
-    return $null
-}
 
 function Test-BundledIpa {
     param([string]$Path)

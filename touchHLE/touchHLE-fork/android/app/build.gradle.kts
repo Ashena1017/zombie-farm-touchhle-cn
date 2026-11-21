@@ -89,7 +89,7 @@ android {
         // 7: the statement now appears on every launch, plus the QQ group.
         // 8: launching any IPA is allowed again; only the bundled one is watched.
         // 12: empty Cocos text textures keep zero layout with transparent backing.
-        versionCode = 13
+        versionCode = 14
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }

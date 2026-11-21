@@ -5,6 +5,7 @@
  */
 //! Zombie Farm-specific Objective-C message workarounds and tracing helpers.
 
+mod camera;
 mod farmers;
 
 use super::{autorelease, id, msg_send_no_type_checking, nil, release, retain, ObjC, SEL};
@@ -7185,7 +7186,9 @@ pub(super) fn zombie_farm_pre_dispatch_workarounds(
     if !zombie_farm_uses_playforge_bundle(env) {
         return false;
     }
-    if farmers::pre_dispatch(env, receiver, selector_name) {
+    if camera::pre_dispatch(env, receiver, selector_name)
+        || farmers::pre_dispatch(env, receiver, selector_name)
+    {
         return true;
     }
 
@@ -7557,7 +7560,7 @@ pub(super) fn zombie_farm_needs_pre_dispatch_workarounds(
             | "updateProfile:forFriend:"
             | "getGiftableNeighbors"
             | "showNeighborsForGifting"
-    )
+    ) || camera::needs_pre_dispatch(selector_name)
 }
 
 #[cfg(test)]
@@ -7871,6 +7874,9 @@ pub(super) fn zombie_farm_post_dispatch_workarounds(
         return;
     }
     farmers::post_dispatch(env, receiver, selector_name, args);
+    if selector_name == "captured:" {
+        camera::after_capture(env, receiver);
+    }
 
     if zombie_farm_touch_trace_enabled() {
         zombie_farm_trace_game_interaction_return(env, receiver, selector_name);
@@ -7907,6 +7913,6 @@ pub(super) fn zombie_farm_needs_post_dispatch_workarounds(
             || matches!(
                 selector_name,
                 "handleTimeResponse:" | "statusCheckDone" | "startUpChecksComplete" | "saveGame"
-                    | "table:cellTouched:"
+                    | "table:cellTouched:" | "captured:"
             ))
 }
