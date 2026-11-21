@@ -930,3 +930,10 @@ $env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
 2. Windows 管理器将准确匹配的无水印 v29fix 文件名视作正式包的旧别名，有正式包时隐藏重复选项。两端各含一份 IPA，SHA-256 同为 `7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC`，游戏存档仍按同一 app id 读取。Windows 自检确认了旧选择映射和真实存档未变。
 3. [`v29fix-camera-notice`](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-camera-notice) 为正式公开版本，Release id **453629161**，目标 `cfe467f96aabb67b8facbcd3e282bb2ee7c64b6c`。Windows ZIP **95,997,460 B** / `14196FFDA83C30784561FA4064D45925A4D7C6C29060D823441D082C47584AAB`，包内 45 文件和 44 项哈希通过。Android APK **97,353,992 B** / `F2E31A28DBA4C75B0D96989A8707CF6765820A73CCD04E0A9F9824203111CE7E`，versionCode **14**，证书仍为 `c2ddca91…4ca6f`。个人 git-hosting 技能在公开前完整下载核验两份附件，源码已推送 master。
 4. 新版公开并确认为 latest 后，按用户授权删除旧版剩余 **6 个下载附件**，回读确认 11 条历史 Release 记录仍在、均无上传附件，新版两个资产仍在。发布清单、下载核验与清理结果位于 `_analysis/dumps/release-camera-notice-20261121/`。
+
+## 50. 交接后追加（2026-11-21，帮助与农场主界面修复发布）
+
+1. 两端修复主菜单冷启动设置、游戏内帮助闪退和农场主头像页卡住。帮助页顶部加入免费开源声明、项目地址和 QQ 交流群，下方保留原帮助。农场主头像页可选择本地农场并返回，原联网入口显示停服。Windows 管理器同步新版 EXE 校验值。
+2. [v29fix-help-profile](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-help-profile) 为 GitHub 最新公开版本，Release id `453779694`，tag 指向 `7ffeff143977637a9b98da1dad354fa06b2a861a`。源码已推送 master，README 五处下载与版本链接已核对。
+3. Windows ZIP 95,566,617 B，SHA-256 `d4654b44f1a8cebe21f7c7120c4d85bbd9eb175b2c666ae4b3f1e9185138a4f4`。沿用已实测的发行目录，包内 45 个文件与目录逐字节一致，44 项 SHA-256 通过，发行 sandbox 为空，管理器与发布提交的 Git blob 一致。Android APK 97,371,582 B，SHA-256 `f56ceba32016ad9398d90f416b15665da3e368c1bbd96dddae8d30834dee8853`，与 MuMu 验证的 APK 字节一致，`versionCode` 16，签名指纹仍为 `c2ddca91…4ca6f`。
+4. 两份附件在公开前均从 GitHub 完整回下载并核对 SHA-256。发布清单及结果在 `_analysis/dumps/release-help-profile-20261121/`，两端场景验证材料在 `_analysis/dumps/help-profile-20261121/`。
