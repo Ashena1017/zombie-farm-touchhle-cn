@@ -15,21 +15,13 @@ param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$TimeoutSeconds = 45
 )
-$root = (Split-Path -Parent $PSScriptRoot)
-# The emulator lives in its own folder now (the tree mirrors the shipped
-# ./Release layout). Fall back to the flat layout so these scripts keep working
-# either way -- same rule GameManager.ps1 uses.
-$hleRoot = if (Test-Path -LiteralPath (Join-Path $root 'touchHLE\touchHLE.exe')) {
-    Join-Path $root 'touchHLE'
-} else {
-    $root
-}
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
 
 
 $ErrorActionPreference = 'Continue'
 
 $optionsFile = Join-Path $hleRoot 'touchHLE_options.txt'
-$selectionFile = Join-Path $Root 'launcher_selected_ipa.txt'
+$selectionFile = Join-Path $Root 'run\windows\launcher_selected_ipa.txt'
 
 # Preserve the user's remembered choice so the test does not change it for real.
 $selectionBackup = $null
@@ -113,7 +105,7 @@ $hwnd = [IntPtr]::Zero
 try {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = 'powershell.exe'
-    $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -File "' + (Join-Path $Root 'GameManager.ps1') + '"'
+    $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -File "' + (Join-Path $Root 'windows\GameManager.ps1') + '"'
     $psi.WorkingDirectory = $Root
     $psi.UseShellExecute = $false
     $gui = [System.Diagnostics.Process]::Start($psi)
@@ -141,13 +133,19 @@ try {
     if ($ipaCombo -eq [IntPtr]::Zero) { throw 'IPA dropdown not found' }
 
     $items = [IpaProbe]::ComboItems($ipaCombo)
-    $ipaCount = @(Get-ChildItem (Join-Path $Root 'zombie_farm_ipa') -Filter '*.ipa' -File).Count
+    $ipaFiles = @(Get-ChildItem (Join-Path $Root 'zombie_farm_ipa') -Filter '*.ipa' -File)
+    $ipaNames = @($ipaFiles.Name)
+    $catalog = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix'
+    $ipaCount = $ipaFiles.Count
+    if ($ipaNames -contains "$catalog-notice.ipa" -and $ipaNames -contains "$catalog.ipa") {
+        $ipaCount--
+    }
     Write-Host "IPA entries in dropdown: $($items.Count)   files on disk: $ipaCount"
     if ($items.Count -ne $ipaCount) {
-        Write-Host '  FAIL: dropdown does not list every IPA'
+        Write-Host '  FAIL: dropdown does not list every distinct IPA'
         $ok = $false
     } else {
-        Write-Host '  every IPA listed: PASS'
+        Write-Host '  all distinct IPA entries listed: PASS'
     }
 
     # The odd bundle ids should be spelled out so they are recognisable.

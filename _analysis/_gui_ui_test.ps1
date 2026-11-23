@@ -13,19 +13,11 @@ param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$TimeoutSeconds = 40
 )
-$root = (Split-Path -Parent $PSScriptRoot)
-# The emulator lives in its own folder now (the tree mirrors the shipped
-# ./Release layout). Fall back to the flat layout so these scripts keep working
-# either way -- same rule GameManager.ps1 uses.
-$hleRoot = if (Test-Path -LiteralPath (Join-Path $root 'touchHLE\touchHLE.exe')) {
-    Join-Path $root 'touchHLE'
-} else {
-    $root
-}
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
 
 
 $ErrorActionPreference = 'Continue'
-$manager = Join-Path $Root 'GameManager.ps1'
+$manager = Join-Path $Root 'windows\GameManager.ps1'
 $optionsFile = Join-Path $hleRoot 'touchHLE_options.txt'
 
 Add-Type -TypeDefinition @'

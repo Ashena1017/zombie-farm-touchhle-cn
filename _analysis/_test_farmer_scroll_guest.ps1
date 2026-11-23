@@ -8,9 +8,8 @@ $env:RUSTUP_HOME = Join-Path $buildTools 'rustup'
 $env:CARGO_HOME = Join-Path $buildTools 'cargo'
 $env:CARGO_TARGET_DIR = Join-Path $buildTools 'target-fork'
 $env:Path = "$env:CARGO_HOME\bin;$env:Path"
-$ipaName = [IO.File]::ReadAllText((Join-Path $root 'launcher_selected_ipa.txt')).Trim()
 $env:ZFR_GUEST_TEST_IPA = if ($IpaPath) { $IpaPath } else {
-    Join-Path (Join-Path $root 'zombie_farm_ipa') $ipaName
+    Join-Path $root 'zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
 }
 $vsDevCmd = 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat'
 $cargoExe = Join-Path $buildTools 'rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\cargo.exe'

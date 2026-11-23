@@ -4,9 +4,8 @@ param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$WaitSeconds = 40
 )
-$root = (Split-Path -Parent $PSScriptRoot)
 $ErrorActionPreference = 'Continue'
-$hleRoot = Join-Path $Root 'touchHLE'
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
 
 Add-Type -TypeDefinition @'
 using System;
@@ -42,7 +41,7 @@ public class DszWin {
 
 [void][DszWin]::SetProcessDPIAware()
 
-$ipa = Join-Path $Root 'zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa'
+$ipa = Join-Path $Root 'zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
 $exe = Join-Path $hleRoot 'touchHLE.exe'
 $log = Join-Path $hleRoot 'touchHLE_log.txt'
 $optionsFile = Join-Path $hleRoot 'touchHLE_options.txt'

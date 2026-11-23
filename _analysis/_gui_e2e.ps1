@@ -14,11 +14,10 @@ param(
     [int]$Seconds = 32,
     [string]$Root = (Split-Path -Parent $PSScriptRoot)
 )
-$root = (Split-Path -Parent $PSScriptRoot)
 
 $ErrorActionPreference = 'Continue'
 $gameLog = Join-Path $Root "_analysis\perf\gui_e2e_$Tag.log"
-$manager = Join-Path $Root 'GameManager.ps1'
+$manager = Join-Path $Root 'windows\GameManager.ps1'
 
 # --- write options through the GUI's own code -------------------------------
 $spec = "fps_limit=$Fps,scale_hack=$Scale,fullscreen=0,show_fps=1,run_loop_fix=1"
@@ -29,14 +28,14 @@ $line = (& powershell -NoProfile -ExecutionPolicy Bypass -File $manager -ShowSet
 Write-Host "  readback     : $line"
 
 # --- launch through the real launcher --------------------------------------
-& (Join-Path $Root 'RestoreTestSave.ps1') -Force *>&1 | Out-Null
+& (Join-Path $Root 'windows\RestoreTestSave.ps1') -Force *>&1 | Out-Null
 Remove-Item -LiteralPath $gameLog -Force -ErrorAction SilentlyContinue
 
 $job = Start-Job -ScriptBlock {
     param($root, $log)
     Set-Location -LiteralPath $root
     & powershell -NoProfile -ExecutionPolicy Bypass `
-        -File (Join-Path $root 'StartZombieFarmNextHour.ps1') -NoSkip *> $log
+        -File (Join-Path $root 'windows\StartZombieFarmNextHour.ps1') -NoSkip *> $log
 } -ArgumentList $Root, $gameLog
 
 $deadline = (Get-Date).AddSeconds($Seconds)

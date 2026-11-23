@@ -19,15 +19,7 @@ param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$TimeoutSeconds = 45
 )
-$root = (Split-Path -Parent $PSScriptRoot)
-# The emulator lives in its own folder now (the tree mirrors the shipped
-# ./Release layout). Fall back to the flat layout so these scripts keep working
-# either way -- same rule GameManager.ps1 uses.
-$hleRoot = if (Test-Path -LiteralPath (Join-Path $root 'touchHLE\touchHLE.exe')) {
-    Join-Path $root 'touchHLE'
-} else {
-    $root
-}
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
 
 
 $ErrorActionPreference = 'Continue'
@@ -35,7 +27,7 @@ $ErrorActionPreference = 'Continue'
 $docs = Join-Path $hleRoot 'touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents'
 $live = Join-Path $docs 'saveGame.bin2'
 $safe = Join-Path $Root '_analysis\save_backups_safe'
-$manager = Join-Path $Root 'GameManager.ps1'
+$manager = Join-Path $Root 'windows\GameManager.ps1'
 
 # --- 0. refresh the safety copy --------------------------------------------
 if (Test-Path -LiteralPath $safe) { Remove-Item -LiteralPath $safe -Recurse -Force }

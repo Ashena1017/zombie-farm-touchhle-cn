@@ -15,7 +15,7 @@ Set-Location $root
 # GameManager.ps1 is UTF-8 *with* BOM, but Get-Content -Raw on this PowerShell
 # version still needs the encoding named explicitly, or the Chinese literals get
 # decoded as GBK and the parse blows up with mojibake errors.
-$src = [System.IO.File]::ReadAllText((Join-Path $root 'GameManager.ps1'), [System.Text.UTF8Encoding]::new($false))
+$src = [System.IO.File]::ReadAllText((Join-Path $root 'windows\GameManager.ps1'), [System.Text.UTF8Encoding]::new($false))
 $tokens = $null
 $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($src, [ref]$tokens, [ref]$errors)

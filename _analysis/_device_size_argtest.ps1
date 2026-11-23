@@ -2,9 +2,9 @@ $root = (Split-Path -Parent $PSScriptRoot)
 # Probe --device-size argument validation without launching a window.
 # Uses [Process]::Start (Start-Process crashes on this machine due to NO_PROXY).
 $ErrorActionPreference = 'Continue'
-$hleRoot = "$root\touchHLE"
+$hleRoot = Join-Path $root 'run\windows\touchHLE'
 $exe = Join-Path $hleRoot 'touchHLE.exe'
-$ipa = "$root\zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa"
+$ipa = "$root\zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa"
 
 function Try-Arg([string]$extra) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo

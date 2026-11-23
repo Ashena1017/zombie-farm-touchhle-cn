@@ -71,7 +71,7 @@ public class WinCap {
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = 'powershell.exe'
 $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -File "' +
-    (Join-Path $Root 'GameManager.ps1') + '"'
+    (Join-Path $Root 'windows\GameManager.ps1') + '"'
 $psi.WorkingDirectory = $Root
 $psi.UseShellExecute = $false
 

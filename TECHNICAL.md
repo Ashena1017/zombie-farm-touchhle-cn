@@ -4,22 +4,16 @@
 游戏自报的 bundle 代号为 `ZFR`，bundle id `com.playforge.ZombieFarm.ZFR`）中文版，
 并对游戏 IPA 做**二进制补丁**：修复崩溃、统一界面字号、改善中文本地化。
 
-本文件是给**新会话**的入口文档。读完它应当能理解：项目在做什么、产物在哪、怎么改、以及踩过哪些坑。
+本文保留 IPA 补丁、模拟器适配和故障排查的技术细节。涉及「当前」的版本、构建结果和本机路径，以各节记录时间为准。
 
-> **这是技术细节与教训的全集**（11 章），查具体问题时再进来。
-> **想先了解项目本身，请回 [`README.md`](README.md)。**
->
-> **新会话请先读 `HANDOVER.md`**（2026-09-23）：那是更短的交接稿 ——
-> 当前状态、关键事实与哈希、常用工作流（改管理器/改模拟器/重建交付包/跑验证）、
-> 这台机器的环境坑、文档地图，以及"建议的起手式"。
->
-> **要把项目交给一个全新会话？** 直接复制 `交接提示词.md` 里的 prompt 粘贴过去，
-> 里面有「完整版 / 极简版 / 只报 bug 版」三种开场白。
+当前版本、源码入口与双平台构建流程见[维护交接](HANDOVER.md)。下载与安装见 [README.md](README.md)。
 
-### 目录结构
+### 历史目录结构
+
+以下目录树记录 2026-09-20 的布局。当前目录与入口见[维护交接](HANDOVER.md#源码入口)。
 
 **开发树与交付包 `./Release` 同构**：模拟器相关的一切都在 `touchHLE\` 里，
-外面只放游戏管理相关的东西。（2026-09-20 重构；见 `_analysis/_reorg_touchhle.py`。
+外面只放游戏管理相关的东西。（2026-09-20 重构；见 `_analysis/legacy/maintenance/_reorg_touchhle.py.txt`。
 同日 `zombie_farm\` 改名 `zombie_farm_ipa\`，见 `_analysis/_rename_ipa_dir.py`。）
 
 ```
@@ -74,16 +68,14 @@
 
 > **脚本里的 `$hleRoot`**：为兼容两种布局，所有脚本都写成
 > `$hleRoot = if (Test-Path (Join-Path $root 'touchHLE\touchHLE.exe')) { Join-Path $root 'touchHLE' } else { $root }`。
-> 新写脚本**照抄这个模式**，不要硬编码 `touchHLE\`，也不要把模拟器路径直接接在 `$root` 后面。
-> 同理：**启动 touchHLE 的 `WorkingDirectory` 必须是 `$hleRoot`**，跑 GUI 的才是 `$root`。
+> 这是旧脚本定位规则。当前仓库的 Windows 程序从 `windows/RepositoryPaths.ps1` 取路径，启动 touchHLE 时以模拟器目录为工作目录。
 
 **根目录不要再堆临时脚本和输出** —— 分析脚本放 `_analysis/`，历史输出放
 `_analysis/dumps/`。
 
-> ⚠️ **改任何含中文的 `.ps1` 后必须跑 `_analysis\_ensure_bom.ps1`。**
+> 含中文的 `.ps1` 修改后用 `scripts\_ensure_bom.ps1` 检查编码。
 > PowerShell 5.1 会把**无 BOM** 的 `.ps1` 按 GBK 解码，中文里的字节可能被读成
-> 引号，导致满屏 `Unexpected token` 假语法错误。`edit` 工具会剥掉 BOM，所以
-> 每次编辑后都要跑一次（它同时做语法检查，以及所有启动器动作的验证）。
+> 引号，导致 `Unexpected token` 报错。脚本也会检查 PowerShell 语法。
 
 ---
 
@@ -154,7 +146,7 @@
 
 > **界面上没有「?」按钮。** 全部说明文字都在交付包里的 **`使用说明.html`**
 > （第二节「设置都是什么意思」逐个设置讲原理与注意事项），
-> 由 `_analysis\_build_release.ps1` 的内嵌模板生成。
+> 由 `scripts\_build_release.ps1` 的内嵌模板生成。
 > 这样管理器只有一个职责，说明可以写得更长、能搜索、能复制。
 > `-SelfTest` 里有「没有任何设置定义 `Tip`」的断言，`_gui_tip_test.ps1` 里有
 > 「界面上没有 `?` 按钮」+「指南里确实写到了这些设置」的双向断言 ——
@@ -1118,8 +1110,8 @@ memLevel、wbits、key 排序、手写去重 bplist —— 全是 193。于是�
 | `tools/value_xref.py` | **准确的**寄存器值追踪交叉引用（找「谁用了这个地址」） |
 | `tools/dump_window.py` | 带 selector / CFString / 类引用解析的反汇编窗口 |
 | `tools/ivar_xref.py` | 列出一个 `__objc_ivar` 的全部引用点及归属方法 |
-| `tools/_zt/zscan.py` | 符号执行式常量追踪器（已处理 ROR 立即数折叠、`add rX,sp,#imm` 别名） |
-| `tools/_zt/c13_final.py` | `ZFAlertWindow*` 字号普查（arity 感知 + 新鲜度过滤） |
+| `_analysis/legacy/zt/zscan.py` | 符号执行式常量追踪器（已处理 ROR 立即数折叠、`add rX,sp,#imm` 别名） |
+| `_analysis/legacy/zt/c13_final.py` | `ZFAlertWindow*` 字号普查（arity 感知 + 新鲜度过滤） |
 
 ### 6.2 历代 patcher 与验证器
 
@@ -1783,28 +1775,12 @@ IPA 里能直接拿来用的只有**素材和数据**，**逻辑一行都拿不�
 - **回复用中文**（标识符、地址、字节、路径保持原样不翻译）。
 - 改 IPA 前先读对应 `report.json`，改完必须跑独立验证器。
 - 不碰 cave 区域，除非明确要动 helper。
-- **根目录只放运行时和交付物**：新脚本进 `_analysis/`，新输出进 `_analysis/dumps/`，
-  活代码进 `tools/`。临时文件用完就挪走，别留在根目录。
-- 每个结论区分**逐字节验证**与**推断**；拿不准就说拿不准。
-- **改了含中文的 `.ps1` 就跑 `_analysis\_ensure_bom.ps1`**（`edit` 工具会剥 BOM，
-  见文件开头那条警告）。改完 `.ps1` 顺手 parse 一遍：
-  `[System.Management.Automation.Language.Parser]::ParseFile(...)`。
-- **改了 `GameManager.ps1` / `touchHLE.exe` / 交付的 IPA，必须重建 `Release`**：
-  `_analysis\_build_release.ps1`，然后跑 `_verify_release.ps1` 与 `_release_e2e.ps1`。
-  `Release\GameManager.ps1` 是**副本**，不同步就会出现「开发树好了、交付包还是旧的」。
-- **换默认 IPA 要改三处**：`GameManager.ps1` 的 `Get-DefaultIpaPath` fallback、
-  `launcher_selected_ipa.txt`、`_analysis\_build_release.ps1` 的 `$ipaName`。
-- **动游戏存档前先快照**：跑任何会启动游戏的测试脚本前，
-  把 `touchHLE\touchHLE_sandbox` 整个复制到 `$env:TEMP`，跑完再还原
-  （现有脚本都这么做）。**主人的存档是真进度，不能被测试污染。**
-- **别用 `Select-String` 直接搜 `touchHLE\zfr_last_run.log`** —— 它是累积文件，
-  要先切到最后一个 `CPU emulation begins now.` 之后那段（见 6.5）。
-- **模拟器路径一律走 `$hleRoot`**（`$script:HleDir`），**别硬编码 `touchHLE\`**；
-  启动 touchHLE 时 `WorkingDirectory` 必须是 `$hleRoot`。踩过的坑：
-  重构后 `_v28_boot.ps1` 等脚本仍把工作目录设成 `$root`，于是 touchHLE 在
-  **根目录**重新建了一个空的 `touchHLE_sandbox\` 与 `touchHLE_log.txt` ——
-  不报错，只是悄悄跑在错的沙箱上（**存档看起来"丢了"**）。重构后请检查
-  `Get-ChildItem -Force | Where-Object Name -match '^touchHLE|^zfr'` 是否为空。
+- 构建及发行校验用 `scripts/`，诊断和取证用 `_analysis/`，IPA 工具用 `tools/`。
+- 结论按静态检查、逐字节校验和游戏内实测记录。
+- 修改含中文的 `.ps1` 后运行 `scripts\_ensure_bom.ps1`，检查 UTF-8 BOM 和 Windows PowerShell 5.1 语法。
+- 修改 Windows 管理器、模拟器或发行 IPA 后，按[维护交接](HANDOVER.md#构建与核验)重新生成并验证 ZIP。
+- Windows 测试存档在 `run/windows/touchHLE/touchHLE_sandbox/`。需要从指定进度重现问题时，先保留该测试档。
+- 模拟器的工作目录使用 `run/windows/touchHLE/`。Windows 启动路径从 `RepositoryPaths.ps1` 取得。排查累积日志 `zfr_last_run.log` 时，以最近一次 `CPU emulation begins now.` 为界。
 - **汇报时不许把「静态全绿」写成「已修好」**；游戏内验证由主人做（见 6.4 / 6.5）。
 - **读内存一律 `sl.addr_to_file(va)`**，绝不 `data[va]`；**反汇编从方法入口开始**，
   别从任意地址起扫（Thumb 会漂相位）。见 5.7 那条 ★ —— 2026-09-20 有一次

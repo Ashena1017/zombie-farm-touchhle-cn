@@ -13,7 +13,7 @@
 > 发现与事实不符的地方，欢迎提 Issue 指正。
 
 项目包含针对 Zombie Farm 修复的 [touchHLE](https://touchhle.org/) 模拟器、Windows 与 Android 管理器，
-以及对游戏 IPA 的**等宽原地二进制补丁**（修崩溃、统一界面字号、修复中文本地化、修正排版）。
+以及对游戏 IPA 的补丁（修崩溃、统一界面字号、修复中文本地化、修正排版和加入标题水印）。
 
 > 游戏本体是 2011 年前后的 iPhone 老游戏。**iPhone 原生分辨率是 480×320**；iPad 原生分辨率
 > 是 **1024×768**，选择 iPad 并使用 ×1.5 倍率时，才会渲染为 **1536×1152**。此外还有 60 帧、
@@ -30,12 +30,14 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-help-profile/zombie-farm-windows-x64-v29fix-help-profile.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-help-profile/zombie-farm-android-arm64-v29fix-help-profile.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置带标题水印的游戏包，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v29fix-maintenance.zip) | 解压后运行「游戏管理.exe」；可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v29fix-maintenance.apk) | 安装后打开「Zombie Farm 游戏管理」；APK 已内置带标题水印的游戏包，无需手动准备 data 文件；支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
-两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-help-profile)查看。
+两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest)查看。
 
-> **请下载最新 Release 的附件**。历史版本记录仍可查阅。
+> Releases 只保留最新版本。历史变更见下方记录。
+
+**2026-11-23 设置、存档与高倍率渲染更新**：修复 Windows 切换游戏包时设置串用、还原失败和运行状态误判，以及 Android 快速切页时设置丢失和大写 `.IPA` 无法重选的问题。两端减少了高倍率渲染中的像素复制。Android `versionCode` 17，沿用正式签名，可覆盖安装。
 
 **2026-11-21 帮助与农场主界面更新**：修复冷启动时主菜单「设置」无法打开、游戏内「帮助」闪退，以及点击主菜单农场主头像后无法返回的问题。帮助页顶部加入免费开源声明、项目地址和 QQ 交流群，下方保留原游戏帮助。Windows 游戏管理同步了新版文件校验值。Android `versionCode` 16，可覆盖安装。
 
@@ -100,7 +102,7 @@ Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows �
 
 | 你的目标 | 去哪 |
 |---|---|
-| **想玩原版那一版游戏**（原美术、原数值、原玩法，离线单机，中文界面） | 就是本仓库 —— 用 [Releases](../../releases) |
+| **想玩原版那一版游戏**（原美术、原数值、原玩法，离线单机，中文界面） | 见[本项目发行页](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest) |
 | **想玩现代化重写版**（浏览器 / 桌面直接跑，联机、云存档、好友、黑市；**原生只有英文**） | [**actualdoctornerd-ai/Zombie-Farm-2-Reforged**](https://github.com/actualdoctornerd-ai/Zombie-Farm-2-Reforged)，再配 [**中文汉化脚本**](https://github.com/Ashena1017/zombie-farm-reforged-translation-cn) |
 
 ### 推荐：Zombie Farm 2 Reforged
@@ -199,7 +201,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-help-profile/zombie-farm-windows-x64-v29fix-help-profile.zip) 并解压；
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v29fix-maintenance.zip) 并解压；
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 
@@ -207,7 +209,7 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/download/v29fix-help-profile/zombie-farm-android-arm64-v29fix-help-profile.apk)；
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v29fix-maintenance.apk)；
 2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。最新 v29fix IPA 已内置，首次启动自动校验安装，不需要手动复制 `data` 文件。
 
@@ -215,8 +217,7 @@ Android 管理器还支持按需从系统文件选择器导入 IPA、iPhone/iPad
 
 ### 从源码构建
 
-见 [从源码构建](#从源码构建)。注意本仓库**不含**编译好的 `touchHLE.exe` 与游戏 IPA，
-Windows 运行包与 Android 安装包请从 Releases 下载；从源码构建需准备相应平台工具链和游戏 IPA。
+Windows 和 Android 的构建、打包及验证步骤见[维护交接](HANDOVER.md#构建与核验)。
 
 ---
 
@@ -225,35 +226,26 @@ Windows 运行包与 Android 安装包请从 Releases 下载；从源码构建�
 ```
 .
 ├── touchHLE/
-│   ├── touchHLE-fork/          ★ 本项目维护的模拟器源码（上游 fa3d095 + 本项目适配）
-│   │   ├── src/                15 个文件相对上游有改动（见下节）
-│   │   └── .git-upstream-fa3d095/  上游浅克隆被改名保留下来的信息 + UPSTREAM-COMMIT.txt
-│   └── LICENSE                 touchHLE 的 MIT 许可
-├── touchHLE-zombiefarm-android-arm64/  Android APK 交付物（不入库）
-├── tools/                      ★ 补丁工具链（50 个 Python 模块）
-│   ├── audit_zfr_ipa.py        解析 Mach-O、导出方法表/CFString/导出符号
-│   ├── _dis.py / value_xref.py 反汇编与「索引式文字池」交叉引用
-│   └── patch_zfr_*.py          历代 patcher（v3 … v29），每个都自带 dry-run 与自检
-├── _analysis/                  验证套件、探针与 12 份技术报告
-│   ├── _ensure_bom.ps1         脚本 BOM/语法体检
-│   ├── _verify_layout.ps1      dev 树与交付包同构校验
-│   ├── _device_size_roundtrip.ps1  设置读写与窗口尺寸算术
-│   ├── _verify_release.ps1     独立启动交付包并确认真到得了游戏
-│   ├── reports/                ★ 技术报告：每个结论的取证过程
-│   └── archive/                （未纳入，本机保留）历史探针脚本
-├── GameManager.ps1             ★ 图形管理器（游戏管理.exe 是它的 GUI 宿主）
-├── StartZombieFarmNextHour.ps1 命令行启动 + 跳过游戏时间
-├── SetZombieFarmCurrency.ps1   直接读写存档里的金币/脑子
-├── RestoreTestSave.ps1         测试前还原存档
-├── TECHNICAL.md                   ★ 技术细节全集（11 章，最大的文档）
-├── HANDOVER.md                 交接稿：现状、哈希、工作流（含发 PR / 发 Release）、环境坑
-├── process.md                  历代改动的「现象 → 根因 → 修法 → 验证」流水账
-└── 交接提示词.md                给新会话的开场提示词（三种版本）
+│   └── touchHLE-fork/
+│       ├── src/                两端共用的模拟器源码和 ZFR 适配
+│       └── android/            Android 游戏管理器及 APK 构建
+├── windows/                    Windows 管理器源码、启动器与默认设置
+├── Play-Windows.bat            本机开发版入口
+├── run/windows/                本机 Windows 运行文件、设置和测试存档
+├── dist/                       本机构建的 Windows ZIP 和 Android APK
+├── scripts/                    双平台构建与发行包校验
+├── tools/                      IPA 补丁、水印与分析工具
+├── zombie_farm_ipa/            共用 IPA 与补丁报告
+├── _analysis/                  专项测试、诊断、报告和历史维护脚本
+├── docs/                       文档图片、历史交接
+├── HANDOVER.md                 当前版本、源码入口及构建发布流程
+├── TECHNICAL.md                技术参考
+└── process.md                  变更记录
 ```
 
 > **不在仓库里的东西**（都能重新生成，或属于运行时状态）：
-> 编译好的 `touchHLE.exe`、`_build_tools/`（Rust 工具链与 cargo 缓存，约 4.4 GB）、
-> `touchHLE-fork/vendor/`（上游依赖）、游戏 IPA、`Release/` 交付包、存档与日志。
+> 本机的 `run/` 和 `dist/`、`_build_tools/`（Rust 工具链与 Cargo 缓存）、
+> `touchHLE-fork/vendor/`（上游依赖）以及游戏 IPA 都由 Git 忽略。
 > 具体的排除清单见 [`.gitignore`](.gitignore)。
 
 ---
@@ -261,8 +253,7 @@ Windows 运行包与 Android 安装包请从 Releases 下载；从源码构建�
 ## 模拟器 fork 的扩展
 
 本 fork 基于上游 [`touchHLE`](https://github.com/touchHLE/touchHLE) 的
-commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*），
-相对上游改了 15 个文件，加入这些能力：
+commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*）。主要扩展如下。
 
 | 新增选项 / 修复 | 说明 |
 |---|---|
@@ -279,7 +270,7 @@ commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*），
 
 ## 游戏 IPA 补丁谱系
 
-每一代补丁都是**等宽原地改写**（尺寸不变），所以历代 IPA 都是 59,564,493 字节。
+早期补丁采用等宽原地改写。当前发行内置的 v29fix-notice 在 v29fix 基础上替换标题背景图片，加入免费开源水印。
 
 | 版本 | 内容 |
 |---|---|
@@ -290,7 +281,8 @@ commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*），
 | v15fix–v17fix | 修乱码本地化、补本地化道具名与经验飘字 |
 | v18fix–v27fix | 仓库面板与陵墓按钮字号；标题被裁切与错位的连环修正 |
 | **v28fix** | **任务闪退根因**：把被删掉的 `stopListening` 注销循环加回来 |
-| **v29fix** | 施肥飘字还原（`.strings` 改存 OpenStep 文本，绕开压缩体积限制）← **当前版本** |
+| **v29fix** | 施肥飘字还原（`.strings` 改存 OpenStep 文本，绕开压缩体积限制） |
+| **v29fix-notice** | Windows 和 Android 当前共用的 IPA，在标题背景加入免费开源水印 |
 
 每个版本都有独立的 verifier，逐指令比对期望序列（而不是做关键词探测），
 并确认改动范围之外的字节零变化。取证过程见 `_analysis/reports/`。
@@ -299,60 +291,7 @@ commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*），
 
 ## 从源码构建
 
-### 前置
-
-- Windows x64
-- Rust（含 MSVC toolchain）、CMake、Visual Studio Build Tools
-- 约 5 GB 磁盘（依赖与编译产物）
-- Android 构建另需 JDK 17、Android SDK/NDK 27.2.12479018、Gradle 8.11.1
-
-### 步骤
-
-```powershell
-# 1. 取上游依赖（本仓库不含 vendor/，因为它是 843 MB 的第三方源码）
-#    最省事的办法是直接克隆上游仓库，把它的 src/ 换成我们的：
-git clone https://github.com/touchHLE/touchHLE.git touchHLE-trunk
-cd touchHLE-trunk
-git checkout fa3d09511d471f505e41abed7c535e4dfbd7c59c
-
-# 2. 用本仓库的 fork 覆盖源码
-#    （只覆盖 src/、Cargo.toml、Cargo.lock、build.rs 等，保留 vendor/ 与 .cargo/）
-robocopy ..\touchHLE-zombiefarm\touchHLE\touchHLE-fork . /E /XD target vendor .git
-
-# 3. 编译
-cargo build --release
-```
-
-编译产物是 `target\release\touchHLE.exe`。把它放到 `touchHLE\touchHLE.exe`，
-连同 `touchHLE_dylibs/`、`touchHLE_fonts/`、两个 options 模板一起，就是一个可运行的模拟器目录
-（这些资源都可以从 Releases 的 zip 里取）。
-
-> 上游 `vendor/` 里的 `boost` / `dynarmic` / `SDL` / `openal-soft` / `stb`
-> 体积庞大且带各自的子模块，因此不进本仓库。本项目当年的构建脚本
-> `_analysis/_restore_vendor.ps1` 里有把它们按版本重新抓下来的做法，可以参考。
-
-### 改完怎么验证
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_ensure_bom.ps1          # 脚本编码与语法
-powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_layout.ps1       # 目录布局
-powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_device_size_roundtrip.ps1 # 设置读写与算术
-powershell -NoProfile -ExecutionPolicy Bypass -File GameManager.ps1 -SelfTest          # 管理器自检
-powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps1      # 交付包能否独立启动
-```
-
-> ⚠️ 这些脚本默认按**本仓库的目录结构**工作（用 `$PSScriptRoot` 推导根目录），
-> 并且 `_verify_release.ps1` 需要先有 `Release/` 交付包（由 `_analysis/_build_release.ps1` 生成）。
-
-Android ARM64 APK 的源码构建命令为：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_local.ps1
-```
-
-快捷脚本使用仓库交接文档记录的本机 Android 工具链；通用构建入口仍为 `_analysis\_build_android.ps1`。
-脚本输出 `touchHLE-zombiefarm-android-arm64\touchHLE-zombiefarm-android-arm64-fixed.apk`，
-并通过 `_analysis\_verify_android_package.ps1` 检查内置 IPA 哈希、Android 默认设置与 arm64 native library。
+构建源码需要 Rust、CMake 和对应平台的工具链。打包还需要模拟器运行资源和 v29fix-notice IPA，可以从官方 Windows 发行包取得。依赖与构建命令见[维护交接](HANDOVER.md#构建与核验)。
 
 ---
 
@@ -384,7 +323,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_loc
 491 个类 / 9352 个方法 + 500 帧图集坐标 + 已无源码的服务端 —— 结论是**不划算**，
 但素材可以直接复用。
 
-**⑥ 这台机器的环境坑**（详见 `HANDOVER.md`）：
+**⑥ 当时的本机环境与诊断记录**（详见[历史交接](docs/HANDOVER_HISTORY.md)）：
 `pwsh` 不在 PATH；`Start-Process` 因 `NO_PROXY` 重复键会崩；
 桌面 2560×1440 @150%，任何读窗口几何的脚本**必须先声明 DPI 感知**，
 否则量到的值会「自洽地错成 2/3」，把好功能误判成 bug；编辑器保存 `.ps1` 会剥掉 BOM，
@@ -396,16 +335,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_loc
 
 | 想查什么 | 去哪 |
 |---|---|
-| 怎么用、界面长什么样 | [`TECHNICAL.md`](TECHNICAL.md) §1 |
+| 怎么下载和运行 | [快速开始](#快速开始) |
 | 字号/本地化补丁怎么做（核心技术） | [`TECHNICAL.md`](TECHNICAL.md) §5 |
-| 当前状态、哈希、工作流、环境坑 | [`HANDOVER.md`](HANDOVER.md) |
-| 怎么发 PR、怎么发 Release（发布流程） | [`HANDOVER.md`](HANDOVER.md) §3.5 / §3.6 |
+| 当前发行、源码入口、构建与发布 | [维护交接](HANDOVER.md) |
 | 历代改动的现象→根因→修法→验证 | [`process.md`](process.md) |
 | 每个结论的取证过程 | [`_analysis/reports/`](_analysis/reports) |
 | 各分析脚本干什么 | [`_analysis/README.md`](_analysis/README.md) |
 | 已有 code cave 清单（改补丁必读） | [`TECHNICAL.md`](TECHNICAL.md) §5.10 |
 | 已知问题与未结项 | [`TECHNICAL.md`](TECHNICAL.md) §7 |
-| 怎么把项目交给新会话 | [`交接提示词.md`](交接提示词.md) |
+| 旧交接编号与当时的核验记录 | [历史交接](docs/HANDOVER_HISTORY.md) |
 
 ---
 
@@ -414,11 +352,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_loc
 这些约定是踩坑换来的，改这个项目时值得遵守：
 
 - **静态检查全绿 ≠ 已修好**：必须区分「逐字节验证过」与「推断」，游戏内效果要实机确认。
-- **动存档前先整个快照** `touchHLE/touchHLE_sandbox`，跑完还原；真实存档绝不能污染。
-- **不碰已占用的 code cave**（清单在 README §5.10），新补丁必须把旧 cave 列入 `FORBIDDEN_PRIOR`。
-- **等宽原地改写**：补丁不改变 IPA 尺寸，便于逐字节比对与独立验证。
-- **根目录只放运行时状态与交付物**：新脚本进 `_analysis/`，新输出进 `_analysis/dumps/`，活代码进 `tools/`。
-- **中文 `.ps1` 改完必须跑 `_analysis/_ensure_bom.ps1`**。
+- 记录测试所用的存档。Windows 本机测试数据在 `run/windows/touchHLE/touchHLE_sandbox/`，发行包使用空存档目录。
+- **避开已占用的 code cave**（清单在 `TECHNICAL.md` §5.10），新补丁须把旧 cave 列入 `FORBIDDEN_PRIOR`。
+- 既有二进制补丁用等宽原地改写和独立验证器。水印脚本则核对 IPA 成员列表及各成员的哈希。
+- 构建和发行校验放进 [scripts/](scripts/README.md)，专项诊断放进 [_analysis/](_analysis/README.md)，IPA 工具放进 [tools/](tools/README.md)。
+- 含中文的 `.ps1` 修改后运行 `scripts/_ensure_bom.ps1` 检查编码和语法。
 
 ---
 
@@ -433,8 +371,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_loc
 - **游戏本体**（《僵尸农场》的 IPA，bundle id `com.playforge.ZombieFarm.ZFR`）版权归其原权利人所有。
   仓库里不含 IPA；Releases 中的压缩包为了方便「下载即可玩」而包含一份游戏文件，
   **仅供个人学习与备份用途**，请自行判断在你所在地区的合规性。
-- **模拟器部分**：`touchHLE` 采用 MIT 许可，见 [`touchHLE/LICENSE`](touchHLE/LICENSE)。
-  fork 的源码改动同样以 MIT 发布；`touchHLE-fork/.git-upstream-fa3d095/UPSTREAM-COMMIT.txt`
-  记录了上游仓库与所用提交。
+- 模拟器 fork 的许可见 [Mozilla Public License 2.0](touchHLE/touchHLE-fork/LICENSE)。
 - **本项目自己的代码与文档**（`tools/`、`_analysis/`、`GameManager.ps1`、各启动脚本、文档）
   同样以 MIT 许可发布，可自由取用。

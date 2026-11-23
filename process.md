@@ -1,5 +1,7 @@
 # 待办清单（用户反馈批次 2）
 
+本文按时间保留当时的状态。下文的 HANDOVER 章节号对应[历史交接归档](docs/HANDOVER_HISTORY.md)。当前维护入口见 [HANDOVER.md](HANDOVER.md)。
+
 > **2026-11-21 帮助与农场主界面发布（#53）**。修复冷启动设置、帮助闪退、头像页返回与 Windows 校验误报，帮助页增加免费开源声明。已公开 `v29fix-help-profile`（id `453779694`，目标 `7ffeff1`），双平台附件完整下载核验通过，Android `versionCode` 16。详见 HANDOVER §50。
 
 > **2026-11-21 相机声明与统一游戏包（#52）**：Windows 旧 v29fix 选择自动映射到带水印的正式包，两端内置 IPA 一致。僵尸相机手动及升级自动拍照后显示免费开源声明，Windows 游戏内实测通过，Android v14 通过构建和签名核验。发布 `v29fix-camera-notice`（id `453629161`，目标 `cfe467f`），完整下载核对两端附件后公开；已删除 6 个旧附件并回读确认新版仍有两份下载。详见 HANDOVER §49。

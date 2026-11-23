@@ -69,7 +69,10 @@ public class ManagerActivity extends Activity {
     private boolean nightMode;
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
     private final Handler settingsHandler = new Handler(Looper.getMainLooper());
-    private Runnable settingsSaveRequest;
+    private final Runnable settingsSaveRequest = this::flushSettingsSave;
+    private JSONObject pendingSettings;
+    private String pendingSettingsId;
+    private JSONObject submittedSettings;
     private TextView settingsStatus;
     private TextView simulatedClock;
     private Runnable skipPreview;
@@ -101,7 +104,11 @@ public class ManagerActivity extends Activity {
         super.onResume(); if (storage != null && !busy) refresh(true);
         statusHandler.removeCallbacks(statusCheck); statusHandler.postDelayed(statusCheck, 1000);
     }
-    @Override protected void onPause() { statusHandler.removeCallbacks(statusCheck); super.onPause(); }
+    @Override protected void onPause() {
+        statusHandler.removeCallbacks(statusCheck);
+        flushSettingsSave();
+        super.onPause();
+    }
     @Override protected void onSaveInstanceState(Bundle state) {
         state.putInt("page", page); state.putString("pendingId", pendingId);
         if (exportFile != null) state.putString("exportFile", exportFile.getPath());
@@ -140,6 +147,7 @@ public class ManagerActivity extends Activity {
     private void task(Task action) { task(action, null); }
     private void task(Task action, Runnable after) {
         if (busy) return;
+        flushSettingsSave();
         busy = true; render();
         worker.execute(() -> {
             String message = null; Exception failure = null;
@@ -157,12 +165,13 @@ public class ManagerActivity extends Activity {
     }
     private void refresh(boolean install) {
         if (busy) return;
+        flushSettingsSave();
         busy = true; render();
         worker.execute(() -> {
             Exception failure = null;
             try {
                 if (install && !storage.gameRunning()) {
-                    try (ZfStorage.Lease ignored = storage.lock()) { storage.ensureBundled(); }
+                    try (ZfStorage.Lease ignored = storage.lock()) { storage.prepareBundled(); }
                 }
                 versions = storage.versions(); selected = storage.selected(); settings = storage.settings(selected.appId);
                 running = storage.gameRunning(); currency = null;
@@ -214,6 +223,9 @@ public class ManagerActivity extends Activity {
     }
     private boolean editable() { return !busy && !running && selected != null; }
     private void render() {
+        flushSettingsSave();
+        family = null;
+        settingsStatus = null;
         simulatedClock = null;
         shell = vertical(); shell.setBackgroundColor(BACKGROUND); shell.setPadding(dp(14), dp(12), dp(14), 0);
         FrameLayout hero = new FrameLayout(this); hero.setBackground(shape(SOFT, 8)); hero.setClipToOutline(true);
@@ -331,7 +343,10 @@ public class ManagerActivity extends Activity {
                     .setNegativeButton("取消", null)
                     .setPositiveButton("重置", (dialog, which) -> {
                         String id = selected.appId;
-                        task(() -> { JSONObject app = new JSONObject(settings.toString()).put("offset", 0); storage.settings(id, app); return "累计跳过时间已重置"; });
+                        task(() -> {
+                            storage.settings(id, storage.settings(id).put("offset", 0));
+                            return "累计跳过时间已重置";
+                        });
                     }).show());
                 reset.setEnabled(editable()); addButton(launch, reset);
             }
@@ -420,24 +435,25 @@ public class ManagerActivity extends Activity {
             try {
                 long h = Long.parseLong(hours.getText().toString()); int m = Integer.parseInt(minutes.getText().toString());
                 String id = selected.appId; long seconds = skipSeconds(h, m);
-                JSONObject app = new JSONObject(settings.toString()).put("skipHours", h).put("skipMinutes", m);
                 dialog.dismiss(); task(() -> {
-                    storage.settings(id, app); storage.advance(id, seconds);
+                    JSONObject app = storage.settings(id).put("skipHours", h).put("skipMinutes", m);
+                    storage.advance(id, seconds, app);
                     return null;
                 }, () -> startActivity(new Intent(this, MainActivity.class)));
             } catch (Exception e) { toast("请输入小时与 0～59 的分钟，时间需大于零"); }
         })); dialog.show(); skipPreview.run();
     }
     private void settingsPage() {
+        JSONObject displaySettings = submittedSettings != null ? submittedSettings : settings;
         LinearLayout display = card("画面设置", "按当前版本记忆设置；游戏画面保持比例并适配屏幕。");
         display.addView(text("设备类型", 13, MUTED, false)); family = spinner(new String[]{"iPhone（推荐）", "iPad"});
-        family.setSelection(settings.optString("family", ZfStorage.DEFAULT_FAMILY).equals("ipad") ? 1 : 0); display.addView(family); family.setEnabled(editable());
+        family.setSelection(displaySettings.optString("family", ZfStorage.DEFAULT_FAMILY).equals("ipad") ? 1 : 0); display.addView(family); family.setEnabled(editable());
         display.addView(text("渲染倍率", 13, MUTED, false));
         String[] scaleChoices = new String[SCALE_PRESETS.length + 1];
         for (int i = 0; i < SCALE_PRESETS.length; i++) scaleChoices[i] = "×" + SCALE_PRESETS[i];
         scaleChoices[SCALE_PRESETS.length] = "自定义";
         scale = spinner(scaleChoices);
-        String current = settings.optString("scale", ZfStorage.DEFAULT_SCALE);
+        String current = ZfStorage.validScaleOrDefault(displaySettings.optString("scale", ZfStorage.DEFAULT_SCALE));
         int index = Arrays.asList(SCALE_PRESETS).indexOf(current);
         scale.setSelection(index < 0 ? SCALE_PRESETS.length : index); display.addView(scale); scale.setEnabled(editable());
         customScale = number("小数或分数，例如 1.5、3/2", current, true); display.addView(customScale);
@@ -446,6 +462,7 @@ public class ManagerActivity extends Activity {
         AdapterView.OnItemSelectedListener sizes = new AdapterView.OnItemSelectedListener() {
             public void onNothingSelected(AdapterView<?> p) {}
             public void onItemSelected(AdapterView<?> p, View v, int position, long id) {
+                if (p != family && p != scale) return;
                 customScale.setVisibility(scale.getSelectedItemPosition() == SCALE_PRESETS.length ? View.VISIBLE : View.GONE);
                 updateResolution(); queueSettingsSave();
             }
@@ -458,13 +475,14 @@ public class ManagerActivity extends Activity {
         display.addView(text("默认 iPhone ×3（1440 × 960）。画面卡顿时可调低倍率；两指缩放由游戏处理。", 12, MUTED, false));
         LinearLayout timing = card("帧率设置", null);
         fps = spinner(new String[]{"30 FPS", "60 FPS（推荐）", "90 FPS", "120 FPS", "不限帧率", "自定义"});
-        String[] rates = {"30", "60", "90", "120", "off"}; current = settings.optString("fps", "60");
+        String[] rates = {"30", "60", "90", "120", "off"}; current = displaySettings.optString("fps", "60");
         index = Arrays.asList(rates).indexOf(current); fps.setSelection(index < 0 ? 5 : index); timing.addView(fps); fps.setEnabled(editable());
         customFps = number("1～1000 FPS", current.equals("off") ? "60" : current, false); timing.addView(customFps);
         customFps.setVisibility(index < 0 ? View.VISIBLE : View.GONE); customFps.setEnabled(editable());
         fps.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onNothingSelected(AdapterView<?> p) {}
             public void onItemSelected(AdapterView<?> p, View v, int position, long id) {
+                if (p != fps) return;
                 customFps.setVisibility(position == 5 ? View.VISIBLE : View.GONE);
                 queueSettingsSave();
             }
@@ -477,32 +495,17 @@ public class ManagerActivity extends Activity {
         fix = new Switch(this); fix.setText("高速帧率修复（推荐开启）"); fix.setTextSize(14);
         fix.setThumbTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}}, new int[]{NIGHT_BLUE, Color.rgb(177, 174, 188)}));
         fix.setTrackTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}}, new int[]{0x6634415F, 0x55777786}));
-        fix.setChecked(settings.optBoolean("fix", true)); fix.setEnabled(editable()); fix.setPadding(0, dp(14), 0, dp(8)); timing.addView(fix);
+        fix.setChecked(displaySettings.optBoolean("fix", true)); fix.setEnabled(editable()); fix.setPadding(0, dp(14), 0, dp(8)); timing.addView(fix);
         fix.setOnCheckedChangeListener((button, checked) -> queueSettingsSave());
         timing.addView(text("关闭修复可能让游戏无法达到设定帧率。提高帧率不会加快游戏时间。", 12, MUTED, false));
-        settingsStatus = text("已保存 · 下次启动生效", 12, LAVENDER, false); timing.addView(settingsStatus);
+        settingsStatus = text(submittedSettings == null ? "已保存 · 下次启动生效" : "正在保存…", 12, LAVENDER, false);
+        timing.addView(settingsStatus);
     }
     private void queueSettingsSave() {
-        if (busy || selected == null || running || family == null || scale == null || fps == null || fix == null) return;
-        if (settingsSaveRequest != null) settingsHandler.removeCallbacks(settingsSaveRequest);
-        settingsSaveRequest = this::saveSettingsFromControls;
-        settingsHandler.postDelayed(settingsSaveRequest, 250);
-    }
-    private void flushSettingsSave() {
-        if (settingsSaveRequest == null) return;
-        settingsHandler.removeCallbacks(settingsSaveRequest); settingsSaveRequest = null;
-        saveSettingsFromControls();
-    }
-    private void saveSettingsFromControls() {
-        settingsSaveRequest = null;
-        if (isFinishing() || isDestroyed() || selected == null || family == null || scale == null || fps == null || fix == null) return;
-        if (busy) {
-            settingsSaveRequest = this::saveSettingsFromControls;
-            settingsHandler.postDelayed(settingsSaveRequest, 120);
-            return;
-        }
-        final JSONObject app;
-        final String id = selected.appId;
+        if (!editable() || family == null || scale == null || fps == null || fix == null) return;
+        settingsHandler.removeCallbacks(settingsSaveRequest);
+        pendingSettings = null;
+        JSONObject reference = submittedSettings != null ? submittedSettings : settings;
         try {
             String scaleText = scaleValue(), fpsText = fpsValue();
             ZfStorage.scale(scaleText);
@@ -511,35 +514,51 @@ public class ManagerActivity extends Activity {
                 int rate = Integer.parseInt(fpsText);
                 if (rate < 1 || rate > 1000) throw new IllegalArgumentException("请输入 1～1000 的整数帧率");
             }
-            app = new JSONObject(settings.toString())
+            JSONObject draft = new JSONObject()
                 .put("family", family.getSelectedItemPosition() == 1 ? "ipad" : "iphone")
                 .put("scale", scaleText).put("fps", fpsText).put("fix", fix.isChecked());
-            if (app.optString("family").equals(settings.optString("family", ZfStorage.DEFAULT_FAMILY))
-                    && app.optString("scale").equals(settings.optString("scale", ZfStorage.DEFAULT_SCALE))
-                    && app.optString("fps").equals(settings.optString("fps", "60"))
-                    && app.optBoolean("fix", true) == settings.optBoolean("fix", true)) return;
+            if (draft.optString("family").equals(reference.optString("family", ZfStorage.DEFAULT_FAMILY))
+                    && draft.optString("scale").equals(reference.optString("scale", ZfStorage.DEFAULT_SCALE))
+                    && draft.optString("fps").equals(reference.optString("fps", "60"))
+                    && draft.optBoolean("fix", true) == reference.optBoolean("fix", true)) return;
+            pendingSettings = draft;
+            pendingSettingsId = selected.appId;
+            settingsHandler.postDelayed(settingsSaveRequest, 250);
         } catch (Exception e) {
             if (settingsStatus != null) settingsStatus.setText("输入值尚未有效，因此未保存");
-            return;
         }
-
-        settings = app;
-        busy = true;
+    }
+    private void flushSettingsSave() {
+        if (pendingSettings == null) return;
+        settingsHandler.removeCallbacks(settingsSaveRequest);
+        JSONObject draft = pendingSettings;
+        String id = pendingSettingsId;
+        pendingSettings = null;
+        submittedSettings = draft;
         if (settingsStatus != null) settingsStatus.setText("正在保存…");
         worker.execute(() -> {
             Exception failure = null;
-            try (ZfStorage.Lease ignored = storage.lock()) { storage.settings(id, app); }
+            JSONObject saved = null;
+            try (ZfStorage.Lease ignored = storage.lock()) {
+                saved = storage.settings(id);
+                for (Iterator<String> keys = draft.keys(); keys.hasNext();) {
+                    String key = keys.next();
+                    saved.put(key, draft.get(key));
+                }
+                storage.settings(id, saved);
+            }
             catch (Exception e) { failure = e; }
             final Exception problem = failure;
+            final JSONObject persisted = saved;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
-                busy = false;
-                if (problem == null) {
-                    if (settingsStatus != null) settingsStatus.setText("已保存 · 下次启动生效");
-                } else {
-                    if (settingsStatus != null) settingsStatus.setText("保存失败");
-                    error(problem);
+                if (problem == null && selected != null && id.equals(selected.appId)) settings = persisted;
+                if (submittedSettings == draft) {
+                    submittedSettings = null;
+                    if (settingsStatus != null && pendingSettings == null)
+                        settingsStatus.setText(problem == null ? "已保存 · 下次启动生效" : "保存失败");
                 }
+                if (problem != null) error(problem);
             });
         });
     }
@@ -618,7 +637,7 @@ public class ManagerActivity extends Activity {
             File source = exportFile;
             task(() -> {
                 try (InputStream in = new FileInputStream(source); OutputStream out = getContentResolver().openOutputStream(uri, "wt")) {
-                    if (out == null) throw new IOException("无法打开导出位置"); ZfStorage.copy(in, out, 128L * 1024 * 1024);
+                    if (out == null) throw new IOException("无法打开导出位置"); ZfStorage.copy(in, out, ZfStorage.MAX_BACKUP_ARCHIVE_BYTES);
                 } return "备份已导出";
             });
         }

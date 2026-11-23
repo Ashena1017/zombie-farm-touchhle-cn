@@ -19,7 +19,6 @@ param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$TimeoutSeconds = 45
 )
-$root = (Split-Path -Parent $PSScriptRoot)
 
 $ErrorActionPreference = 'Continue'
 
@@ -103,7 +102,7 @@ public class TipProbe {
 }
 '@
 
-$manager = Join-Path $Root 'GameManager.ps1'
+$manager = Join-Path $Root 'windows\GameManager.ps1'
 $ok = $true
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -161,12 +160,24 @@ foreach ($want in @($browseLabel, $startLabel, $applyLabel)) {
 # literal Chinese path would be decoded with the console's ANSI code page and turn
 # into mojibake ("浣跨敤璇存槑.html"), producing a bogus "missing" failure.
 $guideName = [string][char]0x4F7F + [char]0x7528 + [char]0x8BF4 + [char]0x660E + '.html'
-$guide = Join-Path (Join-Path $Root 'Release') $guideName
-if (-not (Test-Path -LiteralPath $guide)) {
+$zipPath = Join-Path $Root 'dist\windows\zombie-farm-windows-x64.zip'
+$guideText = $null
+if (Test-Path -LiteralPath $zipPath -PathType Leaf) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [IO.Compression.ZipFile]::OpenRead($zipPath)
+    try {
+        $guide = $zip.GetEntry("zombie-farm-windows-x64/$guideName")
+        if ($guide) {
+            $reader = [IO.StreamReader]::new($guide.Open(), [Text.Encoding]::UTF8)
+            try { $guideText = $reader.ReadToEnd() }
+            finally { $reader.Dispose() }
+        }
+    } finally { $zip.Dispose() }
+}
+if (-not $guideText) {
     Write-Host "  FAIL: the shipped guide is missing ($guideName)"
     $ok = $false
 } else {
-    $guideText = [System.IO.File]::ReadAllText($guide, [System.Text.UTF8Encoding]::new($true))
     # A few phrases that must be documented, keyed by ASCII-safe substrings where
     # possible so this file stays readable. Chinese is built from code points.
     $needles = @(

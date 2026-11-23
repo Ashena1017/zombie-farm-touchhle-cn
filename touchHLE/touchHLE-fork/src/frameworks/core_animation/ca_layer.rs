@@ -31,7 +31,6 @@ use crate::objc::{
 use crate::Environment;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone)]
 pub(super) struct CALayerHostObject {
     /// Possibly nil, usually a UIView. This is a weak reference.
     delegate: id,
@@ -67,7 +66,39 @@ pub(super) struct CALayerHostObject {
 }
 impl HostObject for CALayerHostObject {}
 
+/// Values used to draw one animation frame. Pixel storage and GL resources
+/// belong to the model layer and can be much larger than these properties.
+pub(super) struct PresentationProperties {
+    pub(super) bounds: CGRect,
+    pub(super) position: CGPoint,
+    pub(super) anchor_point: CGPoint,
+    affine_transform: CGAffineTransform,
+    pub(super) hidden: bool,
+    pub(super) opacity: f32,
+    pub(super) background_color: Option<CGColorHostObject>,
+    pub(super) corner_radius: CGFloat,
+}
+
 impl CALayerHostObject {
+    pub(super) fn presentation_properties(&self) -> PresentationProperties {
+        PresentationProperties {
+            bounds: self.bounds,
+            position: self.position,
+            anchor_point: self.anchor_point,
+            affine_transform: self.affine_transform,
+            hidden: self.hidden,
+            opacity: self.opacity,
+            background_color: self.background_color,
+            corner_radius: self.corner_radius,
+        }
+    }
+
+    fn superlayer_to_layer_transform(&self) -> CGAffineTransform {
+        self.presentation_properties().superlayer_to_layer_transform()
+    }
+}
+
+impl PresentationProperties {
     /// Internal helper method: generate a transformation matrix to transform
     /// from the superlayer's co-ordinate space (the space that the layer's
     /// position is specified in) to the layer's internal co-ordinate space

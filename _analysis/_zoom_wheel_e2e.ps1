@@ -13,7 +13,6 @@ param(
     [int]$TitleButtonY = 659,
     [string]$Ipa = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa'
 )
-$root = (Split-Path -Parent $PSScriptRoot)
 $ErrorActionPreference = 'Continue'
 Add-Type -AssemblyName System.Drawing
 
@@ -35,8 +34,8 @@ public class ZWin {
 '@
 Add-Type -TypeDefinition $src -ErrorAction SilentlyContinue
 
-$hleRoot = if (Test-Path -LiteralPath (Join-Path $Root 'touchHLE\touchHLE.exe')) { Join-Path $Root 'touchHLE' } else { $Root }
-$hle     = Join-Path $hleRoot 'touchHLE_fork.exe'
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
+$hle     = Join-Path $hleRoot 'touchHLE.exe'
 $ipaPath = Join-Path $Root ('zombie_farm_ipa\' + $Ipa)
 $sandbox = Join-Path $hleRoot 'touchHLE_sandbox'
 $log     = Join-Path $hleRoot 'touchHLE_log.txt'

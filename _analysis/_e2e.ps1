@@ -14,7 +14,7 @@ function Log([string]$m) {
 Set-Content -LiteralPath $out -Value "e2e launcher test $(Get-Date -Format o)" -Encoding utf8
 
 # reference save first, exactly like the documented workflow
-& (Join-Path $root 'RestoreTestSave.ps1') -Force *>&1 | ForEach-Object { Log "  $_" }
+& (Join-Path $root 'windows\RestoreTestSave.ps1') -Force *>&1 | ForEach-Object { Log "  $_" }
 
 Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue
 
@@ -23,7 +23,7 @@ $job = Start-Job -ScriptBlock {
     param($root, $log)
     Set-Location -LiteralPath $root
     & powershell -NoProfile -ExecutionPolicy Bypass `
-        -File (Join-Path $root 'StartZombieFarmNextHour.ps1') -NoSkip *> $log
+        -File (Join-Path $root 'windows\StartZombieFarmNextHour.ps1') -NoSkip *> $log
 } -ArgumentList $root, $log
 
 $deadline = (Get-Date).AddSeconds(40)

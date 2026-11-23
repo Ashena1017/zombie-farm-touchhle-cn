@@ -44,7 +44,7 @@ public class MainActivity extends SDLActivity {
                 settings.optBoolean("fix", true) ? "1" : "0", true);
             launchArguments = new String[]{ipa.file.getPath(), "--landscape-right",
                 "--device-family=" + settings.optString("family", ZfStorage.DEFAULT_FAMILY),
-                "--scale-hack=" + settings.optString("scale", ZfStorage.DEFAULT_SCALE),
+                "--scale-hack=" + ZfStorage.validScaleOrDefault(settings.optString("scale", ZfStorage.DEFAULT_SCALE)),
                 "--fps-limit=" + settings.optString("fps", "60")};
         } catch (Exception e) {
             Toast.makeText(this, "无法启动：" + e.getMessage(), Toast.LENGTH_LONG).show();

@@ -12,15 +12,7 @@ param(
     [int]$BootSeconds = 30,
     [int]$PlaySeconds = 15
 )
-$root = (Split-Path -Parent $PSScriptRoot)
-# The emulator lives in its own folder now (the tree mirrors the shipped
-# ./Release layout). Fall back to the flat layout so these scripts keep working
-# either way -- same rule GameManager.ps1 uses.
-$hleRoot = if (Test-Path -LiteralPath (Join-Path $root 'touchHLE\touchHLE.exe')) {
-    Join-Path $root 'touchHLE'
-} else {
-    $root
-}
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
 
 
 $ErrorActionPreference = 'Continue'
@@ -64,7 +56,7 @@ public class WinCount {
 '@
 
 # Identify the launcher without embedding its Chinese filename.
-$launcher = Get-ChildItem -LiteralPath $Root -Filter '*.exe' -File |
+$launcher = Get-ChildItem -LiteralPath (Join-Path $Root 'windows') -Filter '*.exe' -File |
     Where-Object { $_.Name -notmatch '^touchHLE' } |
     Sort-Object Length | Select-Object -First 1
 if (-not $launcher) { Write-Host '  FAIL: launcher not found'; exit 1 }

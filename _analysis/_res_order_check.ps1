@@ -8,7 +8,6 @@ param(
     [string]$OutFile = "$root\_analysis\perf\res_order.png",
     [int]$TimeoutSeconds = 45
 )
-$root = (Split-Path -Parent $PSScriptRoot)
 $ErrorActionPreference = 'Continue'
 Add-Type -AssemblyName System.Drawing
 
@@ -105,7 +104,7 @@ public class OrdWin2 {
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-$psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $Root 'GameManager.ps1') + '"'
+$psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $Root 'windows\GameManager.ps1') + '"'
 $psi.WorkingDirectory = $Root
 $psi.UseShellExecute = $false
 $proc = [System.Diagnostics.Process]::Start($psi)

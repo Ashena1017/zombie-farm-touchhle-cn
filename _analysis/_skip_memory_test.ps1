@@ -2,7 +2,7 @@
 # Extracts Read-SkipMemory / Save-SkipMemory from GameManager.ps1 via the AST
 # (same technique as the earlier currency probe), points SkipMemoryFile at a
 # throwaway temp file, and checks round-trip + edge cases.
-$gm = Join-Path (Split-Path -Parent $PSScriptRoot) 'GameManager.ps1'
+$gm = Join-Path (Split-Path -Parent $PSScriptRoot) 'windows\GameManager.ps1'
 $ast = [System.Management.Automation.Language.Parser]::ParseFile(
     $gm, [ref]$null, [ref]$null)
 $wanted = @('Read-SkipMemory', 'Save-SkipMemory')

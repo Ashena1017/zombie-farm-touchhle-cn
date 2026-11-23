@@ -63,7 +63,7 @@ function Count-Consoles {
 # Locate the launcher by exclusion rather than by its Chinese name: embedding a
 # Chinese literal here would risk the BOM/encoding trap this project keeps hitting
 # (see _analysis/_ensure_bom.ps1), and the launcher is simply "the other .exe".
-$exe = Get-ChildItem -LiteralPath $Root -Filter '*.exe' -File |
+$exe = Get-ChildItem -LiteralPath (Join-Path $Root 'windows') -Filter '*.exe' -File |
     Where-Object { $_.Name -notmatch '^touchHLE' } |
     Sort-Object Length |
     Select-Object -First 1

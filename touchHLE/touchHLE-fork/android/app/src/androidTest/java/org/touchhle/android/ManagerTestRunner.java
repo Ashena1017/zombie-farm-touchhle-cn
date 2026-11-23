@@ -58,7 +58,14 @@ public class ManagerTestRunner extends Instrumentation {
                     zip.putNextEntry(new ZipEntry("Payload/ZFR.app/ZFR")); zip.write(new byte[]{1}); zip.closeEntry();
                 }
                 check(ZfIpa.read(xmlIpa).version.equals("1.0"), "XML IPA plist with external DTD");
-                check(ZfStorage.hash(ipa.file).equals("7bb214498b149e11deca49c19e5a21b9aa7f763646537206b85cbbab86582ffc"), "bundled IPA bytes unchanged");
+                String bundledHash = "7bb214498b149e11deca49c19e5a21b9aa7f763646537206b85cbbab86582ffc";
+                check(ZfStorage.hash(ipa.file).equals(bundledHash), "bundled IPA bytes unchanged");
+                try (RandomAccessFile altered = new RandomAccessFile(ipa.file, "rw")) {
+                    altered.seek(altered.length());
+                    altered.writeByte(0);
+                }
+                store.ensureBundled();
+                check(ZfStorage.hash(ipa.file).equals(bundledHash), "game verifies and repairs a changed bundled IPA even with its original stamp");
                 JSONObject app = new JSONObject().put("family", "ipad").put("scale", "3/2").put("fps", "120").put("fix", false);
                 store.settings(id, app);
                 JSONObject roundtrip = store.settings(id);
@@ -71,12 +78,30 @@ public class ManagerTestRunner extends Instrumentation {
                 check(ZfStorage.scale("1.5") == ZfStorage.scale("3/2"), "fraction and decimal scale equivalent");
                 check(ZfStorage.scale("6") == 6 && ZfStorage.scale("4.5") == ZfStorage.scale("9/2"), "scale through six and high fraction accepted");
                 reject(() -> ZfStorage.scale("6.01"), "scale above six refused");
+                check(ZfStorage.scale("4.294967295") > 4 && ZfStorage.scale("1.0000000000") == 1,
+                    "large decimal components that reduce into the emulator range are accepted");
+                reject(() -> ZfStorage.scale("4.294967297"), "scale with out-of-range reduced numerator refused");
+                reject(() -> ZfStorage.scale("1.0000000001"), "scale with out-of-range reduced denominator refused");
+                check(ZfStorage.validScaleOrDefault("4.294967297").equals(ZfStorage.DEFAULT_SCALE),
+                    "legacy invalid scale falls back to the default at launch");
                 byte[] original = fixture(); ZfStorage.atomic(store.live(id), original);
                 File profile = new File(store.sandbox(id), "Documents/profile.txt");
                 ZfStorage.atomic(profile, "original profile".getBytes(StandardCharsets.UTF_8));
                 File preferences = new File(store.sandbox(id), "Library/Preferences/game.plist");
                 ZfStorage.atomic(preferences, "original preferences".getBytes(StandardCharsets.UTF_8));
                 File manual = store.backup(id, "manual");
+                File[] largeFiles = {new File(store.sandbox(id), "Documents/a"), new File(store.sandbox(id), "Documents/b")};
+                for (File file : largeFiles) {
+                    try (RandomAccessFile large = new RandomAccessFile(file, "rw")) {
+                        large.setLength(65L * 1024 * 1024);
+                    }
+                }
+                try {
+                    reject(() -> store.backup(id, "oversized"), "backup rejects combined data exceeding the restore limit");
+                    check(store.backups(id).size() == 1, "failed backup does not replace existing backups or publish a partial one");
+                } finally {
+                    for (File file : largeFiles) if (!file.delete()) throw new IOException("Cannot delete test fixture " + file);
+                }
                 store.setCurrency(id, 123456, 654321); byte[] changed = ZfStorage.bytes(store.live(id));
                 ZfSave money = store.currency(id);
                 check(money.gold == 123456 && money.brains == 654321, "currency write readback");
@@ -109,8 +134,11 @@ public class ManagerTestRunner extends Instrumentation {
                 store.importSave(id, new ByteArrayInputStream(imported));
                 check(Arrays.equals(imported, ZfStorage.bytes(store.live(id))), "raw save import exact readback");
                 try (InputStream in = getTargetContext().getAssets().open(ZfStorage.BUNDLED)) {
-                    ZfIpa added = store.importIpa(in, "测试版本.ipa");
-                    check(store.versions().size() == 2 && store.selected().file.equals(added.file), "IPA import and version selection");
+                    ZfIpa added = store.importIpa(in, "测试版本.IPA");
+                    List<ZfIpa> versions = store.versions();
+                    check(versions.size() == 2 && versions.get(0).file.equals(ipa.file)
+                        && versions.get(1).file.equals(added.file) && store.selected().file.equals(added.file),
+                        "uppercase IPA appears in the version list after the bundled game");
                 }
                 store.select(ipa); check(store.selected().file.equals(ipa.file), "switch back to bundled version");
                 int count = store.backups(id).size(); store.deleteBackup(id, manual);

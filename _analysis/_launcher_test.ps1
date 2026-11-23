@@ -22,11 +22,11 @@ function Log([string]$m) {
 Set-Content -LiteralPath $out -Value "launcher settings test: $Tag $(Get-Date -Format o)" -Encoding utf8
 
 # 1. apply the settings through the same code path the menu uses
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'GameManager.ps1') -Set $Settings |
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'windows\GameManager.ps1') -Set $Settings |
     ForEach-Object { Log "  set: $_" }
 
 # 2. restore the reference save so the run is comparable
-& (Join-Path $root 'RestoreTestSave.ps1') -Force *>&1 | ForEach-Object { Log "  $_" }
+& (Join-Path $root 'windows\RestoreTestSave.ps1') -Force *>&1 | ForEach-Object { Log "  $_" }
 
 Remove-Item -LiteralPath $gameLog -Force -ErrorAction SilentlyContinue
 
@@ -35,7 +35,7 @@ $job = Start-Job -ScriptBlock {
     param($root, $log)
     Set-Location -LiteralPath $root
     & powershell -NoProfile -ExecutionPolicy Bypass `
-        -File (Join-Path $root 'StartZombieFarmNextHour.ps1') -NoSkip *> $log
+        -File (Join-Path $root 'windows\StartZombieFarmNextHour.ps1') -NoSkip *> $log
 } -ArgumentList $root, $gameLog
 
 $deadline = (Get-Date).AddSeconds($Seconds)

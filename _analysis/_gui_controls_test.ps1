@@ -15,15 +15,7 @@ param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [int]$TimeoutSeconds = 45
 )
-$root = (Split-Path -Parent $PSScriptRoot)
-# The emulator lives in its own folder now (the tree mirrors the shipped
-# ./Release layout). Fall back to the flat layout so these scripts keep working
-# either way -- same rule GameManager.ps1 uses.
-$hleRoot = if (Test-Path -LiteralPath (Join-Path $root 'touchHLE\touchHLE.exe')) {
-    Join-Path $root 'touchHLE'
-} else {
-    $root
-}
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
 
 
 $ErrorActionPreference = 'Continue'
@@ -131,7 +123,7 @@ public class UiProbe {
 
 $WM_CLOSE = 0x0010
 $optionsFile = Join-Path $hleRoot 'touchHLE_options.txt'
-$manager = Join-Path $Root 'GameManager.ps1'
+$manager = Join-Path $Root 'windows\GameManager.ps1'
 
 function Get-OptionsLine {
     (([System.IO.File]::ReadAllText($optionsFile)) -split "`r?`n") |

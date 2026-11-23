@@ -437,22 +437,22 @@ unsafe fn composite_layer_recursive(
 
     // This is both acting as the presentationLayer and the private render layer
     // It might need to be reworked in the future into a guest presentationLayer
-    let host_obj = animation_state.create_presentation_layer(env, layer);
+    let presentation = animation_state.create_presentation_layer(env, layer);
 
-    if host_obj.hidden {
+    if presentation.hidden {
         return;
     }
 
     let window = env.window.as_mut().unwrap();
     let mut gles = window.make_internal_gl_ctx_current();
 
-    let opacity = opacity * host_obj.opacity;
+    let opacity = opacity * presentation.opacity;
     let cumulative_transform = {
-        let CALayerHostObject { bounds, .. } = host_obj;
+        let bounds = presentation.bounds;
 
         // Update the transform to match this layer's co-ordinate space.
         let cumulative_transform =
-            <Matrix<4> as From<_>>::from(host_obj.superlayer_to_layer_transform())
+            <Matrix<4> as From<_>>::from(presentation.superlayer_to_layer_transform())
                 .multiply(&cumulative_transform);
 
         // Reposition and scale the unit quad (see ARRAY_BUFFER binding)
@@ -469,7 +469,7 @@ unsafe fn composite_layer_recursive(
     };
 
     // Draw background color, if any
-    let have_background = if let Some(background_color) = host_obj.background_color {
+    let have_background = if let Some(background_color) = presentation.background_color {
         let misc = env
             .framework_state
             .core_animation
@@ -488,7 +488,7 @@ unsafe fn composite_layer_recursive(
         gles.Enable(gles11::BLEND);
         gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
 
-        let radius = host_obj.corner_radius;
+        let radius = presentation.corner_radius;
         if radius == 0.0 {
             gles.Disable(gles11::TEXTURE_2D);
             gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
@@ -518,14 +518,14 @@ unsafe fn composite_layer_recursive(
                 &make_9patch_coords(
                     [
                         0.0,
-                        (radius / host_obj.bounds.size.width).min(0.5),
-                        (1.0 - radius / host_obj.bounds.size.width).max(0.5),
+                        (radius / presentation.bounds.size.width).min(0.5),
+                        (1.0 - radius / presentation.bounds.size.width).max(0.5),
                         1.0,
                     ],
                     [
                         0.0,
-                        (radius / host_obj.bounds.size.height).min(0.5),
-                        (1.0 - radius / host_obj.bounds.size.height).max(0.5),
+                        (radius / presentation.bounds.size.height).min(0.5),
+                        (1.0 - radius / presentation.bounds.size.height).max(0.5),
                         1.0,
                     ],
                 ),
@@ -546,9 +546,9 @@ unsafe fn composite_layer_recursive(
         false
     };
 
-    let need_texture = host_obj.presented_pixels.is_some()
-        || host_obj.contents != nil
-        || host_obj.cg_context.is_some();
+    let host_obj = env.objc.borrow::<CALayerHostObject>(layer);
+    let (contents, cg_context, opaque) = (host_obj.contents, host_obj.cg_context, host_obj.opaque);
+    let need_texture = host_obj.presented_pixels.is_some() || contents != nil || cg_context.is_some();
     let need_update = need_texture && !host_obj.gles_texture_is_up_to_date;
 
     if need_texture {
@@ -585,13 +585,13 @@ unsafe fn composite_layer_recursive(
 
     // Update texture with CGImageRef or CGContextRef pixels, if any
     if need_update {
-        if host_obj.contents != nil {
-            let image = cg_image::borrow_image(&env.objc, host_obj.contents);
+        if contents != nil {
+            let image = cg_image::borrow_image(&env.objc, contents);
 
             // No special handling for opacity is needed here: the alpha channel
             // on an image is meaningful and won't be ignored.
             upload_rgba8_pixels(gles.as_mut(), image.pixels(), image.dimensions());
-        } else if let Some(cg_context) = host_obj.cg_context {
+        } else if let Some(cg_context) = cg_context {
             // Make sure this is in sync with the code in ca_layer.rs that
             // sets up the context!
             let (width, height, data) = cg_bitmap_context::get_data(&env.objc, cg_context);
@@ -619,7 +619,7 @@ unsafe fn composite_layer_recursive(
             .unwrap();
 
         gles.Color4f(opacity, opacity, opacity, opacity);
-        if opacity == 1.0 && host_obj.opaque && !have_background {
+        if opacity == 1.0 && opaque && !have_background {
             gles.Disable(gles11::BLEND);
         } else {
             gles.Enable(gles11::BLEND);
@@ -635,7 +635,7 @@ unsafe fn composite_layer_recursive(
         // expects bottom-to-top, so flip the UVs in that case.
         gles.BindBuffer(
             gles11::ARRAY_BUFFER,
-            if host_obj.contents != nil {
+            if contents != nil {
                 misc.basic_square_buffer
             } else {
                 misc.flipped_square_buffer

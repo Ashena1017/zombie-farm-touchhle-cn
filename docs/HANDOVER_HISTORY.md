@@ -1,0 +1,939 @@
+# 项目交接（供新会话使用）
+
+> **写于 2026-09-23**。本会话过长，新会话从这里接手。
+> 先读完本文件，再按需查 `TECHNICAL.md`（技术细节）与 `process.md`（历代改动流水账）。
+> **回复一律用中文**（标识符、路径、地址、字节保持原样不翻译）。
+
+---
+
+## 0. 一句话现状
+
+> **2026-11-21 当前状态**：双平台 **`v29fix-camera-notice`** 已公开并确认为 GitHub latest。两端内置同一份带标题水印的 IPA，Windows 管理器自动兼容记住的旧 v29fix 选择；僵尸相机成功拍照后显示免费开源声明。此前倍率 ×6、农场主购买与列表滑动修复均包含。Windows 手动与升级自动拍照已实测，Android v14 通过构建、包结构及签名校验。旧版下载附件已清空，详见 §49。
+
+> **2026-11-17 当前状态**：Windows / Android 三项修改已由用户实测确认成功，双平台新版 **`v29fix-farmers-scroll` 已公开发布并确认为 GitHub latest**（Release id **447957589**，目标 `fe62d1e31583244097775ed5a61f9b25ebea8ecd`）。包含分辨率 ×6、九种农场主各 15 脑子购买和列表滑动修复；沿用已验收二进制，两端完整下载 SHA-256 与本地一致，首页及 Release 页面验证通过。详见 §48。
+
+> **2026-11-15 当前状态**：双平台新版 **`v29fix-clock-rendering` 已公开发布并确认为 GitHub latest**（Release id `445999220`，发布目标 `8a02902`）。用户已确认原受影响玩家实测 v12 商店黑框修复有效；两端模拟时间显示与快进预览、Android 昼夜光照/云手机启动修复和默认 iPhone ×3 均已发布。两端资产完整下载的 SHA-256 一致，首页与 Release 渲染通过；详见 §46。
+
+> **2026-11-15 云手机启动修复**：Android v9 在用户的 Android 11 云手机启动时报 `1280 != 0`。已查明是 GLES1 附件查询触发 `GL_INVALID_ENUM`，并串到画面合成上下文。修复后 APK **versionCode 10** 在同一云手机已覆盖安装并实测到“开始游戏”界面。原数据 6 个文件哈希一致。当前本地 APK 为 v10，MuMu 的三时段结果来自 v9；公开 GitHub 仍是 `v29fix-verify2` / v8。详见 §43。
+
+> **2026-11-15 最新增补**：Android 农场始终白天的问题已修复，MuMu 正式包在模拟时间 12:00 / 18:00 / 23:00 的亮度与提灯光照均实测通过。修复 EAGL sharegroup 跨上下文的 FBO 名称/附件映射及绑定查询，APK versionCode **9** 已在本机构建并覆盖安装；**尚未提交或发布 GitHub，线上仍是 `v29fix-verify2`**。Android 原存档/设置的 8 个文件已按快照逐字节还原，并恢复应用 UID 权限；Windows exe 与 IPA 未改。详情先看 §42。
+
+> **2026-10-21 当前增补**：Windows 管理器修复了「闪退后误报游戏仍在运行」——运行状态改为读 `touchHLE\zfr_running.json` 的 pid + 启动时间 + exe 路径三元校验（失配即自愈），启动参数加 `--no-error-popup` 消除崩溃后的隐形模态框，等待改成切片并加看门狗，另加 `zfr_manager.log` 取证日志。源码已推送 `master`（`8a6e477` 修复、`e0abbd0` 文档），并已发布新版本 `v29fix-running-detect`（release id `419529614`，latest 已确认，两端资产经代理下载核对）。Android 未改动，其同类判定由 `zf_game.lock` 文件锁保证，结构上不会出现该误报。接手先看 §35～§36。
+
+> **2026-10-13 当前增补**：Windows 管理器的存档选中高亮已修复并发布为 latest `v29fix-save-selection`，GitHub `master` 为 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d`。两端附件的实际下载哈希、发布页面与首页链接均核验通过；Android APK 沿用 versionCode `4` 的入侵修复包。此前稳定闪退的单次 Windows 入侵已用修复版完成，正常退出码 `0`，生产库 65 项测试通过；重复入侵、死亡后补队和 Android 游戏场景尚未验证。接手先看 §31～§34；GitHub 大文件使用主人明确代理 `http://127.0.0.1:10808`，不要重新搜索环境或反复尝试直连。
+
+**Zombie Farm 中文版已经做完并可用。** touchHLE 的 ZFR 专用 fork + 图形化管理器
+`游戏管理.exe` + 交付包 `Release\` 都是绿的，主人正在实机使用。
+
+当前会话最后两件事也都已完成并验证：
+1. 给管理器加了「窗口大小/分辨率」（左选 iPad/iPhone，右选小数倍率）与「滚轮缩放倍率」两项设置；
+2. 去掉界面上所有 `?` 按钮（说明搬进 `使用说明.html`）、倍率预置改成小数 ×1.25 / ×1.5 / ×1.75；
+3. 清理了 126 MB 过往会话记录与过程性产物，并重写了文档。
+
+**Windows 版本没有未完成的阻塞项，正在等主人实机反馈。** 2026-10-06 Windows 存档备份已扩展为同时恢复累计跳过时间，旧备份兼容性保留；Android ARM64 已完成 MuMu 黑屏、形象页裁剪、沉浸式全屏修复，并新增「Zombie Farm 游戏管理」原生管理器。Windows 备份细节见 §20；Android 管理器最终 APK、MuMu 启动/存档复原结果与验证边界见 §19。
+
+---
+
+## 1. 目录结构（当前实际状态）
+
+```
+touchHLE-zombiefarm/
+├── TECHNICAL.md                  ★ 主文档：技术细节 + 血泪教训（11 章，最大的文件）
+├── process.md                 ★ 历代改动流水账，一行一个批次（最新 #30）
+├── HANDOVER.md                本文件
+├── 交接提示词.md              给新会话的开场提示词（复制粘贴用）
+├── 游戏管理.exe / GameManager.ps1   ★ 图形管理器（唯一入口，双击 exe）
+├── launcher_selected_ipa.txt  记住上次选的 IPA（运行时状态）
+├── launcher_skip_memory.txt   记住上次快进时长（运行时状态，可能不存在）
+├── StartZombieFarmNextHour.ps1 / RestoreTestSave.ps1 / SetZombieFarmCurrency.ps1
+│                              命令行辅助脚本（管理器不依赖它们，但保留可用）
+├── 运行游戏.bat / 选择跳过时间并启动.bat / 使用教程.txt
+├── MSVCP140.dll / VCRUNTIME140*.dll        VC++ 运行库（管理器需要）
+├── zombie_farm_ipa/           IPA 谱系（63 个文件 / 1.8 GB：33 个 .ipa + 30 个 .report.json）
+├── tools/                     ★ 活代码：patcher + 反汇编基础设施（46 + 4 模块）
+├── .agents/skills/            （空壳）旧的项目级 git-pr 技能已迁到个人 git-hosting 技能，见 §3.5
+├── _analysis/                 ★ 分析/验证脚本 + 精简后的历史产物（见其 TECHNICAL.md）
+├── Release/                   ★ 交付包（构建产物，由 _build_release.ps1 生成）
+├── touchHLE-zombiefarm-android-arm64/ Android APK 输出（构建产物，不入库）
+└── touchHLE/                  ★ 模拟器相关的一切
+    ├── touchHLE.exe           当前运行的模拟器（= fork 构建）
+    ├── touchHLE_fork.exe      构建输出（内容应与上面一致）
+    ├── touchHLE.exe.backup-*  4 个可回滚的旧版 exe（见 README 二·五）
+    ├── touchHLE_dylibs/  touchHLE_fonts/  touchHLE_sandbox/（存档在这里）
+    ├── touchHLE_options.txt   ★ 管理器写的设置（每个 app id 一行）
+    ├── touchHLE_default_options.txt  touchHLE_log.txt  zfr_last_run.log
+    ├── zfr_last_launch.txt    上次启动的 IPA 指纹（运行时状态）
+    ├── zfr_running.json       管理器记录的游戏进程 pid/启动时间/exe（见 §35）
+    ├── zfr_manager.log        管理器取证日志 launch/exit/guard/watchdog（见 §35、TECHNICAL §7.8）
+    ├── touchHLE_time_offset_seconds.txt / zfrpatch_current.dylib / LICENSE
+    ├── touchHLE-fork/         模拟器源码（上游 fa3d095 + 本项目适配）
+    │   └── vendor/            构建依赖，**自包含**（曾是 junction，见 process.md #26）
+    └── _build_tools/          自包含 rust/cmake 工具链 + cargo 缓存 + target-fork
+```
+
+**`touchHLE-trunk/` 已删除**（2026-09-23，主人的上游参考源码，含提示注入文件）。
+
+---
+
+## 2. 关键事实（改东西前必看）
+
+### 2.1 路径与 app id
+
+| 项 | 值 |
+|---|---|
+| 开发树模拟器 | `touchHLE\` （脚本用 `$hleRoot` 定位，**别硬编码**） |
+| 当前 IPA | `zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa`（59,564,493 B） |
+| 存档目录 | `touchHLE\touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGame.bin2` |
+| 真实存档 | 现为玩家复现档：金币 **9963972** / 脑子 **99997** / 等级 23，文件 `19,671 B` / SHA-256 `F6AFCC1A18D46981FDFB9BCACC468C8E737B5272CE794035C710572F0DE87FB4`（**测试绝不能污染；§31 记录的 40 级档已不是现场，任何情况下都不要拿旧快照覆盖**） |
+| 当前 options 行 | `com.playforge.ZombieFarm.ZFR: --fps-limit=60 --zf-wheel-zoom-step=1.1 --device-family=ipad --scale-hack=1.5 --non-blocking-zero-timeout-run-loop` |
+
+> ⚠️ `zombie_farm_ipa\` 里有 **3 个不同的 bundle id**。切换 IPA 会**同时切换设置行与存档目录**。
+> 换默认 IPA 要改三处：`GameManager.ps1` 的 `Get-DefaultIpaPath` fallback、
+> `launcher_selected_ipa.txt`、`_analysis\_build_release.ps1` 的 `$ipaName`。
+
+### 2.2 二进制哈希（用于确认三方同步）
+
+| 文件 | sha256 前缀 |
+|---|---|
+| `touchHLE\touchHLE.exe` | `75A0F9DD97BF0C27` |
+| `touchHLE\touchHLE_fork.exe` | `75A0F9DD97BF0C27` |
+| `Release\touchHLE\touchHLE.exe` | `75A0F9DD97BF0C27` |
+| `GameManager.ps1` | `8A949E6742721E55` |
+| `Release\GameManager.ps1` | `8A949E6742721E55` |
+| v29fix IPA | `E5951F945D23E88F`（前 16 位） |
+
+### 2.3 这台机器的环境坑（**踩过多次**）
+
+- **`edit`/`write` 工具会剥掉 `.ps1` 的 BOM** → 改完含中文的 `.ps1` **必须**跑
+  `_analysis\_ensure_bom.ps1`，否则 PowerShell 5.1 用 ANSI 码页解码，报一堆
+  `'30 帧'` 之类莫名其妙的语法错误。
+- **PowerShell 变量名大小写不敏感**：脚本作用域的 `$rowY` 与 `$script:RowY` 是**同一个变量**。
+  曾因此把哈希表毁成整数。
+- **PS 5.1 把弯引号 `“ ”` 当字符串定界符**（即使在双引号串里），字符串里只能用直引号 `'`。
+- **`pwsh` 不在 PATH**，用 `powershell -NoProfile -ExecutionPolicy Bypass -File`。
+- **`Start-Process` 在这台机器上崩**（`NO_PROXY`/`no_proxy` 重复键）→ 用
+  `[System.Diagnostics.Process]::Start($psi)`。
+- **`ProcessStartInfo.EnvironmentVariables` 在 PS 5.1 里是 null** → 先在同进程设 `$env:VAR` 让子进程继承。
+- **桌面 2560×1440 @150%**：任何读窗口几何的脚本**必须先 `SetProcessDPIAware()`**，
+  否则量到的值是真实值的 2/3，而且**自洽地错**（连未改动的档位也一起缩），极易误判成功能 bug。
+- **不要用 `Select-String` 直接搜 `touchHLE\zfr_last_run.log`** —— 它是累积文件，
+  要先切到最后一个 `CPU emulation begins now.` 之后那段。
+- **`_gui_shot.ps1` 截图前要确认没有遗留的同名窗口**，否则会抓到旧会话留下的进程窗口
+  （本会话就被这个骗过一次，以为改动没生效）。
+
+### 2.4 别用 `Get-Content` 判断中文文件行数
+
+`Get-Content` 不带 `-Encoding UTF8` 时按 **ANSI 码页**解码无 BOM 的 UTF-8 文件：
+中文的尾字节会和紧随的 `0x0A` 粘成一个字符，**换行被吞掉，行数虚低**。
+本会话实测：`process.md` 真实约 1050 行，`Get-Content` 只报 **726**（现为 727）；
+`TECHNICAL.md` 真实约 1780 行，只报 **1100**。一度以为文件被截断，虚惊一场。
+
+要正确读中文文件，任选其一：
+
+```powershell
+[System.IO.File]::ReadAllText($p, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::ReadAllLines($p, [System.Text.UTF8Encoding]::new($false))
+Get-Content $p -Encoding UTF8        # 也可以，但上面两个更明确
+```
+
+**判据**：行数明显偏低（比如按 `Write-Host` 次数估的应该更多）就是踩了这个坑，
+而不是文件真的坏了。用 `[regex]::Matches($txt,"`n").Count` 复核。
+（本文件不再写死这些行数 —— 每次编辑都会变，写死了就会过期。）
+
+---
+
+## 3. 常用工作流（照抄即可）
+
+### 3.1 改管理器（`GameManager.ps1`）
+
+```powershell
+# 1. 改完先修 BOM + 全脚本 parse 检查
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_ensure_bom.ps1
+# 2. 自检（设置读写 + 存档管理，不开界面）
+powershell -NoProfile -ExecutionPolicy Bypass -File GameManager.ps1 -SelfTest
+# 3. 无头改设置 / 看当前设置
+powershell -NoProfile -ExecutionPolicy Bypass -File GameManager.ps1 -Set wheel_zoom=1.5
+powershell -NoProfile -ExecutionPolicy Bypass -File GameManager.ps1 -ShowSettings
+# 4. 同步到交付包（Release\GameManager.ps1 是副本！）
+Copy-Item GameManager.ps1 Release\GameManager.ps1 -Force
+```
+
+### 3.2 改模拟器（`touchHLE\touchHLE-fork\src\`）
+
+```powershell
+# 增量构建（约 1m20s）
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_fork_now.ps1
+# ⚠️ 它只产出 touchHLE_fork.exe，必须再复制两处：
+Copy-Item touchHLE\touchHLE_fork.exe touchHLE\touchHLE.exe -Force
+Copy-Item touchHLE\touchHLE_fork.exe Release\touchHLE\touchHLE.exe -Force
+```
+
+### 3.3 重建交付包
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_release.ps1
+# 它会先清空 Release\ 再重建，并在最后自检
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps1
+```
+
+> `Release\使用说明.html` 是**构建产物**，内容在 `_build_release.ps1` 的内嵌模板里。
+> 直接改 Release 会被下次构建覆盖。
+
+### 3.4 完整验证套件（改完必跑）
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_layout.ps1         # 目录布局
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_layout_match.ps1   # 与 Release 同构
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_device_size_roundtrip.ps1 # 设置读写+算术
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps1        # 交付包能跑
+powershell -NoProfile -ExecutionPolicy Bypass -File GameManager.ps1 -SelfTest
+```
+
+GUI 相关（每个约 1 分钟，会开界面）：
+
+```powershell
+_analysis\_gui_controls_test.ps1   # 驱动真实控件，验证设置落盘
+_analysis\_res_order_check.ps1     # 读运行中 GUI 的下拉框内容与顺序
+_analysis\_gui_tip_test.ps1        # 验证没有 ? 按钮，且说明书覆盖这些设置
+```
+
+窗口尺寸**实测**（会真的开 8 次游戏，约 3 分钟）：
+
+```powershell
+_analysis\_device_size_e2e.ps1
+```
+
+### 3.5 推送 / PR / Release（个人 `git-hosting` 技能）
+
+原 `git-pr` 已改名为 **`git-hosting`**（覆盖推送、PR、Issue/评论、Release），脚本沿用旧文件名。
+本项目不再保存副本，直接用个人技能：
+
+- 技能说明：`C:\Users\Loner\.dsh\skills\git-hosting\SKILL.md`（`C:\Users\Loner\.codex\skills\git-hosting` 是同一份的另一处副本，两处都可读；旧的 `.codex\skills\git-pr` **已不存在**）。
+- 脚本：`scripts\git-pr.mjs`（推送 / PR）、`scripts\discussions.mjs`（Issue / 评论）、`scripts\github-release.mjs`（Release）。
+- 默认预演，加 `--apply` 才写入；脚本使用 Node.js 18+（本机 `node` 已可用，实测 v24）。
+
+```powershell
+# 0. 核对 Git 身份；缺失时按已确认身份设置仓库级配置
+git -C <目标仓库> config --show-origin --get-regexp '^(user\.name|user\.email)$'
+
+# 1. 只推送（本项目自己的仓库用这条）；--expected-files 收 JSON 数组文件，精确核对范围
+node "C:\Users\Loner\.dsh\skills\git-hosting\scripts\git-pr.mjs" --mode push `
+  --repo <本地仓库路径> --branch master --remote origin `
+  --expected-files <预期路径.json> --allow-dirty
+
+# 2. 预演核对无误后，同参数加 --apply
+
+# 3. PR（往上游 / 别人的仓库）：--mode pr，remote 与 upstream 按真实目标填写
+node ...\git-pr.mjs --mode pr --repo <本地仓库路径> --branch <分支> `
+  --remote <推送remote> --upstream <owner/repo> --title "<标题>" --body-file <PR描述.md>
+```
+
+- `--base` 省略时查询目标仓库的真实默认分支，不假设 `main` 或 `master`。
+- 核对实际 remote 的 push URL、PR 目标仓库和文件范围；不要只凭 remote 名称判断。
+- 先按项目流程测试、fetch 并审查基线，只发布已提交的内容。
+- `--allow-dirty` 的语义是「只发已提交 HEAD」，不是「把未提交内容一起发」；本项目工作区常年不干净，必须用它并明确说明。
+- 凭据由 Git credential helper 提供，禁止回显令牌或 `git credential fill` 的原始输出。
+- 本项目 `zombie-farm-touchhle-cn`（`Ashena1017/zombie-farm-touchhle-cn`）沿用直接推送 `master`；Release 见 §3.6。
+
+### 3.6 发 Release（打包 → 建 tag → 传附件 → 回读）
+
+**只有 `_build_release.ps1` 能产出交付包**，`Release\` 是构建产物，`zip` 不入库
+（`.gitignore` 排除 `Release/`）。完整流程：
+
+```powershell
+# 1. 重建 Release\ 并自检（它会先清空 Release\ 再重建）
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_verify_layout_match.ps1
+
+# 2. 打包：顶层必须是一个同名目录，收到 %TEMP%（zip 不进仓库）
+$stage = "$env:TEMP\touchHLE-zombiefarm-<版本>"
+$zip   = "$env:TEMP\touchHLE-zombiefarm-<版本>.zip"
+robocopy Release $stage /E /NFL /NDL /NJH /NJS | Out-Null   # 别用 Copy-Item -LiteralPath "…\*"（它不展开通配符）
+Compress-Archive -Path $stage -DestinationPath $zip -CompressionLevel Optimal -Force
+
+# 3. 记下大小与 sha256，写进 Release 说明的「校验信息」表
+(Get-Item $zip).Length
+(Get-FileHash $zip -Algorithm SHA256).Hash
+```
+
+**回读校验**（`$zip` 里应有 43 个文件，IPA 59,564,493 B，`touchHLE.exe` 26,376,704 B）：
+
+```powershell
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$a = [System.IO.Compression.ZipFile]::OpenRead($zip)
+($a.Entries | Where-Object { $_.Name -ne '' }).Count      # 应为 43
+$a.Entries | Where-Object { $_.FullName -match '\.ipa$' } | ForEach-Object { "$($_.FullName)  $($_.Length)" }
+$a.Dispose()
+```
+
+**建 Release 与传附件**（本项目实测走 GitHub REST；`curl.exe` 可用，**.NET WebRequest 不行**）：
+
+```powershell
+# ⚠️ 先清掉代理变量，否则 api.github.com 连不上（本机 HTTP_PROXY 指向本地代理）
+$env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''
+
+# 建 Release（body 从本地说明文件读，中文必须按 UTF-8 字节发，否则乱码）
+# POST https://api.github.com/repos/<owner>/<repo>/releases
+#   {"tag_name":"<tag>","name":"<标题>","body":"<说明>","draft":false,"prerelease":false}
+# 传附件：POST https://uploads.github.com/repos/<owner>/<repo>/releases/<id>/assets?name=<文件名>
+```
+
+**五个坑（都踩过）：**
+
+1. **附件名必须纯 ASCII**。`POST …?name=<文件名>` 里的中文名会被**静默丢弃** ——
+   内容传上去了，但资产名变成 `default.html`，**且不报错**。中文名文件仍可正常放**仓库内**。
+   所以附件名用 `touchHLE-zombiefarm-v29fix.zip` 这种，中文留给说明正文。
+2. **上传后必须回读** `GET /releases/tags/<tag>` 核对 `assets[].name` 与 `size`，
+   不能只看 HTTP 200；**内容完好**要下载回来算 SHA-256 与本地比对（大小相同 ≠ 内容相同）。
+3. **改了 Release 说明要 PATCH 并回读**：`PATCH /repos/<owner>/<repo>/releases/<id>`，
+   body 用 `ConvertTo-Json` 后**按 UTF-8 字节**发，回读时与本地文件 `-eq` 比对确认逐字符一致。
+4. **发布后要核验线上渲染**：抓 release 页面 HTML 确认新链接/新文案真的渲染出来了
+   （本会话就是靠这一步发现正文已更新但需刷新确认）。
+5. **别忘 `.git/config`**：推送用的令牌不要留在 remote URL 里，发完检查
+   `Get-Content .git\config -Raw` 里没有 `ghp_` / `github_pat_` / `x-access-token` 之类的串。
+
+**当前已发布的 Release**（作为格式参考）：
+
+| 项 | 值 |
+|---|---|
+| 仓库 | `Ashena1017/zombie-farm-touchhle-cn`（public，默认分支 `master`） |
+| Release | tag `v29fix`，release id `399756311` |
+| 附件 | `touchHLE-zombiefarm-v29fix.zip`，asset id `600164778`，95,050,820 B，state `uploaded` |
+| 说明源文件 | `_analysis\reports\RELEASE_NOTES_v29fix.md`（**改完要 PATCH 到线上**） |
+| zip 的 sha256 | `39601F129B20E53C641E1D6D37D22057B8B9D578E36E75B22060919C5ADA8841` |
+
+> ⚠️ **重建 zip 会让说明里记录的 sha256 失效** —— 重新打包后必须同步更新
+> `RELEASE_NOTES_*.md` 的「校验信息」表并 PATCH 到线上。
+
+---
+
+## 4. 当前设置模型（`GameManager.ps1` 的 `$script:SettingDefs`）
+
+| key | 选项 | 默认 | 说明 |
+|---|---|---|---|
+| `fps_limit` | `--fps-limit=` | `60` | 30/60/90/120/off/自定义(1–1000) |
+| `wheel_zoom` | `--zf-wheel-zoom-step=` | `1.1` | 滚轮每格乘数，预置 1.1/1.2/1.5，自定义 1.01–2.00 |
+| `window_family` | `--device-family=` | `ipad` | 只有 ipad/iphone 两项，与 `window_scale` **共用一行** |
+| `window_scale` | `--scale-hack=` | `1.5` | 预置 **1.25 / 1.5 / 1.75**（小数），自定义可填小数或分数 |
+| `fullscreen` | `--fullscreen` | `0` | 开关型 |
+| `run_loop_fix` | `--non-blocking-zero-timeout-run-loop` | `1` | 开关型，**ZFR 必须开** |
+
+设计要点：
+- **每个设置只对应一个命令行选项**（不再有 `Extra` 展开多个 token 的机制），
+  所以读取时不需要「取最具体匹配」那套规则。
+- **共用一行**靠 `Row` 键；布局参数是 `ComboX` / `ComboW` / `CustomX` / `CustomWidth`。
+- 行尾 `LblWindowSize` 用 `Get-WindowSizeForScale` **实时算窗口尺寸**
+  （算法与 `options.rs` 的 `scale_dim` 一致：横向、分数精确运算、四舍五入加半个分母；
+  超出屏幕变琥珀色）。
+- **自定义倍率是文本框**（不是数字框）：数字框表达不了 `7/4`，四舍五入会**偷偷改变窗口尺寸**。
+  每次按键校验，非法中间态（`1.`、`7/`、`abc`）**不写文件**。
+- 开关型选项读取：**行存在但无 token → `'0'`**；整行都不存在才用 `Default`。
+  （`Default` 的语义是"推荐值"，不是"缺席时代表什么"。）
+
+界面**没有任何 `?` 按钮**，全部说明在 `Release\使用说明.html`（第二节逐项讲原理）。
+
+---
+
+## 5. 刚做完的三件事（细节在 process.md #27/#28）
+
+1. **新增 `--zf-wheel-zoom-step=`**（fork 扩展）：原来 1.08 是硬编码常量
+   （`zombie_farm.rs` 的 `ZOMBIE_FARM_ZOOM_STEP`），现在读 `options.zf_wheel_zoom_step`，
+   范围 1.01–2.00。实测每格恰好 ×1.1，改成 1.5 后每格 ×1.5（日志可证）。
+2. **窗口大小拆成两个独立设置**（原来是一个打包的 `device_size` 选项组），
+   倍率预置统一改成**小数** ×1.25/×1.5/×1.75。
+   小数写进 options 文件后 touchHLE 会**约分成分数**再按整数运算，
+   所以 `1.5` 与 `3/2` 产生**完全相同**的窗口（八档实测证实）。
+3. **删掉 `?` 按钮与全部 `Tip` 文案**，说明搬进 `使用说明.html`；
+   顺带修掉两个**原有 bug**：
+   - 「高速帧率修复」关掉后重开界面又变回「开启」（读取器错误回退到推荐值）；
+   - `-Set` 没解析当前选中的 IPA，写到了**占位** app id 的另一行（GUI 与 `-ShowSettings` 默默不一致）。
+
+---
+
+## 6. 清理了什么（2026-09-23，回收 126 MB）
+
+删除判据：**没有任何在用脚本读取它**（引用清一色是写入），
+且**能由 `_analysis/` 里现存脚本重新跑出来**；被文档按名字引用的一律保留。
+
+| 删除 | 内容 |
+|---|---|
+| 旧会话对话记录 | `_claude_*`、`hist_*`、`history_*`、`session_*`、`analysis_hist_*`（45 个 / 21 MB） |
+| `__pycache__` | 3 个目录 / 260 个 `.pyc` |
+| 死胡同构建产物 | `_analysis\touchHLE_trunk_build_deadend.exe`（19.6 MB） |
+| 测试截图与日志 | `_analysis\perf\` 全部 218 个文件（75.6 MB） |
+| 孤儿 dump | `dumps/` 里没有脚本写入、也没有文档引用的 |
+| 过期日志 | `_analysis\*.log`（`_build_*`、`_pin_vendor`、`_fork_fetch` …）与旧 GUI 截图 |
+
+**保留**：
+- `_analysis\dumps\` 只剩被点名的取证产物 —— `_zfz_*`（施肥机制）、
+  `_abil2.out.txt`、`_flags.out.txt`、`_reorg_moves.json`。
+- `_analysis\perf\` **保留为空目录**（多个脚本往这里写输出）。
+- `_analysis\reports\` 11 份**技术报告**（当前状态的事实来源）。
+- `_analysis\archive\` 436 个旧探针脚本（**结论的推导过程只在这些脚本里，别删**）。
+- `touchHLE\*.backup-*` 4 个 exe 回滚点（README 明确列为回滚手段）。
+
+清理后**全部验证套件重跑通过**。
+
+---
+
+## 7. 文档地图（要找什么去哪里）
+
+| 想查 | 去哪 |
+|---|---|
+| 怎么用、界面长什么样 | `TECHNICAL.md` §1（含 GUI 截图文字版） |
+| 字号/本地化补丁怎么做 | `TECHNICAL.md` §5（核心技术知识，**务先读**） |
+| 历代 patcher 与验证器对应关系 | `TECHNICAL.md` §6.1/6.2；`_analysis/README.md` |
+| 已知问题、哪些已修 | `TECHNICAL.md` §7；`process.md` 全表 |
+| 能不能重写游戏（重构可行性） | `TECHNICAL.md` §7.5 |
+| 历代改动的「现象→根因→修法→验证」 | `process.md`（最新 #28） |
+| 每个分析脚本干什么 | `_analysis/README.md` |
+| 具体的取证报告 | `_analysis/reports/*.md` |
+| **怎么把项目交给下一个会话** | `交接提示词.md`（复制里面的 prompt 直接开新会话） |
+| 改补丁的固定套路 | `TECHNICAL.md` §6.3 |
+
+**重要约定**（`TECHNICAL.md` §9 有完整列表，这里列最容易踩的）：
+- 改 IPA 前先读对应 `report.json`，改完**必须**跑独立验证器；
+- **不碰已占用的 code cave**（§5.10 有清单，新补丁必须列入 `FORBIDDEN_PRIOR`）；
+- **根目录只放运行时和交付物**：新脚本进 `_analysis/`，新输出进 `_analysis/dumps/`，活代码进 `tools/`；
+- **汇报时不许把「静态全绿」写成「已修好」** —— 游戏内验证由主人做；
+- **动存档前先快照**整个 `touchHLE\touchHLE_sandbox` 到 `%TEMP%`，跑完还原；
+- **读内存一律 `sl.addr_to_file(va)`**，绝不 `data[va]`；反汇编从方法入口开始（Thumb 会漂相位）。
+
+---
+
+## 8. 建议新会话的起手式
+
+1. 读本文件 → 读 `TECHNICAL.md` §1（用法）与 §5（改补丁必读）。
+2. 若主人报「某个功能不对」：先看 `process.md` 最后几行有无同类先例，
+   再决定是**功能 bug** 还是**预期行为**。
+3. 若主人要改管理器：按 §3.1 流程，改完**必跑** `_ensure_bom.ps1` + `-SelfTest` + 同步 Release。
+4. 若主人要改模拟器：按 §3.2 流程，**记得复制二进制到两处**（这个坑踩过）。
+5. 若主人要改游戏内容：按 `TECHNICAL.md` §6.3 的固定套路写 patcher + 独立验证器。
+
+**当前等主人的反馈**：×1.5 放大后的画面排布、滚轮 1.1 的手感、`使用说明.html` 的写法。
+若主人说「都正常」，则本阶段收尾，无遗留任务。
+
+> 查历史改动时注意：`process.md` 的**最新内容在文件顶部**的待办总览表（最新一行 `#29`），
+> 不是文件末尾 —— 末尾是「工作约定」与更早的专题章节。
+
+---
+
+## 9. 交接后追加（2026-09-29，只读核验）
+
+本节由下一个会话追加，记录**本文件写就之后**发生的变化。
+
+**核验结论**：本文件的事实性声明与磁盘**一致**（5 个哈希、IPA 字节数、options 生效行、
+6 项验证套件全绿、回滚点 4 个、`archive` 436 / `reports` 11 / `tools` 50 个 `.py`、
+`zombie_farm_ipa` 63 文件 33 个 IPA / 1.79 GB）。完整逐条证据见
+`_analysis\reports\ZFR_交接核验_20260929.md`。
+
+**核验之后的新事实**：
+
+1. **游戏被真实游玩过一次** —— `zfr_last_launch.txt` 记 `2026-09-29T02:50:32`、IPA = v29fix。
+   因此真实存档的字节数已从本文写的 11592 变成 **10864 B**（游戏自己改写，非事故）；
+   货币仍是**金币 140586 / 脑子 4410**（本次用 `SetZombieFarmCurrency.ps1 -WhatIf` 只读复核），
+   存档 sha256 = `05B5D250CCAF818BD3D9AA82CF7FDBB6402E1901732D1268C10062BA12AFE35D`。
+   **「等级 40」本次未复核**（没单独取证等级字段），引用时请注明未核验。
+2. **模拟时间偏移累计 118800 秒（33 小时）** —— 见 `touchHLE\touchHLE_time_offset_seconds.txt`。
+3. **订正本文 §6 一处**：`_analysis\perf\` **不可能是空目录** ——
+   `_verify_release.ps1` 第 27 行固定把日志写到 `_analysis\perf\release_verify.log`，
+   每跑一次就留一份。它是该脚本的正常输出，**别当垃圾删**（删了不影响功能，只是白删）。
+4. **另外 4 处过时/易误导的表述**（README 界面示意里的 v28fix、存档示意里的 3885 B、
+   `交接提示词.md` 与构建脚本注释里的「最新 #29」、`Release\touchHLE\` 多出的 4 个许可文件）
+   已列在核验报告 §4，**均未改动**，等主人决定是否订正。
+
+**状态**：无阻塞项，环境全绿。
+
+---
+
+## 10. 交接后追加（2026-10-01，发布流程）
+
+本节记录**发布到 GitHub** 这条链路的固定做法。新增两节工作流在 §3.5（发 PR）与
+§3.6（发 Release），**动手前务必先读那两节**，这里只列最容易忘的几条。
+
+**仓库与 Release 现状**：
+
+| 项 | 值 |
+|---|---|
+| 仓库 | <https://github.com/Ashena1017/zombie-farm-touchhle-cn>（public，默认分支 **`master`**） |
+| Release | <https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix>（release id `399756311`） |
+| 附件 | `touchHLE-zombiefarm-v29fix.zip`（asset id `600164778`，95,050,820 B，`uploaded`） |
+| 说明源文件 | `_analysis\reports\RELEASE_NOTES_v29fix.md` —— 改完**必须 PATCH 到线上** |
+| zip 的 sha256 | `39601F129B20E53C641E1D6D37D22057B8B9D578E36E75B22060919C5ADA8841` |
+
+**入库范围**（`.gitignore` 已排除，别再手动 `git add -f`）：构建产物、Rust 工具链（4.4 GB）、
+上游 `vendor/`（843 MB）、游戏 IPA、`Release/`、存档、日志。6.25 GB 的工作树压成 **38.6 MB** 的提交。
+
+**关键提醒**：
+
+1. **`Release/` 与 zip 都不入库**，交付靠 Release 附件；改交付内容 = 重建 → 重新打包 → 重新上传。
+2. **附件名必须纯 ASCII** —— 中文名会被 GitHub **静默丢弃**成 `default.html`，且不报错。
+3. **上传/改说明后一律回读**：附件核对 `name` + `size` + 下载回来算 sha256；
+   说明正文与本地文件做 `-eq` 比对。
+4. **重建 zip 会让说明里的 sha256 失效**，必须同步更新「校验信息」表并 PATCH 到线上。
+5. **`curl.exe` 能用，.NET `WebRequest` 在这台机器上不行**（代理变量会让它返回 HTTP 0）——
+   调用 API 前先 `$env:HTTP_PROXY=''; $env:HTTPS_PROXY=''; $env:ALL_PROXY=''`。
+6. **`git credential fill` 返回的是字符串数组**，`$x.Length` 是元素个数不是字符数，
+   必须先 join 再解析（见 §3.5）。
+7. **绝不打印令牌**，不写进文件、不 `echo`、不贴进会话；发完检查 `.git/config` 里没有残留令牌。
+
+---
+
+## 11. 交接后追加（2026-10-05，Android ARM64 同步）
+
+**Android ARM64 fixed APK 已构建并通过静态包核验**。Android Gradle 构建会把仓库默认 v29fix IPA 放进 APK assets；首次启动或 IPA 哈希变化时，touchHLE 会自动原子复制到应用数据目录的 `touchHLE_apps/Zombie_Farm_v29fix.ipa`，不需要用户手动操作 `data`。Android 专属选项按触屏使用：横屏、60fps、iPhone 设备族、原生倍率、non-blocking run-loop fix；不配置滚轮，由游戏处理两指捏合。GL/FBO 相关改动复用共享 fork 源码。
+
+新增构建与静态包校验入口：`_analysis\_build_android.ps1`、`_analysis\_verify_android_package.ps1`。构建需要 JDK 17、Gradle 8.11.1、Android SDK/NDK `27.2.12479018`，并设置 `ANDROID_HOME` 或 `ANDROID_SDK_ROOT`。旧 APK `touchHLE-zombiefarm-android-arm64\touchHLE-zombiefarm-android-arm64.apk`（36,121,590 B）未修改；fixed APK 位于 `touchHLE-zombiefarm-android-arm64\touchHLE-zombiefarm-android-arm64-fixed.apk`。构建与 APK 结构核验已通过：内置 IPA `59,564,493 B`，SHA-256 为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`；Android 实机安装、启动、两指捏合和自动安装 IPA 仍待主人验证。
+
+**文档命名口径**（本会话订正过，别再改回去）：
+
+- 本项目跑的是**原版**《僵尸农场》（Zombie Farm）。`ZFR` 是**游戏自己的 bundle 代号**，
+  来自 `Payload/ZFR.app/Info.plist`（`CFBundleIdentifier` = `com.playforge.ZombieFarm.ZFR`，
+  `zh-Hans` 显示名 = `僵尸农场`，`zh-Hant` = `殭屍農場`）—— **不要把 `ZFR` 展开成任何词**。
+- **「Reforged」只指 `actualdoctornerd-ai/Zombie-Farm-2-Reforged`**（另一位粉丝从零重写的
+  TypeScript 项目），**不是本项目**。README 与 Release 说明里都有显式辟谣句，别删。
+- 配套的**汉化脚本**是主人另一个仓库
+  `Ashena1017/zombie-farm-reforged-translation-cn`（Tampermonkey 用户脚本，精翻，
+  词库取自原版官方简体中文语言包），在 README 的「想玩原版还是重制版」小节里推荐。
+
+## 12. 交接后追加（2026-10-06，Android MuMu 黑屏定位）
+
+本次 Android 实测已经把现象边界固定下来，明日从本节继续：
+
+1. 使用固定设备 `127.0.0.1:5557`、包名 `org.touchhle.zombiefarm`、ADB
+   `C:\Program Files\Netease\MuMu\nx_device\12.0\shell\adb.exe`。本轮测试时 MuMu 进程 PID 为
+   `12903`，前台 Activity 为 `org.touchhle.android.MainActivity`；收尾时已执行
+   `am force-stop`，明日启动 APK 即可继续。
+2. fixed APK 已安装并启动。启动菜单中文画面正常，截图为
+   `_analysis\dumps\android-mumu-composition-launch.png`；ADB 点击「开始游戏」后，截图
+   `_analysis\dumps\android-mumu-game-after-tap.png` 变为近乎纯黑，但进程持续运行，日志显示
+   游戏逻辑继续、角色加载与 `saveGame.bin2` 保存继续，没有 `FATAL EXCEPTION`、`SIGSEGV`、
+   `Panic` 或 `touchHLE crashed!`。
+3. 当前问题已经从「启动呈现失败」缩小为「切换到游戏场景后的 Core Animation/GLES 输出失败」。
+   `ZFR GL trace` 仍显示游戏在 `fbo 1`、`viewport 320x480` 绘制；`presentRenderbuffer` 日志显示
+   `fullscreen (null)`，按当前源码应走慢速 `glReadPixels`→`present_pixels`→compositor 路径，
+   但现有日志尚未看到预期的 `ZFR Android readback`，这是明日第一检查点。
+4. 当前未清理的临时诊断日志包括 `ZFR Android present/readback/probe/frame stats` 与
+   `ZFR GL trace`。定位完成后再删除日志并重跑 Android 构建与静态包校验；今晚不要把这些诊断
+   改动宣布为最终修复。
+5. 明日优先检查：`composition.rs` 的 `recomposite_if_necessary` 是否在点击后执行、drawable
+   layer 的 `presented_pixels` 是否被更新、`read_renderbuffer` 是否实际返回非零像素，以及
+   layer bounds/sublayers 是否在场景切换后改变。已有完整日志：
+   `_analysis\dumps\android_clean_tap640_log.txt`、`android_original_force_composition_log.txt`、
+   `android_diag_direct3_log.txt`、`android_gl_trace.log`。
+
+**当前结论边界**：Android APK 的内置 IPA、默认 iPhone/60fps/横屏/non-blocking 参数和静态包
+校验已经确认；「点击开始游戏后画面可见」尚未确认，不能写成已修好。
+
+## 13. 交接后追加（2026-10-06，Android 读回修复与形象页）
+
+1. `eagl.rs` Android 默认 framebuffer (`framebuffer 0`) 读回分支已保留：诊断确认游戏帧在默认 framebuffer，而 drawable renderbuffer 为空。临时 `ZFR Android` / `ZFR GL trace` 探针已从源码移除；Android GL 状态恢复仍把 `GLboolean` 当作零/非零处理。
+2. 无诊断日志的 fixed APK 已重建并通过 `_analysis\_verify_android_package.ps1`。APK SHA-256 为 `152B4E8F59CC136C12269C71A2B6A010728307983417928D0D4C3ED8297037D3`；内置 IPA 为 `59,564,493 B`，SHA-256 仍为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`。
+3. MuMu 实测：新 APK 从开始菜单进入游戏后不再黑屏，等待后到达欢迎教程与「选择形象」页。加载过渡采样到的 Playforge 画面连续哈希一致；形象页稳定后仍有横贯头像列表的棕色遮挡区，头像只在右侧部分可见。截图：`_analysis\dumps\android-final-apk-menu-20261006.png`、`android-final-entry-settled-20261006.png`、`android-final-avatar-settled-20261006.png`。这不是 IPA 内缺图的证据：右侧头像素材可见，Android 实际载入 IPA 与 Windows 使用的 v29fix SHA-256 完全一致。更可能是 touchHLE 的 Core Animation/UIScrollView 合成或内容偏移问题；`composition.rs` 仍明确标记 `clipping/masksToBounds` 未实现（第 689 行）。该根因尚未由 Windows 对照或代码修复验证。
+4. 本轮没有在取样的稳定画面中复现闪黑，但这不能证明所有进场时序都无闪烁。最终结论应写成「已解决黑屏、发现形象页遮挡、闪烁待进一步复现」，不能写成 Android 全部正常。
+5. 测试后 MuMu 已 force-stop、卸载并干净重装 fixed APK，以恢复 Android 私有目录权限；随后把测试前外部快照恢复。MuMu 的 `saveGame.bin2` **870 B**，SHA-256 `05BD833C4A952C3A38BBFFB78D4071E775EBEB1F49BB326101FE81CA82086BAB`，与快照逐字节一致；设备上的 IPA 也与预期 SHA-256 一致。当前包名 `org.touchhle.zombiefarm` 已停止，`run-as` 正常，无需 root。不要用 Windows tar 重打包后直接解到 Android app 私有目录；异常权限时干净重装比 root 更稳妥。
+
+## 14. 交接后追加（2026-10-06，Android 形象页遮挡续查）
+
+1. **只查 Android；Windows 版本已由主人确认无此问题，不要再做 Windows 对照。IPA 不改。** MuMu 设备仍用 `127.0.0.1:5557`，ADB 路径见 §12；安装更新必须用 `adb install -r`，不可卸载，以免清掉当前 Android 测试数据。
+2. 已在 MuMu 上用 fixed APK 重现遮挡，并成功用 `adb shell input keyevent 141` 触发 F11 导出实时 inspector。当前可复核证据：截图 `_analysis\dumps\android-avatar-scissor-probe-after.png`；转储 `_analysis\dumps\android-avatar-scissor-probe-inspector.txt`。转储显示表格 `view_size=480×100`、`content_size=1050×100`，15 个头像格和 sprite 存在；滑动后 `content_offset.x=-603.6433`、子层 `x=-570`，可见头像确实随表格滚动。**资源缺失与静态表格偏移都不符合现象。**
+3. 水平滑动后，棕色横带相对屏幕保持不动，而头像内容移动；同一转储显示背景 `CCColorLayer` 位于 `{0,140}`、尺寸 `480×75`、`z=3`，`CCTableView` 为 `z=5`。因此当前首要方向是 Android 下该场景的 Cocos 绘制/层级顺序，暂不归因于 IPA 或滚动偏移。
+4. `gles_guest.rs` 当前有临时 `ZFR Android scissor probe`，记录前 256 次调用的原始请求、实际提交矩形、缩放状态和 framebuffer。全量探针 APK 已构建、静态包核验通过并以 `adb install -r` 安装；包内 IPA 字节数 `59,564,493`，SHA-256 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`。从清空 logcat、冷启动到形象页稳定，未出现任何 scissor probe 日志；这是比上一轮窄筛选更强的证据，表明本次进场/形象页流程没有经 guest `glScissor` wrapper，但不排除 GL 状态由其它路径设置。
+5. **当前仍未修复。** 水平滑动实测显示头像会跟随表格移动，棕色带固定在屏幕上；故遮挡物不是表格内容或其滚动偏移。下一步记录 Android 上该背景 `CCColorLayer z=3` 与表格/sprite 的实际 `visit`/`draw` 次序，并核实 GL 绘制状态，找出为何 z3 区域最后盖住 z5 表格；然后再做 Android 专属、按证据限定范围的修复，重建并实机复测。不要照搬 Windows 窗口设置，不要动存档或选择头像来“验证”。
+6. 本轮 MuMu 是新测试存档（200 金币），当前停在选择形象页；通过滑动只改变了临时表格偏移，未确认/保存形象。全量探针截图为 `_analysis\dumps\android-avatar-scissor-probe-full.png`，Inspector 为 `_analysis\dumps\android-avatar-scissor-probe-inspector.txt`。工具链位置和构建命令仍以本文 §11 与本会话记录为准，不要重复搜索 Android/ADB/Cargo 环境。
+
+## 15. 交接后追加（2026-10-06，Android 一键进形象页与遮挡续查）
+
+1. 新增双击工具 `tools\AndroidEnterAvatar.exe`，源码为 `tools\AndroidEnterAvatar.cs`。它使用固定 ADB
+   `C:\Program Files\Netease\MuMu\nx_device\12.0\shell\adb.exe`、设备 `127.0.0.1:5557`、包名
+   `org.touchhle.zombiefarm`，自动 force-stop / 启动 / 点击开始 / 点击欢迎页勾。屏幕点击按实时截图尺寸比例换算：
+   开始按钮 `(0.5, 0.5833)`、欢迎页勾 `(0.5, 0.7778)`；等待分别为 8 秒、18 秒、4 秒。
+   在 1920×1080 MuMu 横屏完整实测通过，停在“选择形象”页，没有选中头像。运行：双击 `tools\AndroidEnterAvatar.exe`。
+2. 运行截图 `_analysis\dumps\android-entry-tool-final.png`；同次 F11 Inspector
+   `_analysis\dumps\android-avatar-oneclick-inspector.txt`。它确认背景为同一父层下的 `CCColorLayer`
+   （480×75，位置 `{0,140}`，z=3），头像表格为 `CCTableView`（view 480×100，内容 1050×100，z=5）。
+   旧的消息钩子提升 z-order 没生效：转储仍为 z=5，运行日志无 `raised avatar` 记录。
+3. `zombie_farm_debug.rs::repair_android_avatar_table_order` 从 Android `eagl.rs::presentRenderbuffer`
+   入口调用；精确匹配上述棕色层与表格后，用父节点 `reorderChild:z:` 将表格提高至 z=20。
+   首次构建/实测后 Inspector 仍为 z=5；根因已查明是守卫误用了另一个历史 bundle id
+   `com.playforge.ZFR.LZ54D2GT3D`。真实运行日志确认当前 IPA bundle id 是
+   `com.playforge.ZombieFarm.ZFR`，源码守卫刚已改正；一次性 `presentRenderbuffer hook entered`、
+   table size 和重排日志用于下次验证。**该改正尚未构建/实测，遮挡仍未修复。**
+4. 本轮构建命令仍是 `powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android.ps1`。
+   本机快捷构建封装为 `_analysis\_build_android_local.ps1`，直接运行即可。固定目录为
+   `C:\Users\Loner\AppData\Local\Temp\zfr-android-toolchain`：Gradle `gradle-8.11.1\bin\gradle.bat`，
+   JDK 17 `jdk17\`，Android SDK `android\`，Gradle 缓存 `gradle-home\`；Cargo/Rustup 分别为
+   `touchHLE\_build_tools\cargo\` 与 `touchHLE\_build_tools\rustup\`。快捷脚本统一设置这些变量并调用
+   `_build_android.ps1`（含静态包核验）。不要再次搜索 Android/ADB/Gradle/Cargo 环境；ADB 路径见 §12/§14。
+5. 测试结束 MuMu 应仍在选择形象页，存档仍为新测试存档（200 金币）；不要点“选择”或确认形象。
+   目标仍是修复 Android 形象页头像被棕色横带遮挡；Windows 无此问题，不查 Windows、不改 IPA。
+
+### 15.1 常驻环境速查与本轮续查
+
+**不要在新会话重新搜索 Android/ADB/Gradle/Cargo 环境**，先核对本小节；只有命令明确报路径不存在时才重新定位。
+
+| 项 | 固定值 / 做法 |
+|---|---|
+| MuMu 目标设备 | `127.0.0.1:5557`；`adb devices -l` 还会列出 `emulator-5556`，所有命令必须显式 `-s 127.0.0.1:5557` |
+| ADB | `C:\Program Files\Netease\MuMu\nx_device\12.0\shell\adb.exe` |
+| Android 包 | `org.touchhle.zombiefarm`；前台 Activity `org.touchhle.android.MainActivity` |
+| root | 不需要。`adb shell run-as org.touchhle.zombiefarm` 可用；不要为本问题开启 root |
+| 快捷构建 | `powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_local.ps1`（构建后含静态包核验） |
+| Android 工具链 | `C:\Users\Loner\AppData\Local\Temp\zfr-android-toolchain`；Gradle `gradle-8.11.1\bin\gradle.bat`、JDK `jdk17\`、SDK `android\`；Cargo/Rustup 在 `touchHLE\_build_tools\cargo\` 与 `touchHLE\_build_tools\rustup\` |
+| 一键进入头像页 | `tools\AndroidEnterAvatar.exe`；更新 APK 用 `adb install -r`，不要卸载 |
+| F11 Inspector | `adb shell input keyevent 141`；文件在 `/storage/emulated/0/Android/data/org.touchhle.zombiefarm/files/zombie_farm_inspector.txt`，用 `adb pull` 拉到 `_analysis\dumps\` |
+
+**本轮续查结论（2026-10-06）**：隐藏 `CCColorLayer`（480×75，位置 `{0,140}`、z=3）能去掉棕色横带，但头像左侧仍为空；故该层不是完整根因。试验把表格 `contentOffset.x` 设为 210，只改变了当前显示的头像项，屏幕上的可见头像区域仍固定在右侧，没有修复左侧留白。证据为 `_analysis\dumps\android-avatar-offset-test.png` 与 `android-avatar-offset-test-inspector.txt`。**源码已撤销 210px 偏移，但刚安装的测试 APK 仍含这项偏移**；下次改好/确认源码后必须重新构建再装。下一步应检查 Android GLES/Cocos 实际绘制与可见裁剪区域，不能再把滚动偏移当作已证实原因。
+
+一键工具在本次从非交互 PowerShell 调用时确实完成进场，但最后 `Console.Read` 因无控制台输入抛异常并返回 1；若继续使用该工具，需让它在输入重定向时直接退出，或从交互终端启动。MuMu 仍停在头像页；只进行了滑动与截图，未选中或确认形象。当前问题未修复。
+
+
+## 16. 交接后追加（2026-10-06，稳定形象页逐 draw 取证）
+
+- §15/§15.1 关于已安装 offset=210、z-order 修改尚未构建的状态已过时：当前源码撤销这些无效试验；`hide_android_avatar_selection_overlay` 及 visit 前抬高 z-order 的函数已移除，完整原始界面恢复。depth/stencil 强制关闭也已移除，两项均没有改善，不能继续保留为修复。
+- 本轮关闭 depth、关闭 stencil、有效隐藏 `412×139` 面板、隔离表格兄弟节点，均没让左侧头像出现。有效证据：`android-depth-test-avatar.png`、`android-stencil-off-test.png`、`android-panel-hide-test2.png`、`android-table-isolation-test.png`（均在 `_analysis/dumps/`）。第一次 panel-hide 未命中，不作为有效证据。
+- 新诊断 APK 支持稳定页抓整帧：`adb shell touch /storage/emulated/0/Android/data/org.touchhle.zombiefarm/files/zfr_capture_frame`。在下次 guest glClear 后，逐 draw 保存 `zfr-frame-NNN.rgba`（320×480 RGBA）及 `zfr-frame-state.txt`，到 presentRenderbuffer 结束，最大 300 draws。主机转换脚本 `_analysis/_convert_android_frame.ps1`。本轮抓到 95 draws，输出 `_analysis/dumps/android-frame-probe/`。
+- **关键新证据**：头像 draw #49～85 期间 `GL_CLIP_PLANE0..3` 全部 enabled；此前启动计数探针捕得太早，遗漏稳定页状态。scissor/stencil/alpha/cull 均关闭；modelview 是正常横屏旋转，viewport=320×480 本身不是已证明的问题。逐 draw #55 就没有左侧头像，末帧 #94 仍只见右侧两个：继续查裁剪平面方程及 native GLES 的变换，停止猜测普通 panel 遮盖或 offset。
+- `tools/AndroidEnterAvatar.cs` 已修正重定向输入时等待按键抛异常的问题，EXE 已重编译；非交互自动执行成功退出 0。
+- 当前临时探针在 `gles_guest.rs`（整帧）及 `gles1_native.rs`（ClipPlanef 输入/存储值）。问题仍未修复，修好后必须去掉探针再构建复测。不改变 IPA、Windows 和存档；不点击“选择”确认。
+## 17. 交接后追加（2026-10-06，Android 形象页裁剪修复完成）
+
+**本节记录已完成的裁剪修复；最新 APK 与全屏追加见 §18。§12～§16 是取证历史，不再代表未完成事项。**
+
+1. **根因有日志与画面证据**：MuMu native GLES 的 `glClipPlanef` 没有按当前 modelview 的逆转置变换方程。Cocos 在头像表格局部坐标提交 `[0,-1,0,100]`，当时 modelview 含 -90° 旋转与 `{130,480}` 平移；`glGetClipPlanef` 仍返回原方程。它把裁剪错误应用成眼坐标 `y<=100`，对应截图只保留右侧约 100px（两头像）。证据：`_analysis/dumps/android-clip-native-log.txt`、`android-frame-probe/zfr-frame-state.txt` 与逐 draw 图像。**不是 IPA 缺图，也不是普通 panel 覆盖、contentOffset 或 z-order。**
+2. **最终修法**：`src/gles/gles1_native.rs` Android `ClipPlanef/ClipPlanex` 先在 CPU 求 modelview 逆转置后的 eye-space plane，临时用 identity modelview 提交，再恢复原矩阵与 matrix mode。标准 GLES driver 也得到同样的正确方程；非 Android 保留原透传。保留真正的列表边界，不关闭裁剪、不隐藏背景、不修改 IPA。
+3. **清理完成**：整帧、scissor、clip 方程探针均已从活源码移除；无效的 depth/stencil 强制关闭、表格偏移、z-order 抬高、CCArray 重排与面板隐藏都已移除。保留前序黑屏修复、GLboolean 状态恢复、Android 包内 IPA 自动安装等必要改动。`ca_eagl_layer.rs` 去掉了强制 Android composition 返回之后不可达的 Android 放宽检查。
+4. **无探针正式包实测**：覆盖安装后冷启动、一键进入头像页、横向滑至列表后端、再滑回起点均正常；第一排头像和绿色选中框可见，后端上锁头像正常显示、边界处正确裁剪。最后 Inspector `content_offset={0,0}`，进程持续存活（当次 PID 17743），本轮 logcat 未发现 `FATAL EXCEPTION`、`SIGSEGV`、`Panic`、`touchHLE crashed!`，也无诊断探针日志。未点击头像或“选择”确认。截图 `_analysis/dumps/android-avatar-final-cold.png`、`android-avatar-final-scroll.png`、`android-avatar-final-end.png`；Inspector/log 同前缀。
+5. **包与数学校验**：最终 APK `touchHLE-zombiefarm-android-arm64/touchHLE-zombiefarm-android-arm64-fixed.apk`，97,270,439 B，SHA-256 `FAE0C10DBDB71FFCF075030CCEBC759CA35520BC81CF98461E968F457493F9AE`；设备已安装 `base.apk` SHA-256 与本地完全一致。构建及 `_verify_android_package.ps1` PASS；内置 IPA 59,564,493 B / `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED` 未变。真实源码裁剪变换函数的 3 项测试（四个旋转表格边界、缩放平移斜平面、奇异矩阵回退）全过，测试保存在 native 源码 `clip_plane_tests` 中；本机通过 rustc 单独编译执行该函数与测试，无需启动 Windows 游戏。
+6. **固定操作补充**：构建使用的 SDK ADB 可能让本机 ADB server 重启、丢失连接；每次安装前先用 MuMu ADB `connect 127.0.0.1:5557`，确认 `install -r` 成功后再运行 `tools/AndroidEnterAvatar.exe`。不要只因一键工具能启动就推断新包已安装。当前包已装到 MuMu，停在选择形象页。真实 Android 手机、其它页面及长时闪烁仍未由本轮覆盖；不要把这项 MuMu 头像修复写成所有设备全游戏已确认。
+
+## 18. 交接后追加（2026-10-06，Android 沉浸式全屏）
+
+**本节是最新交付状态。** 主人反馈顶部时间、Wi-Fi、电池状态栏一直显示，希望隐藏并让游戏画面使用顶部空间。
+
+1. **实测根因**：旧包运行时 `dumpsys window` 显示 `FORCE_NOT_FULLSCREEN`、`vsysui=LAYOUT_STABLE`。SDLActivity 在创建窗口时调用 `setWindowStyle(false)`，其异步窗口样式设置会覆盖 Manifest 的全屏主题；只设置主题不足以保持全屏。证据：`_analysis/dumps/android-fullscreen-before-window.txt` 与 `android-fullscreen-before.png`。
+2. **实现**：只修改 Android `android/app/src/main/java/org/touchhle/android/MainActivity.java`。在 `onCreate`、`onResume`、恢复窗口焦点及 SDL 退出全屏时重新隐藏系统栏；清除 `FLAG_FORCE_NOT_FULLSCREEN`，设置 `FLAG_FULLSCREEN`，并同步 SDL `mFullscreenModeActive`。Android API 30+ 使用 `WindowInsetsController`、`setDecorFitsSystemWindows(false)` 和 `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`；API 21～29 使用 immersive-sticky flags。游戏保持原有比例，系统栏空间交还渲染区域；边缘滑动仍可临时显示系统栏。没有修改 IPA、Rust 渲染代码或 Windows 二进制。
+3. **MuMu API 35 实测通过**：覆盖安装、冷启动开始菜单、一键进入选择形象页、切桌面后返回、顶部边缘滑动。开始菜单与形象页顶部第一游戏像素为 `y=0`，旧包为 `y=72`；系统状态 `statusBars visible=false`。滑动时 `visible=true`，4 秒后恢复 `visible=false`。头像仍完整可见；本轮日志未发现 `FATAL EXCEPTION`、`SIGSEGV`、`panicked at` 或 `touchHLE crashed!`。截图：`android-fullscreen-menu.png`、`android-fullscreen-avatar.png`、`android-fullscreen-resume.png`、`android-fullscreen-delivery.png`，均在 `_analysis/dumps/`。切回时采样到了开始菜单画面，本轮不据此宣称游戏后台进度恢复正常。
+4. **最新交付 APK**：`touchHLE-zombiefarm-android-arm64/touchHLE-zombiefarm-android-arm64-fixed.apk`，`97270814` B，SHA-256 `00122762D11ADE481550E95953CAB836B594867D5B4B7349FC71F07457697A67`。MuMu 已安装 `base.apk` SHA-256 与本地相同，当前停在全屏开始菜单。内置 IPA 仍为 `59564493` B / `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`。快捷构建与 `_verify_android_package.ps1` PASS；修改前 6 项项目基线全部 PASS。构建日志 `android-fullscreen-build.txt`。
+5. **存档保护**：测试前已 force-stop 并将整个 Android `touchHLE_sandbox` 快照到 `%TEMP%`；测试结束还原并重新拉取，全部 4 个文件 SHA-256 与快照逐字节一致。快照位置记在 `_analysis/dumps/android-fullscreen-snapshot-path.txt`。没有选择或确认头像；Windows 真实存档未用于本轮测试。
+6. **验证范围**：目前全屏效果实测覆盖 MuMu Android API 35；API 21～29 的兼容分支已编译，尚未在对应设备实测。真实手机、刘海屏以及全游戏长时运行仍待主人继续确认。固定 ADB、构建工具与一键入口沿用 §15.1，无需重新搜索环境。
+
+## 19. 交接后追加（2026-10-06，Android「ZF游戏管理」）
+
+1. **产品行为**：APK 启动入口名为「ZF游戏管理」，首页先进入原生管理器，不会直接进入游戏。v29fix IPA 内置在 APK assets，首次启动时校验 SHA-256 并安装到应用数据目录；无需用户复制 `data`。其他 IPA 通过 Android 系统文件选择器导入，校验后加入版本列表并可切换。选择、设置和累计跳过时间按 IPA 的 bundle id 隔离。
+2. **管理功能**：游戏页有版本切换、导入 IPA、启动、启动并跳过时间、重置累计偏移、金币/脑子读取与修改；设置页有 iPhone/iPad、渲染倍率、30/60/90/120/不限/自定义 FPS、高速帧率修复开关；存档页有完整备份、恢复前自动备份、完整 ZIP 与 `saveGame.bin2` 导入、ZIP 导出和备份删除。存档/设置操作与独立 `:game` 进程使用独占文件锁；游戏运行期间存档操作禁用。Android 默认 iPhone ×1/60 FPS，不使用 Windows 滚轮或 `scale-hack`，触控缩放交给游戏两指手势。
+3. **代码与构建**：新增 `ManagerActivity.java`、`ZfIpa.java`、`ZfSave.java`、`ZfStorage.java` 与隔离目录 instrumentation runner；修改 `MainActivity.java`、Android manifest、Gradle 版本与 Rust Android 参数入口。快捷构建：`powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_build_android_local.ps1`；隔离测试：`powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_test_android_manager.ps1`；APK 静态检查由构建脚本调用 `_analysis\_verify_android_package.ps1`。不要重复定位环境：MuMu ADB 为 `C:\Program Files\Netease\MuMu\nx_device\12.0\shell\adb.exe`，设备 `127.0.0.1:5557`，工具链根目录 `C:\Users\Loner\AppData\Local\Temp\zfr-android-toolchain`，其余固定路径见 §15.1。
+4. **最终 APK**：`touchHLE-zombiefarm-android-arm64\touchHLE-zombiefarm-android-arm64-fixed.apk`，97,298,603 B，SHA-256 `CAE397A0901A1DCAE069834E6421D856819DAF84995298FFE0F8D9E61DBB7167`。MuMu `base.apk` SHA-256 与本地逐字节一致。APK 内 v29fix IPA 59,564,493 B / SHA-256 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`；静态校验 PASS。隔离 instrumentation `30 checks PASS`，输出 `_analysis\dumps\android-manager-tests.txt`。构建输出见 `_analysis\dumps\android-manager-build.txt`，测试构建/设备输出见 `_analysis\dumps\android-manager-test-build.txt` 与 `android-manager-tests-run.txt`。
+5. **MuMu 最终包实测**：API 35 覆盖安装后冷启动进入管理器首页，显示内置 v29fix；游戏/设置/存档三页、设备/倍率/FPS 选项、跳过时间对话框和完整备份操作都已在 MuMu 检查。最终包从「启动游戏」进入中文开始菜单成功，再退出回管理器，创建并恢复完整备份。开始菜单显示 MuMu 测试存档金币 200 / 脑子 0；没有点「开始游戏」、确认头像或改动货币。快照在 `%TEMP%\zfr-android-manager-final-<GUID>\touchHLE_sandbox`，路径记录于 `_analysis\dumps\android-manager-final-snapshot-path.txt`；恢复后四个 sandbox 文件与快照逐字节一致（哈希记录见上一节 §18 与本轮 shell 输出）。测试 ZIP 和创建的 `zf_manager.json` 已删除，MuMu 停在管理器存档页。截图包括 `android-manager-final-clean.png`、`android-manager-final-save-backedup.png`、`android-manager-final-game-launch.png`。
+6. **验证边界**：静态校验和隔离测试不等于所有真实流程均已实测。当前未在真实 Android 手机验证；没有实际执行「启动并跳过时间」、金币/脑子写入或系统文件选择器导入 IPA；没有验证厂商系统/刘海屏适配与长时间游戏稳定性。MuMu 入口游戏启动只到中文开始菜单。抓取无关 logcat 时出现的 SIGSEGV 进程名为系统 `uiautomator` helper 的 Shutdown thread（PID 9554），不是 `org.touchhle.zombiefarm`；Android Activity exit-info 没有本轮应用崩溃记录。Windows 真实存档未用于 Android 测试。
+
+## 20. 交接后追加（2026-10-06，Windows 备份恢复累计时间）
+
+1. Windows `GameManager.ps1` 现为每份备份创建隐藏伴随文件 `<backup>.zf-offset`，内容是创建时 `touchHLE_time_offset_seconds.txt` 的累计秒数。恢复新备份时，先自动创建包含当前存档与当前 offset 的 `pre-restore` 备份，再还原存档并原子写回 offset。删除和批量删除会一起移除伴随文件；伴随文件不会显示为备份条目。
+2. **旧备份兼容**：没有 `.zf-offset` 的旧文件仍可恢复，按旧行为只恢复 `saveGame.bin2`，保留当前 offset；不臆测为 0。若元数据内容无效则在改动实时存档前拒绝恢复。`launcher_skip_memory.txt` 只记住对话框上次输入的本次跳过时长，不属于累计 offset，不随存档恢复。
+3. 自检已扩展覆盖新建时保存 7200 秒、恢复时从 9999 秒还原为 7200、旧备份保留当前值、非法元数据不改动存档/offset，以及删除 sidecar。完整 `GameManager.ps1 -SelfTest` PASS；真实 Windows sandbox 在 `%TEMP%\zfr-windows-backup-offset-before-<GUID>\touchHLE_sandbox` 逐文件比对 5 个文件均与测试前 SHA-256 一致。静态测试没有使用 Windows 真实存档写入。
+4. 交付脚本 `_analysis\_build_release.ps1` 已同步说明此行为，必须用该脚本重建 `Release\`，不要手动改生成后的 `Release\使用说明.html`。累计时间仍是 touchHLE 根目录下的全局 `touchHLE_time_offset_seconds.txt`，不会随 IPA 单独隔离。
+
+## 21. 交接后追加（2026-10-07，双平台启动器主题）
+
+1. 主人要求启动器采用伊蕾娜相关配色，随后明确取消角色插画，只保留配色。原始配色版本记录在本节；主人随后指出主体应为银白、灰紫、夜蓝与金色，不应使用酒红。最终校正与 Windows 页面重构见 §22。
+2. Windows `GameManager.ps1` 的旧版「游戏」页采用桌面双栏，右侧集中画面和帧率设置；主人反馈这只是移动设置位置，要求重新设计。最终独立页面与动态窗口尺寸见 §22。
+3. Android 保留原生触屏纵向信息顺序，更新 `ManagerActivity.java` 与 `res\values\zf_styles.xml` 的主题色、系统栏颜色、选中页签/按钮、卡片和开关颜色。没有修改游戏 Activity、渲染代码、IPA 或数据处理。
+4. 原始主题版本的 Android APK 与验证记录保留作历史；如按 §22 校正 Android 配色并重建，须在 §22 更新当前 APK 哈希。Windows Release 与实窗截图的最终状态按 §22 记录。
+
+## 22. 交接后追加（2026-10-07，Windows 管理器重构与配色校正）
+
+1. 主人指出旧 Windows 界面只是把设置移到右侧，并纠正伊蕾娜配色不应使用酒红。Windows 管理器改为三个独立页面：**游戏**仅放 IPA、启动与货币操作；**设置**集中设备/窗口倍率、帧率和显示选项；**存档**独立管理备份。页面切换时窗口高度按当前页面内容调整，避免短页面留下大块空白。
+2. 配色校正为银白底、灰紫控件、夜蓝主操作和古金页眉细线；错误提示仍使用语义红色。Android 管理器的系统强调色、状态栏和导航栏也改为夜蓝，管理页保留原生触屏纵向布局。没有增加图片或依赖，也没有更改设置模型、启动行为或存档逻辑。
+3. 修复布局重构末尾的 PowerShell 尺寸构造与函数调用语法。实窗截图 `_analysis\dumps\windows-manager-redesign.png` 显示游戏页窗口 `976 × 467`，状态栏紧跟页面内容。真实控件回归中三页外框高度设置/游戏/存档=`433/467/591`，并验证 FPS/窗口设置落盘与存档列表。
+4. 只读取 Windows 真实存档，看到金币 `140586` / 脑子 `4410`；没有写入、备份或恢复真实存档。静态检查与 UI 自动化通过不等于主人已做游戏内实测；本次不据此宣称游戏效果变化。
+5. `_analysis\_ensure_bom.ps1`、`GameManager.ps1 -SelfTest`、`_analysis\_verify_layout.ps1`、`_analysis\_verify_layout_match.ps1`、`_analysis\_device_size_roundtrip.ps1`、`_analysis\_gui_controls_test.ps1`、`Release\GameManager.ps1 -SelfTest`、`_analysis\_verify_release.ps1` 均 PASS。Release 运行验证等待 45 秒，窗口出现且进程存活，无 panic；测试后 Release sandbox 已恢复。开发版与 Release 管理器都是 141,807 B / SHA-256 `11F19771E083EBEDC1B0850B540DA12C1B2C746F02FE72230652957D7CB81BEC`。`git -c core.whitespace=cr-at-eol diff --check` PASS。没有发布新的 GitHub Release。
+6. Android `ManagerActivity.java` 原已采用银白/灰紫/夜蓝/古金；本次只将 `zf_styles.xml` 系统强调色及状态/导航栏改为夜蓝。快捷构建、`_verify_android_package.ps1` 与隔离 instrumentation 30 项 PASS。MuMu `127.0.0.1:5557` 覆盖安装成功，设备 `base.apk` SHA-256 与本地相同：`2AB94757AC8DAC964823356E5AD74E96FCF454E3187128C46A2EB1FB8CA775BF`；APK 为 97,299,598 B，内置 IPA 哈希仍为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`。首页截图 `_analysis\dumps\android-manager-night-blue.png` 显示夜蓝状态栏/导航栏和管理页；没有启动游戏或操作存档，真实 Android sandbox 未读取或写入。
+
+## 23. 交接后追加（2026-10-07，Windows 启动器异常复核）
+
+1. 主人反馈启动器弹出 .NET 异常：“Visual Style handle creation operation did not succeed.” 截图没有展开 `Details`，因此没有异常调用栈。
+2. 对当前开发脚本执行 `GameManager.ps1 -SelfTest`、真实 GUI 控件回归（含日/夜按钮来回切换两次）均 PASS；通过 `游戏管理.exe` 启动开发版和 `Release\游戏管理.exe`，窗口正常出现、没有控制台或异常对话框。当前无法复现该异常，不能仅据静态/自动化通过断言用户机器上的触发条件已根治。
+3. 定位到开发版 `GameManager.ps1` 为 150,540 B，而旧 `Release\GameManager.ps1` 为 146,204 B。已用 `_analysis\_build_release.ps1` 重建 Release，两个脚本现在字节数及 SHA-256 一致；`_analysis\_verify_layout.ps1`、`_analysis\_verify_layout_match.ps1` 与 `_analysis\_verify_release.ps1` 均 PASS。Release 验证只运行其自身包内副本，测试后 sandbox 已恢复。
+4. `_analysis\_gui_controls_test.ps1` 增加日/夜按钮的实际 Win32 点击及异常对话框检查。`_analysis\_no_console_test.ps1` 改用 `[System.Diagnostics.Process]::Start()` 并正确采用 `-Root`，可独立检查开发目录或 `Release\` 启动入口；这样也避开本机 `Start-Process`/`NO_PROXY` 问题。测试夜间状态最后已恢复为 `launcher_night_mode.txt=0`。
+5. 若异常仍能在当前重建的 Release 复现，需要展开异常窗的 `Details` 获取调用栈；目前截图提供的消息不足以确认是否仍是相同运行版本或触发路径。静态检查通过不等于异常根因已证实修复。
+
+## 24. 交接后追加（2026-10-07，夜间模式控件白边）
+
+1. 主人指出夜间模式的设置页仍有刺眼白线/白方块，存档页也有亮白表头空块。实窗复核确认：组合框 Windows 主题边框/箭头分隔线不受普通 BackColor 控制；存档 ListView 表头列宽总和短于控件宽度，剩余区域由系统绘成白色。
+2. `PaletteComboBox` 去除原生 `WS_EX_CLIENTEDGE` / `WS_BORDER`，由主题颜色绘制外框与箭头，并把箭头背景向左覆盖系统留出的单像素白线。存档表格最后一列扩展到控件右边缘；夜间分隔线由 RGB `62,75,69` 降至 RGB `49,59,56`。没有更改选项写入、游戏启动或存档行为。
+3. 截图 `_analysis\dumps\windows-night-after-settings.png` 与 `windows-night-after-saves.png` 用于开发版核验；Release 重建后副本与开发版相同。设置页组合框原白色像素实测从 RGB `255,255,255` 变为表面色 RGB `38,46,48`，存档表头右侧白块消失。截图尺寸分别为 976 × 433 与 976 × 591。
+4. `_analysis\_ensure_bom.ps1`、`GameManager.ps1 -SelfTest`、`_analysis\_gui_controls_test.ps1`、`_analysis\_verify_layout.ps1`、`_analysis\_verify_layout_match.ps1`、`Release\GameManager.ps1 -SelfTest`、`_analysis\_verify_release.ps1` 均 PASS；控件回归验证三页高度、设置落盘、存档条目及日夜切换。Release 测试后 sandbox 已按脚本恢复。真实存档只读取，未启动游戏或写入存档。夜间效果由开发版实际截图和控件像素采样确认；交付包的 `GameManager.ps1` 已逐字节同步。
+
+## 25. 交接后追加（2026-10-07，Windows 标题栏随日夜模式）
+
+1. 主人询问窗口最上方系统标题栏能否更改颜色。该区域由 DWM 绘制，WinForms 的 `Form.BackColor` 不控制它。
+2. 新增 `WindowChrome` DWM 调用：日间恢复系统默认 caption/text/border 颜色；夜间模式设置标题栏底色为管理器深色背景、文字为浅色前景、边框为夜间分隔色。通过 `DWMWA_USE_IMMERSIVE_DARK_MODE`（不支持时回退属性 19）与 Windows 11 caption/text/border color 属性实现；颜色值由 C# 按 COLORREF 正确打包，避免 PowerShell byte 位移丢失高位。
+3. 当前 Windows 11 23H2 / build 22631 实窗验证：夜间标题栏为深灰底、浅色系统标题与按钮；日间标题栏恢复浅色系统样式。截图 `_analysis\dumps\windows-night-titlebar-settings.png` 和 `windows-day-titlebar-settings.png`。旧版 Windows 若不支持 caption color 属性，会保留系统可用的沉浸式深色模式，精确标题栏颜色由系统决定。
+4. Release 已通过 `_analysis\_build_release.ps1` 重建；`_analysis\_verify_release.ps1` 与 `_analysis\_gui_controls_test.ps1` PASS，后者实际切换日夜两次，无异常；Release sandbox 由验证脚本恢复。`git -c core.whitespace=cr-at-eol diff --check` PASS。没有启动游戏或写入真实存档。
+
+## 26. 交接后追加（2026-10-07，双平台默认夜间与清洁发行存档）
+
+1. README 分开写清设备分辨率：iPhone 原生 `480×320`；iPad 原生 `1024×768`，iPad ×1.5 才是 `1536×1152`。Android 首页截图改用 `_analysis\dumps\android-manager-night-relaunch.png` 的夜间管理器实拍。两端首次启动管理器都默认夜间；Windows 通过未创建 `launcher_night_mode.txt` 时默认 `$true` 实现，Android 新安装偏好默认 `true`，已有用户保存过的显式主题选择继续保留。Windows 按钮显式设置 `MiddleCenter` 与零 Padding。
+2. 发现并修正公开存档泄露来源：`_analysis\_build_release.ps1` 原会把开发机 `touchHLE\touchHLE_sandbox\...\saveGame.bin2` 复制进 Windows Release。现在 Release 从空 `touchHLE_sandbox` 构建，玩家首次进入游戏再自行生成进度；Release verifier 强制 sandbox 中没有文件。Android APK 本身只内置 IPA，不允许出现 `touchHLE_sandbox`、`sandbox/` 或 `saveGame.bin2` 条目，静态验证器已加断言。后续任何发行包都不要读取或复制工作目录真实 sandbox。
+3. 修复后 Windows ZIP 为 `95,055,963 B`，SHA-256 `0FC4DC8E3EF544C3945651F04434D883181586120E836E6953BBE374FBA49924`，42 个文件、0 个 sandbox/save 条目；Android APK 为 `97,302,385 B`，SHA-256 `8644CB871D01C0DDFD28C7E4ED80620865EA2E6FB2B471EE8EA6823F1E96FED6`。两者已重新上传到现有 `v29fix-platforms`，Release 说明、GitHub 首页也已更新。Assets API 下载回读的两份文件大小和 SHA-256 均与本地一致；直接 release 下载域名当时连接超时，API octet-stream 下载成功。
+4. 验证：BOM/Syntax、`GameManager.ps1 -SelfTest`、`_verify_layout_match.ps1`、`_verify_release.ps1`、`_verify_android_package.ps1`、`_gui_controls_test.ps1`、`git diff --check` PASS；Release standalone launch 45 秒仍存活。工作目录 `touchHLE\touchHLE_sandbox` 未被构建/测试写入，SelfTest 显示真实存档金币 `140586` / 脑子 `4410` 且只读。新截图显示 Android 夜间模式，但本次 MuMu 未连接，因此没有做 APK 新默认主题的设备端启动验证。
+5. GitHub `master` 为 `3cae4df063a6ab95cc499f5ffbe1f6f6695b2050`；包含本批代码与 README 更新的 tree `abf3e979bf801cd6ec65c98d1ee172d235310396`。`process.md` 最新批次 #30。
+
+## 27. 交接后追加（2026-10-07，Windows 日夜图标绘制居中）
+
+1. 主人指出之前的 `TextAlign=MiddleCenter` 并未让 Segoe MDL2 Assets 太阳字形视觉居中。现清空按钮文字，`Paint` 事件用 `TextRenderer.DrawText` 配合 `HorizontalCenter | VerticalCenter | NoPadding | SingleLine` 在 `ClientRectangle` 画 Tag 中的太阳/月亮字形；换主题后显式 `Invalidate()`。不要恢复为 Button.Text 绘制。
+2. 日间窗口实拍 `_analysis\dumps\windows-day-icon-centered-review.png`，图标在边框客户区内目视居中。`GameManager.ps1 -SelfTest` 与 `_analysis\_gui_controls_test.ps1` PASS；重建 Release 后 `_analysis\_verify_release.ps1` 运行 45 秒通过，布局匹配 PASS。截图前将 `launcher_night_mode.txt` 字节快照，临时日间取图后原字节写回。
+3. Windows ZIP 重建后 42 个文件且不含 sandbox/save，`95,056,542 B`，SHA-256 `92C6D2B2D541B3C332DA1427DF4D8A447B89309B481A0446F5726A91D7F4D477`。已替换 `v29fix-platforms` 的 Windows 附件并更新 Release body 哈希；GitHub Assets API 下载回读大小和哈希完全匹配。Android 附件未改。
+4. 本节代码、说明及 Windows ZIP 已同步到 GitHub：`master` 已包含按钮绘制修复，`v29fix-platforms` 使用上述新 ZIP；`process.md` 最新 #31。真实游戏 sandbox 未读写。
+
+## 28. 交接后追加（2026-10-07，月牙光学中心补偿）
+
+1. 主人指出月亮虽然轮廓居中，视觉上仍偏。按夜间实窗截图对按钮客户区的 glyph 色彩权重采样：旧月牙重心在 `(928.66, 62.72)`，客户区中心 `(927, 61.5)`，偏右 `1.66 px`、偏下 `1.22 px`。太阳色心 `(926.99,61.48)` 已居中。
+2. 只对月牙 glyph (`U+E708`) 按 `Graphics.DpiY / 96` 应用 `(-1.65,-1.20)` px 光学补偿。新截图 `_analysis\dumps\windows-night-icon-optically-centered.png` 的月牙色心为 `(927.10,61.36)`，距离中心 `(0.10,-0.14) px`；可见轮廓边距左/右为 `8/11 px`，由于月牙开口形状不对称，判断以色心而非包围框为准。日间太阳继续保持边距 `9/9 px`、色心偏差 `(-0.01,-0.02) px`。
+3. `_analysis\_ensure_bom.ps1`、`GameManager.ps1 -SelfTest`、`_analysis\_gui_controls_test.ps1`、`_analysis\_build_release.ps1`、`_analysis\_verify_release.ps1`、`_analysis\_verify_layout_match.ps1` 均通过；空 sandbox、Release 45 秒 standalone 正常。重新打 Windows ZIP 42 个文件，无 sandbox/save；最终 `95,057,453 B` / SHA-256 `84DE88543BF3D302657E6681F72E28D77F7E3EA5063995A1ECDBCB30B72F4461`，应替换 §27 记载的旧 ZIP。
+4. 最终 ZIP 已替换 `v29fix-platforms` 同名附件：`95,057,453 B` / SHA-256 `84DE88543BF3D302657E6681F72E28D77F7E3EA5063995A1ECDBCB30B72F4461`；Assets API 下载回读字节与本地一致。源码已同步 GitHub `master`；`process.md` 最新 #32。真实游戏 sandbox 未读写。
+
+## 29. 交接后追加（2026-10-07，Android 应用名称）
+
+1. Android 桌面应用标签、管理器标题栏和首页标题统一为「Zombie Farm 游戏管理」。首页标题字号调整为 20sp，给右侧状态标记留出空间。Windows 版名称不变。
+2. APK 重建并通过 `_analysis\_verify_android_package.ps1`；AAPT 从正式 APK manifest 回读的标签为 `Zombie Farm 游戏管理`。APK 为 `97,302,247 B` / SHA-256 `1FDCAD2AE4F0474EB14A86E24202E19851E317F4DD176CC40872D0F76773160F`；内置 IPA 仍为 `59,564,493 B` / SHA-256 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，静态包校验通过，无 sandbox 存档。
+3. README 与 `RELEASE_NOTES_v29fix-platforms.md` 已更新应用名称及 Android 附件校验信息；源码和 APK 随后同步到 GitHub `master` 与既有 `v29fix-platforms` Release，并按线上资产 SHA-256 回读校验。MuMu 未启动，本轮未做设备 UI 实测，也未访问或写入 Android sandbox。
+
+## 30. 交接后追加（2026-10-07，Android 首页状态标记布局）
+
+1. 主人反馈应用改名后首页「准备就绪」胶囊看起来偏斜。根因是状态标记绝对定位在右上角，而长标题占满整行并从其下方穿过。现将胶囊放在标题和副标题之后的纵向内容流中，取消右上角绝对定位；主题按钮仍在右侧独立定位。标题长度变化不再改变状态胶囊的排版或与其重叠。
+2. `_analysis\_build_android_local.ps1` Release 构建成功，内置 IPA 校验仍为 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`，APK 静态校验 PASS。新 APK `97,302,304 B` / SHA-256 `99F896A3E157E4BAD8C099FF8DE825EC9A97AC09E9F3EDB374D53968B932ABB8`。源码提交 `7e8922914eb79710e8b32b5c9e2e1acb615be389` 已推送 `master`；`v29fix-platforms` 的 Android 附件已替换，API 下载回读大小与 SHA-256 一致，Release 正文与本地说明逐字符一致。新附件 asset id `616716673`。未启动 MuMu、游戏或触碰任何 sandbox。
+
+## 31. 交接后追加（2026-10-12，入侵闪退分配器修复，原复现入侵已通过）
+
+1. 本轮持续任务是 Windows 入侵闪退。用户已在当前项目目录用玩家存档稳定复现。前轮 Cocos scheduler/action manager 共用可重入 guest mutex 的候选仍被用户反馈闪退；不要宣称同步修复已经解决此次稳定崩溃。最新报告：`_analysis\reports\ZFR_入侵闪退_分配器修复_20261012.md`，初次反汇编记录另见 `ZFR_入侵随机闪退_20261012.md`。
+2. 确定 allocator bug：原请求 `15345..15359 B` 走小堆，对齐后为 `15360 B`；旧 free 按对齐大小误判 VM，释放 arena 页面，使新的 `16384 B` 纹理与仍存活的小对象重叠。真实诊断日志 `memory-diagnostic-20261012-232158.log` 已抓到 `0x820000 / 16384 B` 包含仍登记的 `0x820b10 / 448 B` 和多个 `16 B` 对象，创建位图前 `isa` 已为零。修复是明确返回 Heap/External 来源并按来源释放，不是调整阈值或修改存档。
+3. 新增 5 项真实 `Mem` 回归覆盖全部边界、相邻哨兵、VM 保留/复用与清零；生产库全部 65 项通过。复跑入口：`powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_test_invasion_mem.ps1 -All`。固定 Windows 构建入口仍是 `_analysis\_build_fork_now.ps1`，已成功增量构建并同步三份 exe，均为 `28,878,848 B` / SHA-256 `948D59D1D3FCDF5CE1198356AF296C37B690611E8FE86A99203A625A99E9D34E`。OpenAL 构建环境坑已解决并记录于 `_analysis\reports\Windows_OpenAL构建配置_20261012.md`，不要再次绕回 vendor/EAX/工具链探索。
+4. 存档现状：用户主动换入玩家测试进度并改过货币；绝不能自动把原开发存档恢复覆盖当前项目 sandbox。原开发完整快照在 `%TEMP%\zfr-owner-before-invasion-ea82b6f0719f4aa5988fe1cb8401a208`。当前稳定复现快照在 `%TEMP%\zfr-project-stable-repro-cb7865f404094e1798db7dcdd15173f0`；存档 SHA-256 `FC2F6465009DA3117A39ED58412EBB52AC1F6FCD2491D67B4E3CB350298B800E`。fixture 及所有固定路径见 `_analysis\dumps\player-invasion-20261012\fixture.json`。
+5. 诊断复测入口：`powershell -NoProfile -ExecutionPolicy Bypass -File _analysis\_run_invasion_diagnostic.ps1 -TimeoutSeconds 900`。只恢复并运行 TEMP 副本，启用默认关闭的只读内存探针。本轮窗口 PID `80356` 已正常关闭，exec session `95101` 已完成；日志 `memory-diagnostic-20261012-235139.log`。用户明确反馈“入侵完成，未闪退”；日志记录战后存档、金币增加 `2000`、正常请求退出和退出存档，进程退出码 `0`。24 条探针创建记录确认诊断开启，FIRST ANOMALY/对象重叠/MemoryError/panic 均未出现。机器可读记录 `fixed-invasion-result.json`。确认范围为单次海盗入侵，重复、死亡补队和 Android 未测；上一轮仅进入后仍崩溃的窗口不能算成功。
+6. 没有修改 IPA、占用 code cave、提交 Git 或发布 GitHub。Android 共享此次修复的内存源码，但尚未重建 APK 或验证 Android 入侵。用户初始未提交的技能删除、`HANDOVER.md` 更改、`tools\AndroidEnterAvatar.exe` 与 crash snapshot 必须保留，不要 blanket stage/清理。
+7. 本轮常规验证已完成：BOM/语法、管理器自检、布局、布局匹配、设备设置往返、交付包独立启动 `45 s` 均通过。项目 sandbox 5 个文件与测试前路径/大小/SHA-256 全部相同；Release sandbox 仍空。旧 allocator 独立证明全部 15 个危险边界复现对象字节被清零/覆盖，2 个相邻对照正常；输出 `allocator-threshold-old-proof.txt`，证明入口 `_analysis\_prove_allocator_threshold.rs`，不能将其当作游戏实测。
+8. 日志仍有既有 `xpNeededForLevel:oob` 被忽略断言、离线资源、GL fallback 和 CCArray 保护记录，不要写“无任何警告”。本次退出后再次核对项目 sandbox 5 文件未改变；入侵进度只写在 TEMP 副本。`process.md` 本批 #35。
+
+## 32. 交接后追加（2026-10-13，Windows / Android 同步构建与发布）
+
+1. 用户本轮明确要求用个人 `git-pr` 技能同步 GitHub，并询问两端是否都已修改。已将共用 allocator/Cocos 修复编译到 Windows exe 和 Android ARM64 `libtouchHLE.so`，APK versionCode 由 `3` 增至 `4`，versionName 为构建源码 `2a47842`。Android 固定 `_build_android_local.ps1` 完整构建成功，`2m51s`；内置 IPA、默认 iPhone/横屏/60FPS/两指缩放和夜间模式保持。MuMu `127.0.0.1:5557` 连接被拒绝，本轮没有 Android 设备游戏实测，也没有执行旧 instrumentation。
+2. APK `97,312,084 B` / SHA-256 `C10F0E00B4AADA2E47944F41245AB5B64C5142849926FCC538179DD405920B7F`。包内 ARM64 lib `29,914,056 B` / SHA-256 `71A0FFFB7A42A4C823D3FB8064D7AB7863F3D954787C58D230865DB2668DEC7A`，与新构建的 stripped native lib 完全相同；IPA 哈希仍 `E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED`。签名校验通过，certificate SHA-256 `c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f` 保持。包不含存档。
+3. Windows 已在源码 commit 后重编，以 `D48D903494AEC412386472637282AA8A1ACC4F0789E1A16921585EE702C1041D` 同步三份 exe（`28,878,848 B`）；和前次实测版的核心源码完全相同，新增差异为版本 commit 标识。用 `_build_release.ps1` 重建，再用修正后的 verifier 实际观察 `45.5 s`，启动通过。旧 verifier 的 `Seconds=45` 曾只是找窗口超时，通常实际约 `14 s`；现在修正为实际等待完整时长，并打印实际时间。不要把早期输出里的 `45s` 当成真实计时证据。
+4. Windows ZIP `95,948,193 B` / SHA-256 `8935F65C5A754D5BADB92541AE09551EB3ADB8E98A8F9479A15B7CE02F2D9C67`，顶层单一同名目录，42 文件，ZIP 中 exe 哈希与构建相同，无人物存档。打包位置、两份产物和 manifest 记录于 `_analysis\dumps\invasion-release-packages-20261013.json` 与 `invasion-release-manifest-20261013.json`。
+5. 源码 commit `2a478424b50591360f91790ee760f34b78072987`，发布文档/README/真实观察时长修正 commit `4f803c3116a797b9a5afbae0aba0a18c4d961187`，已通过技能预演和 apply 推送并回读。15 个明确审查路径；使用 `--allow-dirty` 仅发布已提交 HEAD，旧技能删除、初始 HANDOVER 技能迁移和本机分析数据等均保留，未夹入本批。
+6. Release tag `v29fix-invasion-fix` 绑定实际构建源 `2a478424...`；发布标题「僵尸农场 · Windows / Android 入侵闪退修复」。说明文件 `_analysis\reports\RELEASE_NOTES_v29fix-invasion-fix.md` 与 Git blob 字节相同。为满足技能发布仓干净要求，使用 managed worktree `C:\Users\Loner\.codex\worktrees\invasion-fix-release\touchHLE-zombiefarm`，HEAD 固定构建源；主工作区未清理或 stash 用户改动。Release id `410793711`。初次默认 transport 上传留下本次草稿的 `starter` 记录，已只删除本次未公开失败记录 `634286109`（未碰旧 Release）。任务私有 `_analysis\_publish_invasion_fix.mjs` 复用技能流程，asset transfer 走 Git 自带 OpenSSL curl/stdin 内存凭据、600s 有界等待。**主人已明确代理 `http://127.0.0.1:10808`**；下次 GitHub 大文件传输直接使用这个地址，`--proxy` 并配合 `--noproxy ''`，不要仅凭 HTTPS_PROXY 环境变量为空就认定没有代理，也不要重复测试直连 CDN。当前 exec session `19845`；Windows asset `634299433` 已 `uploaded`，必须等下载验证及公开真实结果再称完成。最终结果自动写 `invasion-release-upload-result-20261013.json`。
+7. 本次常规 BOM/语法、布局匹配、Windows 实际启动与 APK 静态/签名/元数据校验通过。发行包仍空 sandbox；项目真实存档没有参与打包。公开说明不含原始玩家存档、QQ 收件路径、诊断原始日志和本机完整快照路径；这些只在本机分析数据中保留。`process.md` 本批 #36。
+8. **已完成发布**：`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-invasion-fix`，release id `410793711`，draft=false/prerelease=false，`/releases/latest` 确认本版，tag 解析到构建源完整 SHA。Windows asset id `634299433`，Android asset id `634322519`，两者均 uploaded，大小及通过代理实际下载的 SHA-256 与本地完全一致。正文与已提交说明逐字符一致，GitHub README 两端链接和 Release 页面两文件名/两 SHA 均已渲染确认。最终记录 `invasion-release-final-20261013.json` 和 `invasion-release-upload-result-20261013.json`；最终 exec session `19845` 正常退出。不要再跑前面失败/中断的旧 session 或创建重复 Release。
+9. 发布辅助 managed worktree 已归档，可从本 chat artifact 恢复；主项目 checkout 与未提交文件均保留。若未来需要重新执行发布 helper，可创建另一个固定 source SHA 的干净 worktree，不要以为归档路径仍存在。最终再核验项目 sandbox 5 文件未改变、Release sandbox 为空。
+
+## 33. 交接后追加（2026-10-13，Windows 存档选中高亮）
+
+1. 主人反馈存档列表选中和未选中颜色相同。TEMP 隔离包内放三行虚拟记录，实际 `Selected` 为 false/true/false，但旧 `DrawSubItem.ItemState` 路径把四列都画为相同的 SoftGreen；两种主题、选中/未选中及失焦时均复现。此次直接对应 Windows；Android 备份记录点击后立即打开操作弹窗，没有持久选中列表，未改 Android。
+2. `GameManager.ps1` 改为读取 `$eventArgs.Item.Selected`，选中行使用专用底色和左侧 3px 主题色标记。夜间选中/普通背景 RGB `50,83,69` / `38,46,48`，日间 `208,231,219` / `255,255,255`。选择变化与切换主题均显式 Invalidate，焦点移到按钮后仍显示选择。未改存档数据、操作逻辑、模拟器或 IPA。
+3. 一次性实窗取证入口 `_analysis\_probe_save_selection.ps1`；它只复制无存档的 Release 到本次 GUID 命名 TEMP 目录，注入虚拟条目和截图定时器，退出后检查路径并清理该 TEMP 副本。截图/逐列像素为 `_analysis\dumps\save-selection-before\` 与 `save-selection-after\`，覆盖日夜单选、失焦、全选、取消和反选；修改前四列同色，修改后所有行四列均按真实 Selected 状态显示。真实 sandbox 未参与。
+4. 开发版及 `Release\GameManager.ps1` 已同步；此次只修改脚本，`游戏管理.exe` 启动壳不需重编。修复提交 `63e29f0f1227054166b8d2bb00a47ab00c087c38` 已推送；后续 README Android 安装链接修正提交 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d` 为发布 tag 目标。新包已公开，详见 §34。`process.md` 本批 #37。
+5. 修改前基线及修改后的 BOM/语法、开发版 SelfTest、布局、布局匹配、设备设置往返均通过；更新后的 Release 独立运行实际 `45.5 s` 通过并恢复为空 sandbox。两份管理器 SHA-256 均为 `0E2C9F78ADACE3B3D2CCF6821F96D62275897BE1FABA8CBDE0C05A42F8644E74`。注意旧 `-SelfTest` 货币段依赖已有存档，直接对空存档的 Release 运行会报存档不存在；本轮改用 `_probe_save_selection.ps1 -SourceManager Release/GameManager.ps1 -FixtureSelfTest -Label after` 在 TEMP 副本和 128 B 合成版本 14 玩家块执行，全部通过（`save-selection-after\release-fixture-selftest.txt`），没有把测试存档放入交付目录。不要因此重新往正式 Release 里放入人物存档。
+
+## 34. 交接后追加（2026-10-13，存档高亮更新发布完成）
+
+1. 用户调用个人 `git-pr` 技能要求同步 GitHub。本项目继续直接推送 `master`；精确审查并发布 `GameManager.ps1`、`README.md`、`process.md` 与新发行说明 `_analysis\reports\RELEASE_NOTES_v29fix-save-selection.md`。提交 `63e29f0...` 是修复和下载说明，`49c597a...` 修正安装步骤中遗漏的旧 Android APK 链接；两次技能预演和 apply 均通过，远端 master SHA 已回读为 `49c597afdc0a95eb6601af8c3a5a9cb0502e7a1d`。其余初始删除/修改/未跟踪文件均保留，未夹入提交。
+2. Release `https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-save-selection` 已公开，release id `410826263`，latest 确认为本版，tag 指向上述完整 SHA。旧 Release 和 tag 未覆盖或删除。README 首页、两平台安装步骤、Release 正文及 Assets 的线上下载链接均已检查；正文与 Git 源文件逐字符相同，管理器磁盘文件与 Git blob 逐字节相同。
+3. Windows ZIP `zombie-farm-windows-x64-v29fix-save-selection.zip`，`95,948,563 B` / SHA-256 `7A924801C7BA86F853D1D682B674B5955A5E474E44A2451C5E19244805A2A130`，asset id `634385971`。从 `_build_release.ps1` 重建后验证，实际运行 `45.5 s`；ZIP 42 文件、单一同名顶层目录，无玩家存档和日志。ZIP 管理器 SHA 为 §33 所列，exe 和 IPA 仍为入侵修复版。包路径见 `save-selection-release-packages-20261013.json`。
+4. Android 下载 `zombie-farm-android-arm64-v29fix-invasion-fix.apk`，`97,312,084 B` / SHA-256 `C10F0E00B4AADA2E47944F41245AB5B64C5142849926FCC538179DD405920B7F`，asset id `634387040`。与上一公开版本完全相同，本次仅为方便下载而同页提供；没有重编 APK 或新增 Android 实测结论。两端附件均通过明确代理 `http://127.0.0.1:10808` 上传，草稿阶段与公开后均实际下载核对 SHA-256，全部一致。
+5. 任务私有上传脚本 `_analysis\_publish_save_selection.mjs` 复用个人技能 `runRelease` 与既有显式 curl 代理传输，未改个人技能。最终 exec session `79255` 正常退出。只读回读脚本 `_analysis\_verify_save_selection_release.mjs` 完成 API/latest/branch/tag/页面核验。持久记录：`_analysis\dumps\save-selection-release-manifest-20261013.json`、`save-selection-release-upload-result-20261013.json`、`save-selection-release-final-20261013.json`。不要重跑本次创建 Release 的写请求；如需确认，做只读核验。
+6. 发布使用 managed worktree `C:\Users\Loner\.codex\worktrees\save-selection-release\touchHLE-zombiefarm`，HEAD 固定 `49c597a...`，工作树干净；已用应用归档工具归档这个临时发布工作树，需要时从本 chat artifact 恢复，不要直接重用已移除的磁盘路径。真实开发 sandbox 未参与此次构建、打包或发布；发行 sandbox 最终复核为 0 文件。
+
+## 35. 交接后追加（2026-10-21，Windows「游戏已经在运行」误报修复）
+
+1. **现象**：玩家反馈闪退后偶尔出现游戏已不在、任务管理器里也看不到 `touchHLE.exe`，管理器却提示「游戏已经在运行了」；只在闪退后出现，且时有时无。现场抓到活体样本：一个 `touchHLE.exe` 存活但**名下 0 个顶层窗口**（无控制台 + 隐藏父窗口的启动方式下原生模态错误框不可见，或主机线程卡死）。旧判定 `Get-Process -Name touchHLE` 只回答「全世界有没有叫 touchHLE 的进程」，于是把残留进程、其它安装副本、被复用的 PID 一律当成游戏在跑。
+2. **修复**（`GameManager.ps1`，提交 `8a6e4776b7c457c2df5c1fe75371c952600641fc`）：启动时写 `touchHLE\zfr_running.json`（pid、启动时间、exe 绝对路径、IPA、启动时刻），`Get-GameProcessState` 每次校验 pid 存在 + 启动时间 + 镜像路径，任一失配立即删除记录并当作没在跑——这是自愈的关键，崩溃后不再卡住备份 / 还原 / 改存档。`Source` 区分 `record`（管理器自己起的）与 `scan`（`.bat` 起的，且必须是本安装目录下的 exe）。
+3. **启动参数**增加 `--no-error-popup`（现役 `2a47842` exe 的 `--help` 已确认该参数存在），崩溃不再留下隐形模态框。等待由一次 `WaitForExit()` 改成 500 ms 切片 + 看门狗：见过窗口后窗口消失 20 秒，或 120 秒从未开窗，管理器回到前台并询问是否结束残留进程。
+4. **交互**：点「启动游戏」/「启动并跳过时间」时若发现无窗口残留进程，直接给出 PID 与成因并提供「结束它并继续」，不再只回一句「已经在运行」。新增按安装目录 SHA-256 前 16 位命名的单实例互斥 `Local\ZombieFarmManager-<hash>`：同一份安装不能开两个管理器，不同安装可并存。
+5. **可读化与取证**：`Get-ExitCodeHint` 把 `-1073741819` 译成 `0xC0000005 访问冲突` 等；`Get-PanicSummary` 从捕获的 stderr 取 panic 首行显示在状态栏。新增 `touchHLE\zfr_manager.log`（launch / exit / guard / watchdog，超 1 MB 轮转），已加入 `.gitignore`；`_build_release.ps1` 是白名单拷贝，这些运行态文件不会进发行包。
+6. **验证**：78 个 `.ps1` 解析与 BOM 检查通过；`-SelfTest` PASS（新增 5 项：活记录被采信、PID 复用被拒、死 PID 被拒、退出码解码、panic 首行提取）；`_verify_layout` / `_verify_layout_match` / `_device_size_roundtrip` PASS；新增 `_analysis\_probe_launch_state.ps1` 在 `%TEMP%` 的 Release 副本里真实启动游戏，正常退出（`code=0`）与强杀（`code=-1`）两条路径均确认记录写入、pid/exe 正确、记录在 1 秒内清除，并核对了日志行。玩家真实存档 `F6AFCC1A...`（`2026-10-20 23:30:03`）全程未改动。
+7. **边界**：看门狗分支尚未由真实闪退触发（加 `--no-error-popup` 后 panic 直接退出），目前只有强杀测试覆盖；Android 未改动——它的运行状态来自 `zf_game.lock` 的 `FileLock` 与独立 `:game` 进程，进程一死锁即释放，结构上不会出现该误报，但 `gameRunning()` 仍把所有 `IOException` 当「运行中」，属粗糙映射。本轮**未重建 Release / ZIP / APK、未创建新 Release**，线上 `v29fix-save-selection` 内的管理器仍是旧版；要发给玩家必须重跑 `_build_release.ps1` 并发布新 Release。
+8. **文档**：`process.md` 批次 #38、`TECHNICAL.md` §7.8（判定机制与故障模式）随本批更新。`HANDOVER.md` 此次一并提交了上一轮遗留的技能迁移修订（§3.5 已按现状改指个人 `git-hosting` 技能：`C:\Users\Loner\.dsh\skills\git-hosting\SKILL.md`）；`.agents\skills\git-pr\` 的两个删除状态仍保留，未提交。`C:\Haven\Games` 那份旧的安装副本由主人自行更新，本会话未改动。
+
+## 36. 交接后追加（2026-10-21，运行状态修复发布）
+
+1. 主人要求「更新 Release」，于是把 §35 的修复打成新版本 `v29fix-running-detect`。先在开发树跑 `_analysis\_build_release.ps1` 重建 `Release\`（42 文件 / 117.5 MB，sandbox 为空），再用 `_analysis\_verify_release.ps1` 实际启动发行副本，窗口出现、存活 `45.0 s`、无 panic，结束后 sandbox 复原为 0 文件。
+2. Windows ZIP `zombie-farm-windows-x64-v29fix-running-detect.zip`：42 个文件 + 单一同名顶层目录，`95,955,050 B` / SHA-256 `FE942A83D6409C26268F4F637EF51D4A0347E117E6BAE21EDF70B089DD0C69F4`；包内 `GameManager.ps1` 与本次 Git blob 逐字节一致（`C8DF5046...`），无任何 sandbox / 日志条目。Android 未重编，沿用 `zombie-farm-android-arm64-v29fix-invasion-fix.apk`（`97,312,084 B` / `C10F0E00...`）。
+3. Release `https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-running-detect` 已公开，release id `419529614`，`draft=false` / `prerelease=false`，tag 解析到 `e0abbd0bc299c8fc407a86a8a1a16ab120df2689`，`/releases/latest` 确认本版；标题与正文同源文件逐字符一致（2562 字符）。资产：ZIP id `662436607`、APK id `662446606`。
+4. **传输层结论（2026-10-21 复核后修正）**：当晚判断是「技能不读 `HTTP(S)_PROXY`」，复核后**不成立**——本机 harness 本来就向子进程注入 `HTTP_PROXY` / `HTTPS_PROXY` / `NODE_USE_ENV_PROXY=1`，技能的 fetch 当时确实走了代理；`uploads.github.com` 的 `ENOTFOUND` 是代理侧 DNS 瞬时故障，现已复测可通（`400` / 2 s）。真正的硬伤是**固定 120 秒超时**与**重复全量下载**：本轮实测 193 MB 两个资产一次 `--verify` 全量下载耗时 106 秒，慢链路必挂。当晚仍用两个任务脚本收尾（`_analysis\_upload_release_assets.ps1`、`_analysis\_publish_running_detect.ps1`，`HttpClient` + 显式 `WebProxy http://127.0.0.1:10808`），脚本保留备查。
+5. 校验记录：`_analysis\dumps\running-detect-release-manifest-20261021.json`（manifest）、`running-detect-release-upload-20261021.json`（上传后下载核对）、`running-detect-release-final-20261021.json`（公开后 10 项检查全 PASS）。正文源文件 `_analysis\reports\RELEASE_NOTES_v29fix-running-detect.md`，已随本批提交。
+6. README 已更新为三处新 tag 下载链接（下载表 Windows/Android、快速开始两处）并新增 2026-10-21 说明；端到端探针 `_analysis\_probe_launch_state.ps1` 纳入仓库，可按需复跑（`%TEMP%` 副本、不碰真实存档）。`process.md` 本批 #39。
+7. 边界：本次没有重编 APK、没有 Android 设备实测、没有新增游戏场景结论；看门狗分支仍只由「强制结束进程」的探针覆盖，未由真实闪退触发。发布用的临时 worktree `C:\Users\Loner\.codex\worktrees\running-detect-release\touchHLE-zombiefarm` 固定在 `e0abbd0`，用完应 `git worktree remove`，不要直接复用已移除的路径。
+8. **技能修订（2026-10-21，两份副本同步）**：`C:\Users\Loner\.dsh\skills\git-hosting` 与上游 `C:\Users\Loner\.codex\skills\git-hosting` 一起改，scripts / references / tests 两侧逐字节一致，只有 `SKILL.md` 保留 DSH 的两处宿主差异。改动：① 代理自动探测，Node 24+ 检测到 `HTTPS_PROXY` 且未开开关时自动带 `--use-env-proxy` 重跑（`GIT_HOSTING_PROXYED=1` 防递归）；② 传输超时随资产大小放大（约 256 KB/s 兜底，至少 120 秒），可用 `GIT_HOSTING_TIMEOUT_MS` 覆盖；③ 下载核对改流式哈希，不再 `arrayBuffer` + `Buffer.from` 双份占内存；④ `--verify` 与 git 状态、本地产物解耦（manifest 可声明 `sha256` / `size`，不带 `--repo` 也能核）；⑤ 公开发布后默认只比对名称 / 大小 / 服务端 digest，`--recheck` 才全量重下载；⑥ 新增 `--allow-dirty` 放开脏工作区发布，资产仍按加载时 SHA-256 逐个核对、HEAD 仍须等于 target；⑦ 只读 GET 一次有界重试，写请求仍然不重试；⑧ Release 正文不符时报首个差异字符。回归：两侧各 64 项测试全 PASS，`node --check` 全过；真实环境对 `v29fix-running-detect` 跑 `--verify`（无 `--repo`、临时目录里没有产物）通过，106 秒、2 个资产下载哈希一致。
+
+## 37. 交接后追加（2026-11-01，免费开源声明、Android 签名自校验、存档现场异常）
+
+1. **背景与决策**：闲鱼出现倒卖发行包。游戏版权不在本项目手里，模拟器部分又是 MPL-2.0（允许商业转售），所以不走路权与举报，只做「让免费、开源、官方地址在软件内部随处可见」。实现与验证记录见 `process.md` #40，截图在 `_analysis\dumps\notice-win10\`。
+2. **Windows 管理器**：标题栏 `Zombie Farm 游戏管理 · 免费开源`（保留 “Zombie Farm” 前缀，既有自动化按它找窗口）；底部常驻可点击脚注（唯一官方来源 + 付费请退款）；首次运行弹一次「欢迎使用 · 免费开源声明」，含官方地址、退款提示、MPL-2.0 与素材版权归属，并显示管理器自身 SHA-256 前 16 位（当前 `101A5A7D528D3AE5`，随文件变化）供与 Release 说明比对；关闭时写 `launcher_notice_seen.txt`，内容是声明版本号而不是布尔，改文案只要递增 `$script:NoticeVersion`。`ZFR_MANAGER_NO_NOTICE=1` 抑制弹窗（探针与无头验证用）。
+3. **Android 管理器**：副标题改「僵尸农场 · 中文版 · 免费开源」；ScrollView 之外新增常驻脚注；首启同样弹一次（`getPreferences` 记 `notice_version`，先记后弹，弹窗期间崩溃不会反复弹）；新增启动时签名自校验——`PackageManager` 取证书 SHA-256 与 `c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f` 比对，不一致时提示「检测到非官方修改版本」并给官方地址，不阻断运行。**换 keystore 必须同步这个常量**。APK `versionCode` 4 → 5，已重建：`97,315,023 B` / SHA-256 `D7D56DA2E1871FCF228B880123C88D4785CD8DD81829DCF6D94030E2D0A18F55`，签名证书不变（`c2ddca91...4ca6f`），`_verify_android_package.ps1` PASS，包内 IPA 仍 `E5951F94...`。文件在 `touchHLE-zombiefarm-android-arm64\touchHLE-zombiefarm-android-arm64-fixed.apk`。
+4. **两个实测结论，别再踩**：
+   - `Get-FileHash` 是 Microsoft.PowerShell.Utility 的 cmdlet，当管理器由 `PSModulePath` 指向另一套 PowerShell 模块树的 shell 启动时会直接 `CommandNotFoundException`。已改为 .NET `SHA256` 计算（`Get-Sha256Hex`），并替换启动日志、改货币前后校验、指纹三处调用。
+   - 在主窗体 `Shown`（此时主窗体在 `ShowDialog` 里）中 `Show` 出来的**无模态**窗口，`IsWindowEnabled` 为真、`IsWindowVisible` 为真，但**收不到任何输入**：点按钮、回车、UIA Invoke 全部无效。必须用嵌套 `ShowDialog`。弹窗标题刻意不含 “Zombie Farm”，否则会被 `_gui_*.ps1`、`_verify_release.ps1` 之类按标题找窗口的脚本误抓。
+5. **验证**：新增 `_analysis\_notice_probe.ps1`（只在 `%TEMP%` 副本里跑，真实 sandbox 不参与），覆盖首启弹窗出现/关闭写标记、二次不出现、`ZFR_MANAGER_NO_NOTICE=1` 抑制且不写标记，并用截图均值亮度证明日夜切换真实生效（19.5 → 100.3）。同批通过：全部 `.ps1` 解析、`-SelfTest` 的运行状态与设置段、`_verify_layout.ps1`、`_verify_layout_match.ps1`（新增根目录 `请勿购买.txt` 为唯一源）、`_device_size_roundtrip.ps1`、`_verify_release.ps1` 实际启动 `45.0 s`。Release 重建为 43 文件、发行 sandbox 仍为 0 文件。
+6. **存档现场异常（重要，未解决）**：项目 dev sandbox 的 `touchHLE\touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents\saveGame.bin2` 已不存在。最后一次已核验状态是 2026-10-20 23:30:03 / `19,671 B` / `F6AFCC1A18D46981FDFB9BCACC468C8E737B5272CE794035C710572F0DE87FB4`（2026-10-21 的 #38 也记录该哈希未变）。`touchHLE\zfr_last_run.log` 显示 2026-10-31 23:46:23 那次启动**成功加载**了 `saveGame.bin2`，并在 26467 / 26655 / 27190 / 27790 行多次 `******* SAVING saveGame.bin2 *******`，23:46:42 正常退出（code 0）；`Documents` 目录 mtime 停在 23:47。**未找到任何副本**：项目树、`%TEMP%` 历史快照（`zfr-owner-before-invasion-*` 等已空壳）、回收站都没有 19,671 B 的文件，sandbox 里也没有 `.bak` 备份。请先向主人确认存档去向，**在确认前不要重建、覆盖或"顺手清理"该 sandbox**，也不要拿任何旧快照去还原。
+7. **磁盘上有两处安装**：项目 dev tree，以及 `C:\Haven\Games\zombie-farm-windows-x64`（管理器仍是 2026-10-21 20:00 的 `185,814 B` 旧版，没有本轮改动）。后者自带 sandbox：`saveGame.bin2` `5,979 B`（2026-10-31 23:51），备份 `870 B`（10-21）与 `5,967 B`（10-26），日志显示 23:47:45 与 23:48:45 两次启动。也就是说主人实际在玩的是安装副本，两边的存档不是同一份。下次动存档前先问清是哪一处。
+8. **工具链被 TEMP 清理**：`zfr-android-toolchain` 的 `gradle-8.11.1\bin`、`jdk17\bin`、`build-tools\35.0.0`、`ndk\27.2.12479018` 二进制被删空但目录壳还在，于是构建报 “gradle.bat 不存在” 或 `libc++_shared.so` 缺失。处理：`jdk17` → junction 到 `C:\Haven\Tools\jdk\jdk-17.0.20.1+1`，`gradle-8.11.1` → junction 到 `C:\Users\Loner\.gradle\manual-gradle-8.11.1`；新增 `_analysis\_provision_android_sdk.ps1` 用 curl（`Invoke-WebRequest` 在本机大文件会 EOF）下载 cmdline-tools 并重装 `platforms;android-31` / `build-tools;35.0.0` / `ndk;27.2.12479018`。注意 sdkmanager 会把新包装进 `*-2` 目录，需要改名归位。`gradle-home` 的缓存同样被破坏（`caches\8.11.1\*` 里缺 `metadata.bin`），已把 `gradle-home` 改成 junction 指向 `C:\Users\Loner\.gradle`（那里有完整的 8.11.1 缓存），并在 `_build_android.ps1` / `_build_android_local.ps1` 增加 `-Offline` 开关——本机 Gradle 有一次就因为网络解析没有超时而空转十几分钟。代理 `127.0.0.1:10808` 本次不可用（端口关闭），直连 `dl.google.com` 正常，别再无条件依赖代理。
+9. **Android 已在 MuMu 实机验证（2026-11-01 01:41–01:47）**：设备上的 `base.apk` 与本地构建逐字节一致（`d7d56da2…8f55`，`sha256sum` 对比），versionCode 5。逐项：① 启动后副标题「僵尸农场 · 中文版 · 免费开源」与底部常驻脚注均可见；② 删除 `shared_prefs/org.touchhle.android.ManagerActivity.xml` 后重启，首启弹窗完整出现（官方地址、退款提示、MPL-2.0 与素材版权、三个按钮）；③ 点「我知道了，开始使用」关闭，`notice_version=1` 落盘，再次启动不再弹出；④ 点底部脚注可随时重新打开声明（按钮变「关闭」）；⑤ 日/夜切换正常，浅色主题下脚注仍清晰；⑥ 点「打开项目主页」正确拉起浏览器 `mark.via` 并打开 `https://github.com/Ashena1017/zombie-farm-touchhle-cn`；⑦ `logcat` 无本包 FATAL/ANR（期间出现的 `Segmentation fault` 是模拟器里 `toybox grep` 自己崩，不是本应用）。截图与 UI dump 在 `_analysis\dumps\android-notice-20261101\`。**端口更正**：本次 `127.0.0.1:5557` 不在监听，MuMu 实际是 `127.0.0.1:7555`，中途又变成 `emulator-5554`；用 `adb devices` 现查，不要照抄 5557。仍未验证：真实玩家对弹窗的反应、真实闪退触发看门狗、以及签名不匹配时的警告路径（未伪造重签名包）。
+## 38. 交接后追加（2026-11-01，免费开源声明发布完成）
+
+1. **已发布**：`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-free-notice`，release id `430094397`，`draft=false` / `prerelease=false`，`/releases/latest` 已确认本版。侧记：tag 是 annotated，tag 对象 `b84c75e…`，解析到提交 `4a1a21d2f6189d44e18e6f119229c9af371dba6e`（README 五处链接改指新 tag + 新增发行说明 + 更新日志）。
+2. **资产**（上传后全量重新下载核对过 SHA-256，均一致）：
+   - `zombie-farm-windows-x64-v29fix-free-notice.zip`，`95,959,732 B`，`34B3D5313561D425FC1CDD06E76179145D865B44C7BD3DB38A2FB0F421904750`，43 个文件、单一同名顶层目录；
+   - `zombie-farm-android-arm64-v29fix-free-notice.apk`，`97,315,023 B`，`D7D56DA2E1871FCF228B880123C88D4785CD8DD81829DCF6D94030E2D0A18F55`，versionCode 5。
+3. **打包顺序的坑（务必照做）**：`_verify_release.ps1` 会在 `Release\touchHLE\` 里留下 `touchHLE_log.txt`，并在 sandbox 里留 2 个运行文件（`playerProfileManager.txt`、`Preferences\….plist`）。先验证再直接 robocopy，ZIP 会变成 46 个文件、把日志和 sandbox 一起发出去。正确顺序是：**验证 → 重新 `_build_release.ps1` → 立刻打包**，并以「43 文件 / sandbox 0 文件 / 无 `.log`」为放行条件；顺手用 `Get-ChildItem -Recurse -File | Measure-Object` 数一次，别用 `@(... | Measure-Object).Count`（它数的是 Measure 对象，会得到 1，我本轮就被它骗过一次）。
+4. **发布通道**：本轮 `127.0.0.1:10808` 未监听（端口关闭），直接连接 `api.github.com` 与 `uploads.github.com` 正常，因此没有动用任务私有上传脚本，全程走个人技能 `github-release.mjs`：manifest 在 `_analysis\dumps\free-notice-release-manifest-20261101.json`（声明了 `sha256` 与 `size`），`--apply --publish` 上传并公开，随后 `--verify --recheck` 全量重下载复核。下次照抄这条链路即可；如果哪天代理恢复，技能会自动探测，无需手工拼 `HttpClient`。
+5. **线上回读**：Release 正文 2,466 字符与 `_analysis\reports\RELEASE_NOTES_v29fix-free-notice.md` 逐字符一致；README 五处下载链接、Release 页面两个附件名与「免费开源」文案均已在线上渲染确认。
+6. **验证边界**：Android 只在 MuMu 上验过（同页 §37 第 9 条），签名不匹配的警告路径仍未用真实重签名包触发；游戏侧结论未变（重复入侵、死亡补队、Android 入侵仍未实测）。本轮没有改动 IPA、没有重编 Windows exe、没有触碰玩家真实存档。
+
+## 39. 交接后追加（2026-11-02，启动画面水印与窗口标题）
+
+1. **决策与边界**：上一版把声明放进管理器，但转卖者卖的是游戏本体，买家可能压根不打开管理器。本轮把「本作免费开源 · 请勿购买 + 项目地址」直接印在**标题画面**右上角的空天上，并把 touchHLE 窗口标题改成带项目地址。**这不是防盗版**：拦不住有人用 v28 或网上的其他包，也拦不住买家付款前看不到启动画面；它的作用是让「用我们的包转卖」变得不划算（买家一启动就发现是免费的，会退款/举报），并且让任何截图、录屏都带上出处。别在文档里把它写成「已经解决转卖问题」。
+
+2. **改的是哪一张图**：IPA 内 839 张图**全是普通 PNG**，没有 PVR/PVRTC，所以不需要解码或重压纹理。标题界面是分层独立图，不是图集：`MainMenuBG.png`（1024×683，天空+远山）、`MainMenuBGFront.png`（1024×179，泥土层）、`MainMenuPlayBG.png`（644×88，按钮底条）、`MainMenuPlayButton.png` / `ZombieFarmLogo.png`（`zh-Hans.lproj` 里的本地化版，**Apple CgBI 变体**：`CgBI` 块在 `IHDR` 之前、raw deflate、BGRA 预乘，本轮没有碰它们）。只重绘 `MainMenuBG.png` 的右上角，logo 与「开始游戏」之间/周围的几何关系不变。
+
+3. **屏幕映射（复算用）**：`touchHLE_options.txt` 里是 `--device-family=ipad --scale-hack=1.5`，1024×768 逻辑屏渲染到 1536×1152 客户区，贴图与屏幕 1:1 映射，窗口边框 11 px、标题栏约 37–56 px。所以贴图坐标 (x,y) → 截图坐标 (11 + 1.5x, 56 + 1.5y)，水印位置可以精确到像素。实测窗口 `1558×1208`。
+
+4. **产物**：
+   - 新 IPA `zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa`，`59,570,028 B`，SHA-256 `7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC`；1086 个成员里只有 `Payload/ZFR.app/MainMenuBG.png` 变了，其余 1085 个**逐字节相同**，`Payload/ZFR.app/ZFR` 仍为 `45D647787CC6256DBE83B041808E5845739A7B331B72DC030C7FD6E9CC04B05B`。报告 `...v29fix-notice.report.json` 与文件同目录。生成脚本：`_analysis\_make_notice_texture.py`、`_analysis\_build_notice_ipa.py`。
+   - Windows `touchHLE.exe` 重编于 `src/environment.rs` 的标题格式串，`28,878,848 B`，SHA-256 `D9F7506BE3CAF7261290358FCB26784C83FB5BA98232D6517B8764D0599B463F`。**体积与上一版完全相同是正常的**（段对齐吸收了字符串增量），用「二进制里能检到 UTF-8 `免费开源`」来证明改生效，不要用体积判断。
+   - Windows ZIP `zombie-farm-windows-x64-v29fix-notice.zip`，`95,976,692 B`，`4A9168B5CA8817A8B5BE973CC37440344514824520FAA69C4A7883BD884B1195`，43 文件、单一同名顶层目录、无日志与 sandbox。
+   - Android APK `zombie-farm-android-arm64-v29fix-notice.apk`，`97,333,093 B`，`7138BD24597C8BF46F4779161A7FF12BB8AB8412C462DC71AAEE69EF2F0E5D7C`，`versionCode 6`，签名证书仍是 `C2:DD:CA:91:…:CA:6F`（即 `~\.android\debug.keystore`，本机没有 release keystore，`hasReleaseSigning` 为假时走 debug 签名——**这就是为什么旧 APK 能覆盖安装**）。
+
+5. **本轮踩到的两个坑**：
+   - `_verify_android_package.ps1` 第 7 行硬编码了 v29fix 的 IPA 路径，改名后 Gradle 明明 `BUILD SUCCESSFUL`，脚本仍报「APK IPA does not match the repository v29fix IPA」。改名 IPA 必须同步这个脚本。
+   - APK 内资产名 `Zombie_Farm_v29fix.ipa` 被 `ZfStorage.BUNDLED` 与 `ZfIpa.java` 按文件名匹配，**不要跟着改名**；只在 `build.gradle.kts` 里改源路径，`rename {}` 保持不变。
+
+6. **验证**：① 用新 exe + 新 IPA 直接跑，抓到真实标题画面（水印在右上、窗口标题带地址、存档读回正常），截图 `_analysis\dumps\title-capture\verify-notice.png`；② 成品 ZIP 解压到 `%TEMP%` 后独立跑 `_verify_release.ps1` 45.0 s PASS（窗口出现、iPad 选项生效、无 panic、sandbox 干净）；③ `_verify_android_package.ps1` PASS（包内 IPA 哈希与哈希戳一致、`libc++_shared.so` 与 NDK 27.2 一致、默认选项未被改动），`aapt2` 读到 `versionCode='6'`，`keytool -printcert` 读到证书不变，`.so` 内检出新标题字符串。
+
+7. **验证边界**：Android **没有**在本轮重装实测——MuMu 实例未运行，且工具链里的 `adb.exe` 单文件启动报 `0xC0000135`（`platform-tools` 只剩 `adb.exe`，缺 `AdbWinApi.dll`），需改用 `C:\Program Files\Netease\MuMu\nx_device\12.0\shell\adb.exe`；端口 7555/16384/5555/5554 均未监听。Android 侧只做到包级校验。签名不匹配的警告路径仍未用真实重签名包触发过。游戏侧结论未变。
+
+8. **已发布（2026-11-02 20:09）**：tag `v29fix-notice` → `23162e650933f6fe4f3261685c65d8f309b120a4`（annotated tag 对象 `00a23b7c1d95b9e11dd67122c39e18c3420c4cbb`），Release id `431416332`，`draft=false`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-notice`。两个资产上传后又用 `--verify --recheck` **全量重新下载**核对 SHA-256，均一致。主人已在 MuMu 上实测新 APK 可用。发布后补记：正文里那句「本轮未在 Android 设备重装实测」已按主人的实测结果改成「由作者在 MuMu 上安装并启动实测通过」，用 `_analysis\_update_release_body.mjs` PATCH 并回读一致（2,692 字符，2 个资产仍在），本地 `RELEASE_NOTES_v29fix-notice.md` 已同步——**改了正文就要两边一起改，否则下次 `--verify` 会报正文不一致**。
+9. **历史附件已下架（主人要求）**：用 `_analysis\_prune_release_assets.mjs`（走技能 `lib.mjs` 的凭据与 `createApi`，令牌不进日志）删除了 6 条旧 Release 的 **11 个资产**——`v29fix-free-notice`、`v29fix-running-detect`、`v29fix-save-selection`、`v29fix-invasion-fix`、`v29fix-platforms`、`v29fix`。**Release 记录、正文与 tag 全部保留**，删完回读确认：7 条 Release 里只有 `v29fix-notice` 还有 2 个附件，其余 6 条为 0 附件。理由：旧版没有启动画面水印，任何人点两下就能拿到无水印包再转卖。注意三点：① 已经下载过的人、fork 与第三方转存不受影响，这不是撤回，只是不再提供便利；② 旧版页面正文里的下载表与哈希仍在，点进去会 404，按技能约定**没有擅自改旧版说明**，要补「已下架」提示需另行授权；③ 一旦新版出问题没有现成回滚包，但 IPA 与全部构建脚本都在本机，可重建任意旧版。
+10. **README 增补**：下载表下方加了一句「仓库里只保留最新版的下载附件，历史 Release 仅作记录」，免得有人看到旧页面以为下架是意外。
+
+## 40. 交接后追加（2026-11-03，声明每次启动 + 文件校验 + 内置 IPA 拦截）
+
+1. **主人这轮要什么**：①「改成每次启动的时候都弹窗开源免费」；②「还有什么校验的手段能加进去吗」；③ 追加要求「touchHLE 检测到内置的 IPA 没有了就拒绝启动，并且加多重校验尽量防止更改 .exe 文件」；④「游戏管理内加上交流 QQ 群号 1185712984」。当时给了选项清单：弹窗时机选了**每次打开管理器**（不是每次启动游戏），校验手段选了 1（启动前哈希校验）、2（`SHA256SUMS.txt` + `校验.bat`）、3（管理器加「文件校验」页）。
+
+2. **三道校验的分工（别混）**（**注意：这一条已被 §41 修订**——内置 IPA 的检查从「按哈希比对」放宽成「只看在不在」）：
+   - `src/zfr_integrity.rs`：**唯一会阻断**的一道。启动时按 SHA-256 + 字节数核对内置 IPA，不一致直接 `Err` 并弹 Windows 消息框；`ZFR_ALLOW_ANY_IPA=1` 供开发绕过，**刻意不写进拒绝提示**——那等于把绕过方法印在受害者面前。
+   - 管理器：`文件校验`页 + 声明弹窗最下面那一行 + 点「启动游戏」前再核对一次，**只警告不阻断**（玩家可能用自己编译的版本，管理器不该替人做决定）。
+   - Android：`verifySignature()` 是 v5 就有的，本轮没动。
+   - **为什么拦 IPA 而不是拦 exe**：水印画在 IPA 的图片里，换包是最省事的偷法；而「防止改 exe」在没有代码签名证书的前提下只能提高门槛，做不到拦死。`_analysis\_check_pinned_hashes.ps1` 在打包前把 `PinnedExeSha256` / `PinnedIpaSha256` 与实物比对，对不上直接构建失败——**这两个常量是手工维护的，忘了改就会发出一个自己跟自己打架的包**（管理器红字 + 游戏拒绝启动）。
+3. **本轮五个坑（全踩了，别再踩）**：
+   - **编辑工具会吃掉 BOM**。`GameManager.ps1`、`_analysis\_build_release.ps1`、`_analysis\_notice_probe.ps1` 改完都会变成无 BOM；PowerShell 5.1 对无 BOM 文件按 ANSI(936) 解码，中文全变乱码，`_build_release.ps1` 直接报 `Unexpected token 'echo.'`。**每次改完补 BOM**，判据是 `git show HEAD:<path>` 的前三字节是不是 `EF BB BF`；补法 `[System.IO.File]::WriteAllText($p, [System.IO.File]::ReadAllText($p), (New-Object System.Text.UTF8Encoding($true)))`。README / HANDOVER / process / 发行说明反过来必须**无** BOM。
+   - **`[switch]` 参数不吃空格分隔的值**。`Show-ProjectNotice -FirstRun (Test-NoticeFirstRun)` 里 `-FirstRun` 恒为 true、括号表达式被静默丢弃，于是每次启动都显示「欢迎使用」。要写 `-FirstRun:(Test-NoticeFirstRun)`。自己验：`function f([switch]$s){$s}; f -s $false` 返回 True。
+   - **`$script:CurrentIpa` 是记录对象不是路径**（`Path` / `AppId` / …）。把它 `[string]` 化会得到 `@{Path=…}`，`Test-Path` 全失败，校验页把内置 IPA 报成「自定义 / 找不到文件」。要取 `$script:CurrentIpa.Path`（`Get-LaunchPaths` 附近就是既有写法）。
+   - **跨进程发 `TCM_GETITEMRECT` 会打死管理器**。控件消息里的指针不做跨进程编组，sender 传的是自己进程里的地址，目标写 RECT 时 `AccessViolationException`，栈停在 `PaletteTabControl.WndProc`（实测复现）。要切标签页就 PostMessage 方向键，或者让测试直接从目标标签页启动。
+   - **探针的竞态**：校验页的标签在 `Shown` 里才填，等到静态表头「官方 SHA-256」出现就断言会拍到空值，要等「与官方一致」。另外 `PaletteTabControl` 的窗口类是 `WindowsForms10.SysTabControl32.app.0.<pid>_r9_ad1`，`FindWindowEx("SysTabControl32")` 永远返回 0，得按片段匹配。
+4. **产物**：
+   - Windows `touchHLE.exe` `28,891,648 B` / `ABE3883682AE7814E3F3073A965E0F530306301C3AA67D95D17189CE2239296D`（比上一版大 12,800 B，新增了整块校验代码；`sha2` 本来就在 `Cargo.toml` 里，没有新增依赖）。`SDL_MESSAGEBOX_ERROR` 在 rust-sdl2 的 sys 绑定里**没有导出**，用 `0x0000_0010` 字面量。拒绝启动时进程会停在消息框上——那是设计行为，不是卡死。
+   - Windows ZIP `zombie-farm-windows-x64-v29fix-verify.zip` `95,991,291 B` / `2F547265195FC872615129F13846F29D05960954D7EF2908E432F5E4B4C0F705`，**45 文件**（上一版 43 + `校验.bat` + `SHA256SUMS.txt`），单一同名顶层目录、无日志与 sandbox。`校验.bat` 是 **GBK** 写的（cmd 用 OEM 代码页读 .bat，UTF-8 会乱码），判定词用 ASCII 的 `[ OK ]` / `[FAIL]` / `[MISS]` 兜底；实测五个文件全 OK。
+   - Android APK `zombie-farm-android-arm64-v29fix-verify.apk` `97,354,853 B` / `3CDED90B2C1EA3E6939E3C3833504F9EB70B1CA1853825CC6B190C7D24A3C009`，`versionCode 7`，证书不变（`c2ddca91…4ca6f`）。IPA 本轮未改动，仍是 `7BB21449…82ffc` / `59,570,028 B`。
+5. **验证**：① `_notice_probe.ps1` 全绿——每次启动都弹、第二次标题是「免费开源声明」而不是「欢迎使用」、弹窗带 QQ 群与「均与官方发布一致」、校验页三行全对且没有「文件不存在」、`ZFR_MANAGER_NO_NOTICE=1` 抑制且不写标记、日夜亮度 45 → 227；② IPA 门禁三态实测：假 IPA（2197 B）→ `Official IPA check failed … 2197 bytes, expected 59570028` + 消息框；`ZFR_ALLOW_ANY_IPA=1` → 跳过检查、随后按普通错误失败；真 IPA → `Official Zombie Farm IPA verified (sha256 7bb21449…)` 并正常加载；③ `_verify_release.ps1` 45.0 s PASS（**跑完必须重新 `_build_release.ps1` 再打包**，这是老坑）；④ `_verify_android_package.ps1` PASS、`aapt2` 读到 `versionCode='7'`、`keytool -printcert` 证书不变。
+6. **已发布（2026-11-03 10:04）**：tag `v29fix-verify` → `aab396e0486b872589e95e2a460bfa18aed52fc4`（annotated tag 对象 `aec448b21ebb094cf85007cedd4017b961e0eba8`），Release id `432194463`，`draft=false`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-verify`，正文 1,839 字符，`/releases/latest` 已指向本版。上传后用 `--verify --recheck` 全量重新下载核对。
+7. **验证边界（照实说，别夸大）**：Android 侧**本轮没有**在 MuMu 上重装实测（只做了包级校验；主人上一轮验过的是 `versionCode 6` 的包）；「文件校验」页的红字分支（哈希真的对不上）本轮没有伪造被改文件去触发；「签名不匹配」的 Android 提示仍未用重签名包触发过；游戏内容与存档格式未改动。**这些检查不是 DRM**：能反编译的人可以把校验删掉，也能换一个完全不同的包；真正无法伪造的是标题画面上的水印和 GitHub 上公布的哈希。
+
+## 41. 交接后追加（2026-11-03，放宽内置 IPA 校验 → v29fix-verify2）
+
+1. **主人一句话推翻上一版的设计**：「非官方ipa启动不了还是改一下吧，只是内置ipa别被删掉就行」。§40 把检查做成了「按 SHA-256 比对**你要运行的那个包**」，等价于「只许跑官方包」——把「用自己的备份 / 别的版本 / 自己调试的包」这些正常需求一起堵死了。**教训：校验该拦的是「这已经不是我们的发行包了」，不是「你想跑哪个包」。**
+2. **现在的规则（三句话）**：
+   - 任何 IPA 都能启动，不比对被运行包的哈希。
+   - 官方发行版自带的那个 IPA **被删掉** → touchHLE 拒绝启动并弹窗说明（`src/zfr_integrity.rs`）。
+   - 它还在、但被**同名覆盖**成别的包 → 照常启动，管理器的「文件校验」页标红。这一条是故意只标红不拦的：用户可能自己重打了包。
+3. **怎么找「官方包」**：`candidate_paths()` 依次试 `工作目录/zombie_farm_ipa/`、`工作目录/../zombie_farm_ipa/`、`可执行文件目录/zombie_farm_ipa/`、`可执行文件目录/../zombie_farm_ipa/`，Android 再加 `user_data_base_path()/touchHLE_apps/`。发行包与开发树都是「`touchHLE\` 与 `zombie_farm_ipa\` 平级」，`../zombie_farm_ipa` 那条两种布局都能命中。**Android 的文件名不同**：安装到 apps 目录时叫 `Zombie_Farm_v29fix.ipa`（资产名冻结），Windows 是长名，用 `#[cfg(target_os = "android")]` 分开。
+4. **只查存在、不读内容**：`metadata().len()` 和官方字节数比一下只为打一条 warning，不阻断。理由：读 59 MB 只为一次启动前的判断不划算，而「内容被换」这件事管理器已经用哈希回答了。
+5. **管理器跟着改**：`Get-IntegrityReport` 现在**固定**看三样（`touchHLE.exe`、内置游戏 IPA、`GameManager.ps1`），不再跟着当前选择变；页面上多一行「当前选择：…」，明确告诉玩家自定义包可以正常跑，上面三行说的是官方文件本身。`Get-IntegrityHeadline` 里的 `warn`（自定义包）分支删掉了——自定义包不再是异常。
+6. **产物**：`touchHLE.exe` `28,892,672 B` / `54705B0511E69D2DB34709DF2FF340B969AB5D1BC3B260ECFB55FC25B048E865`；ZIP `95,990,421 B` / `DF4BC1A4BA8C430A4F92378E20B83F5DE092D5188D66391DCD49ACE93D1D0324`（45 文件）；APK `97,332,989 B` / `025A863015B5308A9991C6D575E2F420A7762FD7AFFC1E350DA3EADEE6C1CB13`，`versionCode 8`，证书不变。IPA 未改动（`7BB21449…82ffc`）。
+7. **验证（三态实测，新 exe）**：① 官方包在 + 运行另一个 IPA（`v29fix.ipa`）→ 日志 `Bundled Zombie Farm IPA present: …` 并正常进游戏；② 临时副本里删掉官方包、只放一个干净 IPA → 日志「官方发行版自带的那个游戏包不在了，已停止启动。」+ 消息框，进程停在弹窗（设计行为）；③ 同②加 `ZFR_ALLOW_ANY_IPA=1` → 跳过检查、正常加载。管理器侧 `_notice_probe.ps1` 仍全绿（含「当前选择：官方内置的游戏包」那行）。`_verify_android_package.ps1` PASS、`aapt2` 读到 `versionCode='8'`、证书不变。
+8. **已发布（2026-11-03 10:35 前后）**：tag `v29fix-verify2` → `a839ea5c6ee88aaa282590a47147255a119fb739`（annotated tag 对象 `c081582ac15c3c212c8dc11c570debf3dca66096`），Release id `432206236`，`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-verify2`。`--verify --recheck` 全量重下载一致。按惯例把 `v29fix-verify` 的 2 个附件下架，**9 条 Release 里只剩 `v29fix-verify2` 有附件**。
+9. **边界**：这一道只防「删掉带水印的包」，**防不住同名覆盖**（只标红）。要真防住得给 exe 做代码签名，本项目没有证书。Android 已由主人在 MuMu 上安装并启动实测通过（2026-11-03，未留截图）；签名不匹配的提示路径仍未被触发过。
+
+## 42. 交接后追加（2026-11-15，Android 昼夜光照修复）
+
+1. 玩家反馈仅 Android 无昼夜亮度变化。MuMu `127.0.0.1:7555` 上用管理器累计 offset 把 touchHLE 模拟时间设到 23:00：角色已提灯、`DayCycle.currentState=6`，但背景仍亮，证明时间与昼夜逻辑已生效。未改系统时钟。
+2. 根因是后台加载线程在共享 EAGLContext 中创建 `CCRenderTexture`，宿主 GLES 的 FBO 容器却不跨上下文共享；旧实现直接透传名称，使后台的遮罩 FBO 1 在主上下文中撞上屏幕 FBO 1。MuMu 另有绑定查询返回 0 的问题，只修查询仍不足以恢复夜景。完整取证与修复见 `_analysis/reports/Android_昼夜光照修复_20261115.md`。
+3. Android native GLES 后端新增 sharegroup 共用的虚拟 FBO 名称/附件表、每个上下文各自的宿主对象映射，并在绑定及切换上下文时同步附件；跟踪 FBO/RBO 查询。EAGL 创建共享上下文时传递对象关系。代码仅启用 Android 分支，未改 IPA、Windows exe 或存档格式。临时抓帧、Inspector 和日志探针全部撤销。
+4. 正式无探针包已通过 MuMu 三时段农场实测：**12:00、18:00、23:00** 逐渐变暗，夜间局部提灯光照正常；同一块草地亮度 **131.54 / 114.28 / 98.82**。图片为 `_analysis/dumps/android-daynight-20261115/final-daynight-comparison.png`。真实 Rust 适配层 6 项专项回归、Windows 生产库 65 项、APK 包级及签名检查通过。真实 Android 手机、连续跨时段边界、战斗和长时稳定性尚未覆盖。
+5. 本地 APK 仍在 `touchHLE-zombiefarm-android-arm64/touchHLE-zombiefarm-android-arm64-fixed.apk`，**97,350,519 B** / SHA-256 `0CC8077275B84B74C98869FF6B22F065808DC12CD9F3E34125E454FC4FFDD505`，versionCode **9**，证书不变。设备 `base.apk` 与本地逐字节相同。**未提交、未推送、未发布新 Release**；公开最新仍为 §41 的 v8。
+6. Android 存档、设置、偏好、锁文件共 **8 文件**与测试前快照哈希完全一致，offset 已恢复 0；测试包与诊断文件已移除，最终游戏停止。不能用 adb shell 直接 tar 解外部快照：会把 owner 改成 shell；run-as 又无法访问 MuMu 的外部 FUSE 路径。最终用临时 instrumentation 在应用 UID 写回并验证 owner 为 `u0_a64`，原测试 runner 源码已原字节恢复。复用 `_android_daynight_probe.py restore` 的应用 UID 恢复流程；快照和核验记录都在上述 dumps 目录，不要拿旧快照替换玩家进度。Windows 开发档仍是 **881 B** / `12AFE4B0E81568E7B8EE5FB16F962703A89C28964A2689933DDA1D499EF09DD9`。
+7. TEMP 工具链再次缺失，SDK 已补齐到永久目录 `C:/Haven/Tools/android-sdk`，原 `zfr-android-toolchain/android` 等路径通过 junction 兼容。继续用 `_build_android_local.ps1 -Offline`；新版 Android CLI 使用斜杠包名（`ndk/27.2.12479018` 等）。新增测试入口 `_analysis/_test_android_framebuffers.py`；产品源码变动仅 4 个 Rust 文件及 versionCode，旧的技能/交接提示词删除和其他初始未跟踪文件均保留。
+
+## 43. 交接后追加（2026-11-15，Android 云手机启动崩溃）
+
+1. `1280` 是 OpenGL `0x0500 / GL_INVALID_ENUM`。云手机日志定位 `src/frameworks/core_animation/composition.rs:369` 的 `GetError() == 0` 断言。独立 x86_64 EGL 探针证明：空 FBO 查询附件 NAME 依法报错；全新 FBO 挂 renderbuffer 后 TYPE 合法，但 NAME 仍被云端 GLES1 编码器误拒绝；错误会被同线程另一个独立上下文读出。只修空附件查询的 APK 仍崩溃。
+2. `gles_guest.rs` 先查 TYPE，只有需要名称时再查；调试 trace 避开默认 FBO 和空附件。`gles1_native.rs` 在 Android 从共享 FBO 附件描述回答合法 TYPE/NAME，保留其他宿主验证及原合成器断言。新增 `_analysis/_android_cloud_gles_probe.c` 和 `_analysis/_test_framebuffer_scale_queries.py`，扩展原 FBO 测试。
+3. 正式 APK v10 已在同一云手机实测到“开始游戏”界面，无 `0x500` 或 panic。专项 **9 + 6** 项、Windows 生产库 **65** 项、APK 包级与证书检查通过，设备 `base.apk` SHA-256 与本地相同。未在 v10 进入农场或重跑 MuMu 三时段；Windows exe 和 IPA 未替换。
+4. 现有输出 `touchHLE-zombiefarm-android-arm64/touchHLE-zombiefarm-android-arm64-fixed.apk` 已更新至 **97,346,209 B** / `44540F139F86063618370D267424916C496CAF02FFF69B6080DE18F27B94D60D`。v9 旧 APK 备份在 `_analysis/dumps/android-cloud-20261115/before-v9.apk`。未提交、推送或发 Release。
+5. 云手机在测试前没有 `saveGame.bin2`。启动自动修改的资料和偏好仅用当次快照原位还原，保留 inode、属主与权限，6 个原文件哈希一致。该设备 root ADB 推入的外部文件会被 FUSE 拒绝，MuMu instrumentation 方法未能读取恢复包；最终用已有的 root ADB 原位回写两个变化文件，**不要复用历史快照**。测试 APK 和设备探针已清除，游戏已停止。详见 `_analysis/reports/Android_云手机启动崩溃_20261115.md`。
+
+## 44. 交接后追加（2026-11-15，管理器模拟时间与 Android 默认倍率）
+
+1. Windows / Android 游戏页新增每秒刷新的模拟时间，按系统时间加已存累计 offset、使用本地时区显示；快进窗口增加当前与调整后日期时间预览，编辑立即更新，取消不落盘。Windows 同时识别既有开发环境变量 `TOUCHHLE_FAKE_UNIX_TIME`；SHA-256 helper 提前定义，修复 SelfTest 先调用尚未定义函数的旧问题。
+2. Android 新默认 iPhone ×3（1440×960）；×3 加入预设，Java 启动、设置与校验、IPA 默认选项一致，已有显式设置保留。快进窗口补充小时/分钟标签和适配夜间的弹窗颜色。APK versionCode **11**，未改 IPA / Windows touchHLE.exe / 本轮 Rust 渲染代码。
+3. Windows SelfTest、真实 WinForms 快进跨午夜（23:55:12 + 30 分 = 次日 00:25:12）、非法分钟禁用、取消保留 offset 通过；Release 45 文件且无存档，独立运行 20.2 秒通过。Android 正式包实测 iPhone ×3，6 小时 15 分跨午夜预览，启动日志 `scale=3/1, time_offset=22500`，角色提灯的夜间农场及商店正常；取消预览后普通启动保留 22500 秒。MuMu 临时用户 10 测试，随后切回用户 0、删除测试用户；原用户游戏未启动，MuMu 程序保留 v11。
+4. APK **97,347,588 B** / `1BC10CC29B118931306F6310DA9B77B398C73B881D9D47A7A2264A968F089577`，设备 base.apk 哈希一致、证书不变。Windows `Release/` 已同步；ZIP 在 `_analysis/dumps/android-shop-clock-20261115/zombie-farm-windows-x64-manager-clock.zip`，**95,544,432 B** / `32246BEA1188DA4720982193DBFFDE6DF01E06A501680E6A8732641ED4B31ACB`。未提交、推送或发布。
+5. **商店黑框仍待真机取证**：用户明确 MuMu 原本就不复现、未解锁剪影正常；不要将其混为黑色方块或以 MuMu 正常作为修复证据。`C:/Users/Loner/Desktop/download.jpg` 不存在，未读取到原图；已问受影响手机型号 / Android / APK 版本，需原图与其日志继续定位。详情 `_analysis/reports/管理器模拟时间与Android默认倍率_20261115.md`，证据在同名 dumps 文件夹。本轮未在云手机更新 v11、未重复三时段光照测试。
+6. **真机信息补充**：用户确认仅部分手机复现；其中一台 HONOR 100 Pro（MAA-AN10），骁龙 8 Gen 2，MagicOS 10.0 / Android 16，系统 `10.0.0.175(C00E170R6P1)`。新附件为“关于手机”，不是异常商店图；仍缺原 bug 图和真机 `touchHLE_log.txt`。APK 只是用户推测“当前这个”，确切 versionCode 未知，不能认定已用本地 v11。该 SoC 对应 Adreno 740，实际驱动需日志确认；MuMu 报的 Adreno 640 不能代替。已复核 Android native GLES1 与 Windows GL2 路径、共用 PVRTC 软件解码、已有 Driver info 日志，尚不能确定纹理/透明度/FBO 中的具体原因。本次仅更新取证记录，未改渲染、重打包或操作设备/存档。
+7. 用户进一步回答异常黑框“每次都是同一位置”。尚未确定是同一物品位置还是固定屏幕坐标，已异步追问滑动列表时是否跟随物品。随物品移动则优先定位物品贴图/alpha；固定屏幕则优先面板/裁剪/合成区域。固定性仅调整排查优先级，不能排除内存/加载问题；仍未复现、定位或修复，未改产品源码。
+
+## 45. 交接后追加（2026-11-15，商店黑框空文字纹理候选）
+
+1. 用户补充四张异常商店图和聊天图，并回答“固定在屏幕同一位置”。不同页的黑块商品格并不完全相同。西红柿、星星果、彩虹草及四种脑子礼包对应空附加说明；带快速/永不枯萎说明的卡片正常。附件已保存到 `_analysis/dumps/android-shop-black-20261115/player-*`，不再缺原图；仍缺受影响真机日志。
+2. MuMu 独立包 iPad ×1.5 抓取空标签布局 0×0、实际 A8 上传 0×0；游戏纹理初始化随后用内容尺寸除像素尺寸得到 NaN。Android 的 `objc/messages/zombie_farm.rs` 在已知 bundle 1.0 的 `CCTexture2D` 空 A8 初始化前，调用原 guest 方法改用透明 1×1 存储，内容尺寸保持零；临时像素同步上传后释放。仅改宿主 GL 上传不足以修复 guest 元数据，故未做通用纹理格式替换。
+3. **候选状态**：已修正这个可证实的空纹理/非有限坐标路径，尚未在 HONOR 100 Pro 验证黑框是否消失。MuMu 原本不复现，不能把正常截图当真机修复证明。完整取证、调用站点与边界在 `_analysis/reports/Android_商店黑框_空文字纹理_20261115.md`。
+4. 专项真实生产函数 4 项、既有 FBO 9 项与缩放查询 6 项 PASS。诊断候选原 5 次零尺寸上传全变透明 1×1，空布局保持零；同商店 357,112 像素前后完全相同。正式包无临时探针，完整构建/包校验/签名 PASS；用正式 classes.dex、native lib、IPA 字节相同的独立 manifest 克隆，以默认 iPhone ×3 验证农场、作物和脑子页，无 panic。
+5. 交付 APK versionCode **12**，**97,353,660 B** / `6F43969BC01BBEB6CD32859C73B8950DEAABFA1F751D4AE5671D996504CA8183`；原固定输出已更新，同内容测试名 `_analysis/dumps/android-shop-black-20261115/zombie-farm-android-arm64-v12-shop-test.apk`。证书和 IPA 不变，未改 Windows exe / 包。未提交、推送或发布，线上仍 v8。
+6. 临时用户 11 因外置存储不可用未进入游戏，已移除；实际测试在本轮创建的独立应用 `org.touchhle.zombiefarm.shopprobe`，结束已卸载。当前用户 0，原 MuMu 应用仍 v11，本轮未启动原应用游戏或操作其存档。`final-result.json` 记录清理及包信息。不要恢复本轮诊断快照到原应用。两次 Python 启动 PS5.1 的构建在事后 Get-FileHash 校验失败，但 Gradle 成功；最终直接用当前 PowerShell 运行固定入口，完整构建和校验成功。
+
+## 46. 交接后追加（2026-11-15，玩家确认与双平台发布）
+
+1. 用户明确反馈「玩家实测修好了」，将 §45 的黑框兼容候选升级为原受影响玩家验证通过。验证由用户转述，没有新增该手机的 GPU 日志；可以报告黑框修复已验证，不能据此补写具体驱动内部行为。
+2. 用户授权将最新 Windows / Android 发布 GitHub。版本选用 `v29fix-clock-rendering`，Android 直接发布已由玩家验证的 versionCode 12 同字节 APK；Windows 重建管理器发行目录并独立启动校验。两端模拟时间、Android 默认 iPhone ×3 与 v9～v12 累积修复均纳入。
+3. 只提交本轮产品改动、专项测试和相关报告；保留工作区既有技能/交接文件删除与其他未跟踪材料。沿用 master 直接推送与个人 git-hosting 技能，manifest 钉住成品 SHA-256。发布后补记实际 commit、Release 和下载校验结果。
+
+4. **已发布**：`v29fix-clock-rendering` → `8a02902cf23c641fa03994aae06dfb550bdfd017`，Release id **445999220**，`draft=false` / `prerelease=false`，`/releases/latest` 已确认。链接：https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-clock-rendering。源码已按 26 文件授权清单推送 master；既有未提交删除与其他未跟踪文件保持原状。
+5. **资产**：Windows `zombie-farm-windows-x64-v29fix-clock-rendering.zip`，**95,462,195 B** / `8052A971793A872BCCACC5141E87A10AC063865486F6A3FDB838FBD65FCCE6A8`；Android `zombie-farm-android-arm64-v29fix-clock-rendering.apk`，**97,353,660 B** / `6F43969BC01BBEB6CD32859C73B8950DEAABFA1F751D4AE5671D996504CA8183`，versionCode **12**。APK 与玩家验证的测试包逐字节一致，证书和 IPA 未变。Windows 包 45 文件、单一同名顶层目录，SHA256SUMS 44 项全匹配，无存档和日志；包内管理器与发布 commit 的 Git blob 字节相同。
+6. **放行验证**：本轮 Windows SelfTest（含真实存档未改守卫）、发行布局、独立运行 20.1 秒、ZIP CRC/45 文件逐字节检查 PASS；Android 4+9+6 项专项、包内容、默认选项及签名 PASS。Release 正文与本地说明逐字符一致，两个资产都完整下载并核对 SHA-256 通过，首页五处下载/版本链接、Release 正文与附件页面实际 HTML 已验证。未再次进行 Windows 65 项库测试、MuMu 三时段或云手机游戏测试，既有场景结果见 §42～§45；本轮未操作 Android 设备存档。
+7. **传输记录**：Node 的整包下载连接停滞，系统 curl 直连整包速度过低，已停止对应下载进程并回读同一草稿。最终继续使用个人 git-hosting `runRelease` 的完整发布/元数据/哈希检查，仅将下载传输替换为 curl 小范围读取（8 连接、256 KiB 分段，失败读取有界重试），使用命令级 `--resolve` 选择实际 DNS 返回的 GitHub CDN 地址，TLS 校验保持开启。分段仅复用此前实际下载的数据，全部取齐后顺序拼接，再计算整包 SHA-256；没有用本地产物替代下载。没有修改系统代理/DNS或个人技能，没有重复上传已确认的 Windows 资产。网页直连超时后查询仓库已有 Git 代理为 http://127.0.0.1:7890，最终仅在网页 curl 请求上复用该代理，完成首页和 Release HTML 验证；后续发布应优先复用该现有配置，避免继续用已失效的 10808 记录。最终日志、完整下载文件和 manifest 位于 `_analysis/dumps/release-clock-rendering-20261115/`。未重复下载做第二遍验收，未改旧 tag / Release / 附件。
+
+## 47. 交接后追加（2026-11-17，倍率、农场主购买和列表滑动）
+
+1. 用户反馈三项：倍率最多 ×3；停服后付费农场主无法购买，希望统一 15 脑子；变异页和入侵编队滑动长时间卡顿，两端都有。用户确认倍率扩展到 **×6**。两端管理器限制已放宽，Android 预设加入 4/5/6，默认不改。Windows 通过自定义可设 6（iPhone 2880×1920 / iPad 6144×4608），小数/分数继续可用。
+2. 九种付费农场主在 `objc/messages/zombie_farm/farmers.rs` 接管 `buyHead:`，只匹配当前 ZFR 1.0：按钮显示价格，使用原 Cocos 确认窗，确认后调用正常资源扣费 API 扣 15 脑子、OR 原 `fflags` 单位、走原选择方法并保存。已解锁免费选择、取消不扣费、余额不足与重复回调均处理。原 IPA 两个 slice 的 18 个产品/flag 对应已独立核验；不改 IPA 和存档格式。
+3. 卡顿的直接代码原因：`CCTableView _evictCell` 用 `idx < %i` / `idx > %i` 筛出屏幕外格子，旧 `NSPredicate` 只支持等号、其余 `AlwaysTrue`，将可见内容也清掉；旧 hook 又强制 `dequeueCell=nil`。现在补齐严格 idx 比较与 signed 参数，当前 ZFR 恢复原复用和 `setZombie:` 重建，避免回收格子的 node 已清空却被旧“重复赋值跳过”误判。没有调整列表内容、偏移和裁剪。
+4. **验证范围**：最终生产库 68 PASS + 1 个可选 ignored 集成测试；该集成测试另以当前水印 IPA、只读 FS 实际执行并 PASS（28 个原生格子的编号和生产谓词/数组/varargs，未运行游戏循环）。购买生产 hook 10 项、原二进制绑定 18 条、Android scale 的 8 有效/9 无效输入、Windows SelfTest/尺寸往返、BOM/语法/布局及 `diff --check` PASS。Windows 独立发行目录启动 20.4 秒有窗口、无 panic、空发行 sandbox 已还原。Android 完整构建/包结构/原证书通过，versionCode **13**。**初次交付时游戏内场景待用户实测；随后用户确认两端三项修改全部成功，见 §48。没有额外测量完整菜单滚动帧耗时。**
+5. **本地成品**都在 `_analysis/dumps/farmer-scroll-20261117/`：Windows `zombie-farm-windows-x64-v13-farmers-scroll-test.zip` **95,463,501 B** / `BE5FFA735AAC78455336AB9CEEEB9B19295561F30AA41E7F4A40E51AFEDA4C2B`；Android `zombie-farm-android-arm64-v13-farmers-scroll-test.apk` **97,348,980 B** / `B10B909B2EDBC2809447E0DBA92106D539536238AC67D1BB18BF625FA350D780`。Windows 45 文件、44 项 SHA256SUMS、ZIP CRC 与全部文件回读通过，无存档/日志；开发树 exe / fork exe / Release exe 已同步为 **28,894,208 B** / `120653FAE5B17E5CABAAC55BA754C648E6BB4C7E7E44241DF5033E31BB42AF37`，管理器固定哈希也已同步。原 Windows exe 备份为同目录 `before-touchHLE.exe`。Android 固定输出已更新，证书 SHA-256 仍 `c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f`，IPA 仍 `7BB21449…82FFC`。APK versionName 继承当前 Git describe，不要靠它区分版本，读 versionCode 13 / 包哈希。
+6. **数据与工作区**：本轮不操作 Android 设备或其存档。Windows 当前真实存档已变为 **3238 B** / `C5271064CFC0E9445A0D152363DBB7A302F5A014C966D714077432880322C0D1`，最后写于 2026-11-17 08:01:11；本轮 SelfTest 与收尾哈希均一致。旧快照绝不可覆盖这个现场。既有删除/分析材料保持原状；初次测试包交付时本批源码未提交、未推送、未发布，后续用户验收及发布结果见 §48。修复取证从 `_analysis/reports/ZFR_倍率农场主与列表卡顿_20261117.md` 和本批 dumps 继续，测试入口 `_test_farmer_scroll_guest.ps1` / `_test_farmer_purchase.py` / `_verify_farmer_bindings.py` / `_test_resolution_scale.py`。独立运行 guest 测试程序时 cwd 必须含 `touchHLE_dylibs`（例如 `touchHLE/`）；第一次从仓库根直接运行缺 libz，改用正确 cwd 后通过，误写的根日志已保留移入本批 dumps。
+
+## 48. 交接后追加（2026-11-17，三项实测通过与双平台发布）
+
+1. 用户明确确认 Windows / Android 的倍率、15 脑子购买农场主和列表滑动三项修改全部成功，授权发布到其 GitHub。此前 §47 的游戏内待实测状态已结束；没有额外测量滚动帧耗时。
+2. 版本 `v29fix-farmers-scroll`，沿用验收通过的 v13 APK 与 Windows 包内全部 45 个文件，不重新编译。Windows 仅重新命名 ZIP 顶层目录，44 项文件哈希、CRC 和全部成员逐字节回读通过。APK 签名、内置 IPA 和存档格式保持。已公开发布，结果见下。
+3. 沿用个人 git-hosting 技能和 master 精确文件清单推送；保留既有删除与其它未跟踪资料。发布材料位于 `_analysis/dumps/release-farmers-scroll-20261117/`。
+
+4. **已发布**：`https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-farmers-scroll`，Release id **447957589**，`draft=false` / `prerelease=false`，`/releases/latest` 已确认本版。tag 解析到源码提交 **`fe62d1e31583244097775ed5a61f9b25ebea8ecd`**，22 文件授权清单已按个人技能预演、推送并回读远端 SHA；发布记录另补文档提交，不移动 tag。
+5. **正式资产**：Windows `zombie-farm-windows-x64-v29fix-farmers-scroll.zip`，**95,463,321 B** / SHA-256 `6EBD790D8446B74F4F994AE001771E857F6CF53B4CE4CD916B70A323C9781F3F`，asset id `757241690`；Android `zombie-farm-android-arm64-v29fix-farmers-scroll.apk`，**97,348,980 B** / `B10B909B2EDBC2809447E0DBA92106D539536238AC67D1BB18BF625FA350D780`，asset id `757242640`，versionCode **13**。APK 与用户验收包逐字节一致；Windows 包内 45 文件全部与验收 ZIP 一致，仅顶层目录从测试名换为正式名；包内管理器与发布 commit 的 Git blob 逐字节一致。
+6. **验证完成**：个人 `github-release.mjs --apply --publish` 在草稿阶段对两端资产各完整下载一次并核对 SHA-256，全部一致后公开；公开后仅回读元数据，没有重复下载。Release 标题/正文与本地说明逐字符相同；tag、latest、首页五处下载/版本链接、Release 两个文件名/哈希与附件 HTML 均通过。本轮沿用已完成的构建与测试证据，不重复编译已由用户验收的程序。
+7. **传输与数据**：本轮直接使用标准个人技能，Node 24 `--use-env-proxy` 与进程级 `HTTPS_PROXY=http://127.0.0.1:7890` 复用已有 Git 代理配置；上传和完整下载顺利，不需要旧的 10808 或分段下载 helper。没有改系统代理/DNS、旧 Release/tag/附件、Windows/Android 玩家存档，也没有安装应用。`release-result.json`、`public-result.json`、固定完整 SHA 的 `manifest.json` 和正式包均在本批 dumps；既有三个删除和无关未跟踪文件保持。
+
+## 49. 交接后追加（2026-11-21，僵尸相机、统一游戏包与发布）
+
+1. ZFR 1.0 的僵尸相机可手动拍农场，开启「升级时自动拍照」后从 6 级开始触发。新增 touchHLE 相机处理：允许本地离线截图，成功后用游戏弹窗替换旧分享菜单，保留闪光、快门声及手动拍照的原奖励通知，清理相机触摸拦截。Windows iPhone 实测手动拍照、关闭弹窗恢复操作及每日 100 金币，用户实测升级自动拍照也显示声明。Android v14 的游戏内拍照尚未实测。
+2. Windows 管理器将准确匹配的无水印 v29fix 文件名视作正式包的旧别名，有正式包时隐藏重复选项。两端各含一份 IPA，SHA-256 同为 `7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC`，游戏存档仍按同一 app id 读取。Windows 自检确认了旧选择映射和真实存档未变。
+3. [`v29fix-camera-notice`](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-camera-notice) 为正式公开版本，Release id **453629161**，目标 `cfe467f96aabb67b8facbcd3e282bb2ee7c64b6c`。Windows ZIP **95,997,460 B** / `14196FFDA83C30784561FA4064D45925A4D7C6C29060D823441D082C47584AAB`，包内 45 文件和 44 项哈希通过。Android APK **97,353,992 B** / `F2E31A28DBA4C75B0D96989A8707CF6765820A73CCD04E0A9F9824203111CE7E`，versionCode **14**，证书仍为 `c2ddca91…4ca6f`。个人 git-hosting 技能在公开前完整下载核验两份附件，源码已推送 master。
+4. 新版公开并确认为 latest 后，按用户授权删除旧版剩余 **6 个下载附件**，回读确认 11 条历史 Release 记录仍在、均无上传附件，新版两个资产仍在。发布清单、下载核验与清理结果位于 `_analysis/dumps/release-camera-notice-20261121/`。
+
+## 50. 交接后追加（2026-11-21，帮助与农场主界面修复发布）
+
+1. 两端修复主菜单冷启动设置、游戏内帮助闪退和农场主头像页卡住。帮助页顶部加入免费开源声明、项目地址和 QQ 交流群，下方保留原帮助。农场主头像页可选择本地农场并返回，原联网入口显示停服。Windows 管理器同步新版 EXE 校验值。
+2. [v29fix-help-profile](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-help-profile) 为 GitHub 最新公开版本，Release id `453779694`，tag 指向 `7ffeff143977637a9b98da1dad354fa06b2a861a`。源码已推送 master，README 五处下载与版本链接已核对。
+3. Windows ZIP 95,566,617 B，SHA-256 `d4654b44f1a8cebe21f7c7120c4d85bbd9eb175b2c666ae4b3f1e9185138a4f4`。沿用已实测的发行目录，包内 45 个文件与目录逐字节一致，44 项 SHA-256 通过，发行 sandbox 为空，管理器与发布提交的 Git blob 一致。Android APK 97,371,582 B，SHA-256 `f56ceba32016ad9398d90f416b15665da3e368c1bbd96dddae8d30834dee8853`，与 MuMu 验证的 APK 字节一致，`versionCode` 16，签名指纹仍为 `c2ddca91…4ca6f`。
+4. 两份附件在公开前均从 GitHub 完整回下载并核对 SHA-256。发布清单及结果在 `_analysis/dumps/release-help-profile-20261121/`，两端场景验证材料在 `_analysis/dumps/help-profile-20261121/`。

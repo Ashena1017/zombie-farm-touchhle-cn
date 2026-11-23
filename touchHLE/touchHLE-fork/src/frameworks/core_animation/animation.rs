@@ -22,8 +22,10 @@ use crate::frameworks::core_animation::ca_animation::{
     get_animation_start_time, kCAFillModeBackwards, kCAFillModeBoth, kCAFillModeForwards,
     CAMediaTimingFillMode,
 };
-use crate::frameworks::core_animation::ca_layer::remove_anonymous_animation;
-use crate::frameworks::core_animation::{ca_layer::CALayerHostObject, CACurrentMediaTime};
+use crate::frameworks::core_animation::ca_layer::{
+    remove_anonymous_animation, CALayerHostObject, PresentationProperties,
+};
+use crate::frameworks::core_animation::CACurrentMediaTime;
 use crate::frameworks::core_foundation::time::CFTimeInterval;
 use crate::frameworks::core_graphics::cg_color::CGColorHostObject;
 use crate::frameworks::foundation::ns_string::{from_rust_string, to_rust_string};
@@ -40,18 +42,17 @@ impl State {
         &mut self,
         env: &mut Environment,
         layer: id,
-    ) -> CALayerHostObject {
-        // Clone given layer
+    ) -> PresentationProperties {
         let original = env.objc.borrow::<CALayerHostObject>(layer);
-        let mut presentation = original.clone();
+        let mut presentation = original.presentation_properties();
 
         // Loop over all animations and set the presentation layer's values
-        let named_animations: Vec<(Option<String>, id)> = presentation
+        let named_animations: Vec<(Option<String>, id)> = original
             .animations
             .iter()
             .map(|(key, anim)| (Some(key.clone()), *anim))
             .collect();
-        let anonymous_animations: Vec<(Option<String>, id)> = presentation
+        let anonymous_animations: Vec<(Option<String>, id)> = original
             .anonymous_animations
             .iter()
             .map(|anim| (None, *anim))

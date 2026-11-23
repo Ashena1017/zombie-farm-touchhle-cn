@@ -12,8 +12,7 @@
 #      install, which is the whole point: a seller cannot pre-open the manager;
 #   7. ZFR_MANAGER_NO_NOTICE=1 suppresses the dialog even without a marker.
 #
-# Everything happens in a throwaway copy under %TEMP%; the real Release folder
-# and the real sandbox are never opened for writing.
+# Extract the portable ZIP into a throwaway folder under %TEMP%.
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
     [string]$Label = 'notice',
@@ -21,8 +20,8 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 $root = (Resolve-Path -LiteralPath $Root).Path
-$release = Join-Path $root 'Release'
-if (-not (Test-Path -LiteralPath $release)) { throw "missing: $release" }
+$zipPath = Join-Path $root 'dist\windows\zombie-farm-windows-x64.zip'
+if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf)) { throw "missing: $zipPath" }
 
 $outDir = Join-Path $root ("_analysis\dumps\notice-" + $Label)
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
@@ -256,9 +255,11 @@ function Save-Window([IntPtr]$hwnd, [string]$path) {
 }
 
 # --- a throwaway copy of the bundle ---------------------------------------
-$temp = Join-Path $env:TEMP ('zfnotice_' + [Guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $temp | Out-Null
-Copy-Item -Path (Join-Path $release '*') -Destination $temp -Recurse -Force
+$tempRoot = (Resolve-Path -LiteralPath ([IO.Path]::GetTempPath())).Path.TrimEnd('\')
+$extractDir = Join-Path $tempRoot ('zfnotice_' + [Guid]::NewGuid().ToString('N'))
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $extractDir)
+$temp = Join-Path $extractDir 'zombie-farm-windows-x64'
 if (-not (Test-Path -LiteralPath (Join-Path $temp 'GameManager.ps1'))) {
     throw "copy failed: no GameManager.ps1 under $temp"
 }
@@ -489,7 +490,12 @@ Check (-not (Test-Path -LiteralPath $marker)) 'opt-out does not write the marker
 Stop-Manager $proc
 Start-Sleep -Milliseconds 500
 
-Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+$resolvedExtractDir = (Resolve-Path -LiteralPath $extractDir).Path
+if ((Split-Path -Parent $resolvedExtractDir) -ne $tempRoot -or
+    (Split-Path -Leaf $resolvedExtractDir) -notmatch '^zfnotice_[a-f0-9]{32}$') {
+    throw "Unexpected extraction path: $resolvedExtractDir"
+}
+Remove-Item -LiteralPath $resolvedExtractDir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ''
 if ($script:failures -eq 0) {
     Write-Host "DONE: all checks passed; screenshots in $outDir"

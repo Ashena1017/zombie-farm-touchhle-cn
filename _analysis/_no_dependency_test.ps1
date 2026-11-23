@@ -15,20 +15,12 @@ param(
     [int]$TimeoutSeconds = 45,
     [int]$GameSeconds = 30
 )
-$root = (Split-Path -Parent $PSScriptRoot)
-# The emulator lives in its own folder now (the tree mirrors the shipped
-# ./Release layout). Fall back to the flat layout so these scripts keep working
-# either way -- same rule GameManager.ps1 uses.
-$hleRoot = if (Test-Path -LiteralPath (Join-Path $root 'touchHLE\touchHLE.exe')) {
-    Join-Path $root 'touchHLE'
-} else {
-    $root
-}
+$hleRoot = Join-Path $Root 'run\windows\touchHLE'
 
 
 $ErrorActionPreference = 'Continue'
 
-$manager = Join-Path $Root 'GameManager.ps1'
+$manager = Join-Path $Root 'windows\GameManager.ps1'
 $helpers = @('StartZombieFarmNextHour.ps1', 'SetZombieFarmCurrency.ps1')
 $docs = Join-Path $hleRoot 'touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\Documents'
 $live = Join-Path $docs 'saveGame.bin2'
@@ -102,7 +94,7 @@ $hwnd = [IntPtr]::Zero
 try {
     # --- hide the helpers ---------------------------------------------------
     foreach ($h in $helpers) {
-        $p = Join-Path $Root $h
+        $p = Join-Path (Join-Path $Root 'windows') $h
         if (Test-Path -LiteralPath $p) {
             Move-Item -LiteralPath $p -Destination "$p.hidden" -Force
             $renamed += $h
@@ -226,7 +218,7 @@ try {
 
     # --- restore the helpers and the saves ----------------------------------
     foreach ($h in $renamed) {
-        $p = Join-Path $Root $h
+        $p = Join-Path (Join-Path $Root 'windows') $h
         if (Test-Path -LiteralPath "$p.hidden") {
             Move-Item -LiteralPath "$p.hidden" -Destination $p -Force
         }
