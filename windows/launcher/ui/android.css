@@ -1,0 +1,121 @@
+/* The Android host puts the page title in the app bar and the destinations after main. */
+.mobile body {
+  display: grid;
+  grid-template: "bar" auto "content" minmax(0, 1fr) "tabs" auto / minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  font-family: Roboto, "Noto Sans CJK SC", sans-serif;
+}
+.mobile .sidebar {
+  grid-area: bar;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: max(4px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 4px max(16px, env(safe-area-inset-left));
+  background: var(--card);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.mobile .brand { gap: 10px; padding: 0; }
+.mobile .brand img { width: 30px; height: 30px; border-radius: 8px; }
+.mobile .brand h1 { font-size: 20px; letter-spacing: 0; }
+.mobile .sidebar-footer { margin: 0; min-height: 48px; padding: 4px; color: var(--accent-ink); }
+.mobile .icon { display: none; }
+.mobile main {
+  grid-area: content; min-height: 0; padding: 16px max(16px, env(safe-area-inset-right)) 20px max(16px, env(safe-area-inset-left));
+  scrollbar-gutter: auto; scroll-padding-block: 12px; overscroll-behavior: contain;
+}
+.mobile main > section, .mobile #feedback { max-width: 640px; }
+.mobile button, .mobile select, .mobile input:not([type=checkbox]):not([type=radio]) { min-height: 48px; }
+.mobile .card { margin-bottom: 12px; border-radius: 16px; padding: 16px; }
+.mobile .intro { margin: 0 0 12px; }
+.mobile .detail, .mobile .intro, .mobile .setting p { font-size: 14px; }
+
+.mobile nav {
+  grid-area: tabs; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0; margin: 0; padding: 3px max(4px, env(safe-area-inset-right)) max(3px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+  background: var(--card); border-top: 1px solid var(--line);
+}
+.mobile nav button {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 2px; padding: 3px 0; min-height: 54px; color: var(--muted); font-size: 12px; line-height: 1.35;
+}
+.mobile nav button[aria-current=page] { color: var(--accent-ink); background: transparent; }
+.mobile nav button[aria-current=page]::before { display: none; }
+.mobile nav .icon {
+  display: grid; place-items: center; position: relative;
+  width: 48px; max-width: 100%; height: 26px; border-radius: 16px; font-size: 0;
+}
+.mobile nav button[aria-current=page] .icon { background-color: var(--tint); }
+.mobile nav .icon::before, .mobile nav .icon::after { content: ""; position: absolute; box-sizing: border-box; }
+.mobile [data-page=game] .icon::before {
+  width: 20px; height: 18px; background: currentColor;
+  clip-path: polygon(50% 0,100% 46%,90% 58%,84% 53%,84% 100%,57% 100%,57% 68%,43% 68%,43% 100%,16% 100%,16% 53%,10% 58%,0 46%);
+}
+.mobile [data-page=settings] .icon::before { width: 20px; height: 10px; border-block: 2px solid; }
+.mobile [data-page=settings] .icon::after { width: 4px; height: 7px; margin: -8px 0 0 -8px; background: currentColor; border-radius: 2px; box-shadow: 8px 8px currentColor; }
+.mobile [data-page=saves] .icon::before { width: 17px; height: 13px; margin-top: 4px; border: 2px solid; border-radius: 2px; }
+.mobile [data-page=saves] .icon::after { width: 20px; height: 5px; margin-top: -11px; border: 2px solid; border-radius: 2px; background: var(--card); }
+.mobile [data-page=verify] .icon::before, .mobile [data-page=appearance] .icon::before { width: 19px; height: 19px; border: 2px solid; border-radius: 50%; }
+.mobile [data-page=verify] .icon::after { width: 9px; height: 5px; border-left: 2px solid; border-bottom: 2px solid; transform: translateY(-1px) rotate(-45deg); }
+.mobile [data-page=appearance] .icon::before { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+
+.mobile .hero {
+  min-height: clamp(144px, 25vh, 210px); align-items: end; margin-bottom: 12px; border: 0; border-radius: 18px;
+  background: linear-gradient(0deg, rgb(26 33 25 / 82%), transparent 72%), url("farmland.webp") center 55% / cover;
+}
+.mobile .hero::before { display: none; }
+.mobile .hero-content { width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0; padding: 16px; }
+.mobile .hero h2 { color: white; margin: 0; font-size: clamp(24px, 7vw, 32px); text-shadow: 0 1px 4px #15201066; }
+.mobile #start { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 24px; padding-inline: 18px; }
+.mobile #start::before { content: ""; border-block: 5px solid transparent; border-left: 8px solid currentColor; color: var(--accent-ink); }
+.mobile .clock-card { display: grid; grid-template-columns: 1fr auto; gap: 12px 8px; }
+.mobile #clock { font-size: clamp(23px, 6vw, 31px); }
+.mobile .time-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.mobile .time-actions button { flex: 1 1 auto; background: var(--tint); color: var(--accent-ink); border: 0; }
+.mobile #reset-time { background: var(--field); color: var(--text); }
+.mobile .file-picker { margin-top: 4px; }
+.mobile #ipa { width: 100%; font-size: 15px; }
+.mobile #browse { padding: 0 6px; }
+
+.mobile .setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding-block: 14px; }
+.mobile .setting:last-of-type { border-bottom: 0; }
+.mobile .setting select { min-width: 0; max-width: 100%; }
+.mobile .setting-controls { display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; align-items: stretch; }
+.mobile .setting-controls input { width: 100%; }
+.mobile .currency { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.mobile .currency label { min-width: 0; }
+.mobile #write-currency, .mobile #import-save, .mobile #reset-appearance { width: 100%; }
+.mobile #write-currency { grid-column: 1 / -1; }
+.mobile #import-save { margin-top: 10px; }
+.mobile #saves .spread, .mobile #verify .spread { flex-wrap: wrap; gap: 4px 10px; }
+.mobile .backup-row { min-height: 56px; align-items: center; }
+.mobile .backup-row input { flex: none; width: 20px; height: 20px; }
+.mobile .selection { align-items: start; flex-direction: column; gap: 0; border-top: 1px solid var(--line); padding-top: 10px; }
+.mobile #backup-tools > .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.mobile #export-backup { width: 100%; margin-top: 8px; }
+.mobile .integrity-item { padding: 0; }
+.mobile .integrity-item summary { min-height: 48px; padding-block: 14px; overflow-wrap: anywhere; }
+.mobile .modes { margin: 12px 0 22px; }
+.mobile .modes label span { min-height: 48px; }
+.mobile .swatches { gap: 10px 2px; }
+.mobile .swatch { font-size: 13px; }
+.mobile dialog { max-height: calc(100% - 16px); overflow: auto; padding: 20px; }
+.mobile .dialog-actions button { flex: 1 1 0; }
+@media (max-width: 480px) {
+  .mobile .setting { grid-template-columns: minmax(0, 1fr); }
+  .mobile .setting-controls { display: flex; align-items: center; }
+  .mobile .setting-controls > * { flex: 1 1 0; min-width: 0; }
+  .mobile dialog { margin: auto 0 0; width: 100%; max-width: none; border-radius: 20px 20px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+}
+@media (orientation: landscape) and (min-width: 520px) {
+  .mobile body { grid-template: "tabs bar" auto "tabs content" minmax(0, 1fr) / 74px minmax(0, 1fr); }
+  .mobile nav { display: flex; flex-direction: column; justify-content: center; border: 0; border-inline-end: 1px solid var(--line); overflow-y: auto; }
+  .mobile nav button { flex: 0 0 auto; min-height: 48px; }
+  .mobile .hero { min-height: 116px; }
+}
+@media (orientation: landscape) and (max-height: 320px) {
+  .mobile nav { justify-content: start; }
+}

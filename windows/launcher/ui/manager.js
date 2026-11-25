@@ -25,6 +25,33 @@ let verifyResult = null;
 
 if (mobile) {
   document.documentElement.classList.add("mobile");
+  const nav = document.querySelector("nav");
+  const tabNames = { game: "游戏", settings: "设置", saves: "存档", verify: "校验", appearance: "外观" };
+  for (const button of nav.querySelectorAll("button")) {
+    const label = button.lastChild;
+    button.setAttribute("aria-label", label.textContent.trim());
+    label.textContent = tabNames[button.dataset.page];
+  }
+  document.querySelector("main").after(nav);
+  const heading = byId("heading");
+  heading.textContent = "游戏管理";
+  document.querySelector(".brand > div").replaceWith(heading);
+  document.querySelector(".page-header").remove();
+
+  const timeActions = document.createElement("div");
+  timeActions.className = "time-actions";
+  timeActions.append(byId("skip"), byId("reset-time"));
+  document.querySelector(".clock-card").append(timeActions);
+  // Let the player review the saved duration before bringing up a keyboard.
+  byId("skip-title").tabIndex = -1;
+  byId("skip-title").autofocus = true;
+  const versionHeading = byId("ipa").closest(".card").querySelector("h2");
+  const versionHeader = document.createElement("div");
+  versionHeader.className = "spread";
+  versionHeading.before(versionHeader);
+  versionHeader.append(versionHeading, byId("browse"));
+  byId("browse").classList.add("text-button");
+
   for (const id of ["fullscreen", "wheel_zoom"]) byId(id).closest(".setting").hidden = true;
   byId("settings-fields").querySelector(".subhead").hidden = true;
   byId("open-saves").hidden = true;
@@ -101,7 +128,8 @@ for (const link of document.querySelectorAll("nav button")) {
       if (active) other.setAttribute("aria-current", "page");
       else other.removeAttribute("aria-current");
     }
-    byId("heading").textContent = link.lastChild.textContent.trim();
+    byId("heading").textContent = mobile && link.dataset.page === "game" ? "游戏管理" :
+      link.getAttribute("aria-label") || link.lastChild.textContent.trim();
     byId("heading").focus({ preventScroll: true });
     document.querySelector("main").scrollTop = 0;
     if (!byId("feedback").classList.contains("bad")) notify("");
@@ -258,6 +286,10 @@ function showResolution() {
   }
   const base = byId("window_family").value === "iphone" ? [480, 320] : [1024, 768];
   const [w, h] = base.map(side => Math.round(side * scale));
+  if (mobile) {
+    byId("resolution").textContent = "渲染分辨率 " + w + " × " + h;
+    return;
+  }
   const screenScale = window.devicePixelRatio || 1;
   const tooLarge = w > screen.availWidth * screenScale || h > screen.availHeight * screenScale;
   byId("resolution").textContent = "窗口 " + w + " × " + h + (tooLarge ? " · 超出当前屏幕" : "");

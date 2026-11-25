@@ -4,7 +4,14 @@
 
 ## 当前发行
 
-[v31fix-tauri](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-tauri) 提供 Android ARM64（versionCode 21）和 Windows x64。Android 与 Windows 从 windows/launcher/ui/ 构建同一套页面。Android 的 Rust 命令入口在 windows/launcher/src/lib.rs，ManagerPlugin.java 复用 ZfStorage 和旧版外观偏好。ManagerActivity 在 Android 8 和 WebView 105 及以上启动 MobileManagerActivity，其余设备沿用原生页面。
+Android ARM64（内部版本号 22）与 Windows x64 共用 v31 中文 IPA。Android 在竖屏使用底部导航，横屏使用左侧导航。手机布局来自 `windows/launcher/ui/android.css`。Android 8.0 及以上且系统 WebView 105 及以上使用 Tauri 界面，其余受支持设备使用原生兼容界面。[下载双端发行包](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-mobile-layout)
+
+- Android APK 共 105,301,720 字节，SHA-256 为 `8e72aa53dbb2d255955c89c4161ef737f4bd99089a78a3c2509753adb5fecd49`。MuMu Android 15 验证了同签名更新、手机布局、游戏启动与返回，64 项设备检查通过。
+- Windows ZIP 共 98,981,683 字节，SHA-256 为 `6ff9fd60dda7a34d580ea15984669c7d1f95c8ecb6c7b1adafc4b383b8a67c7c`。解压后独立启动运行 45 秒通过。
+
+## v31fix-tauri 记录
+
+[v31fix-tauri](https://github.com/Ashena1017/zombie-farm-touchhle-cn/tree/v31fix-tauri) 提供 Android ARM64（versionCode 21）和 Windows x64。Android 与 Windows 从 windows/launcher/ui/ 构建同一套页面。Android 的 Rust 命令入口在 windows/launcher/src/lib.rs，ManagerPlugin.java 复用 ZfStorage 和旧版外观偏好。ManagerActivity 在 Android 8 和 WebView 105 及以上启动 MobileManagerActivity，其余设备沿用原生页面。
 
 - Android ARM64 APK 共 105,297,997 字节，SHA-256 为 `fc0d2fdcad0c3706ff78cf343437bc34233890cc6599fb9a3dc144d750e617a8`。使用原签名，MuMu Android 15 从上版覆盖安装后存档哈希一致。设备通过 64 项检查，并连续两次从游戏返回管理器后重新启用启动按钮。
 - Windows x64 ZIP 共 98,980,214 字节，SHA-256 为 `0a51eb63738a19e1144f6a920c2b34ca881f68f0931f85a96949b9ba0219e040`。便携包解压到独立目录后，游戏独立运行 45 秒通过。
