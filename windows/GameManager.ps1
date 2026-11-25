@@ -673,8 +673,8 @@ function Test-SettingValue {
     return $n -ge $def.CustomMin -and $n -le $def.CustomMax
 }
 
-# The window size a (family, scale) pair actually produces, in landscape, which
-# is the orientation the launcher uses (--landscape-right).
+# The window size a (family, scale) pair actually produces, in the landscape
+# orientation declared by the selected IPA.
 #
 # Pure function of its arguments (no UI access), so -SelfTest can verify the
 # arithmetic without a window. Implemented with the same arithmetic as touchHLE's
@@ -1726,7 +1726,7 @@ function New-GameChildProcess {
     # looks exactly like "the game is still running" while nothing is on screen.
     # The manager reports the crash itself (exit code + captured panic text), so
     # the box is pure downside on this launch path.
-    $psi.Arguments = '"' + $paths.Ipa + '" --landscape-right --no-error-popup'
+    $psi.Arguments = '"' + $paths.Ipa + '" --no-error-popup'
     # MUST be touchHLE's own folder. src/paths.rs resolves resources against the
     # current directory (Path::new(".") on Windows), not the executable location,
     # so starting this from anywhere else panics with
@@ -2087,6 +2087,11 @@ if ($SelfTest) {
         Write-Host '--- save management (sandboxed) ---'
         New-Item -ItemType Directory -Force -Path $sandbox | Out-Null
         [System.IO.File]::WriteAllText($offsetFixture, '7200', [System.Text.Encoding]::ASCII)
+        Write-TimeOffset -Value 0 -Path $offsetFixture
+        $resetOffset = Read-TimeOffset -Path $offsetFixture
+        Write-Host ("  reset time offset    : {0} sec  {1}" -f $resetOffset, $(if ($resetOffset -eq 0) { 'PASS' } else { 'FAIL' }))
+        if ($resetOffset -ne 0) { $ok = $false }
+        Write-TimeOffset -Value 7200 -Path $offsetFixture
 
         # Build a live save plus one pre-existing backup.
         $live = Join-Path $sandbox 'saveGame.bin2'

@@ -182,6 +182,11 @@ function Invoke-ManagerAction([string]$action, $data) {
             Save-Settings -Settings @{ $key = [string]$data.value }
             return @{ settings = Get-CurrentSettings }
         }
+        'resetTime' {
+            if (-not $script:CurrentIpa) { throw '请先选择 IPA。' }
+            if (Test-GameRunning) { throw '请先退出游戏再重置模拟时间。' }
+            Write-TimeOffset -Value 0 -Path (Get-LaunchPaths).OffsetFile
+        }
         'setCurrency' {
             if (Test-GameRunning) { throw '请先关闭游戏再修改存档。' }
             if ([string]$data.gold -notmatch '^\d{1,10}$' -or [string]$data.brains -notmatch '^\d{1,10}$') {

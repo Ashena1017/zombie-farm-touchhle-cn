@@ -146,7 +146,7 @@ try {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $hle
     $env:PATH = $release + ';' + $env:PATH
-    $psi.Arguments = '"' + $ipas[0].FullName + '" --landscape-right'
+    $psi.Arguments = '"' + $ipas[0].FullName + '"'
     # MUST be touchHLE's own folder: resources resolve against the CURRENT DIRECTORY
     # (src/paths.rs), not the executable location, so the parent folder panics with
     #   Unexpected I/O failure ... "touchHLE_dylibs/libz.1.2.3.dylib"

@@ -4,6 +4,13 @@
 
 ## 当前发行
 
+Windows x64 和 Android ARM64 共用 v31 中文 IPA。用过「快进并启动」后，在管理器的「模拟时间」处选择「重置为当前时间」并确认，即可清零累计偏移。游戏使用 IPA 声明的初始方向。[下载双端发行包](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-time-reset)
+
+- Android 内部版本号为 23。APK 共 105,093,448 字节，SHA-256 `0189aef6d6249d3eea49bfc5c8736008fc3158bcf47fad1ae7f597bd2c486c3d`。MuMu 从 v22 同签名覆盖安装，64 项设备检查通过。实测取消时保留两小时偏移，确认后归零，并成功横屏启动游戏、返回管理器。升级和测试前后的存档 SHA-256 一致。
+- Windows ZIP 共 98,402,368 字节，SHA-256 `19066e7ea141054439cf9e3ecd391aff8842c3eb89bac2c8eaa9d6514d9676be`。管理器后台将 7,200 秒偏移清零后读回一致，存档校验通过。便携包解压后游戏独立运行 45 秒通过。
+
+## v31fix-mobile-layout 记录
+
 Android ARM64（内部版本号 22）与 Windows x64 共用 v31 中文 IPA。Android 在竖屏使用底部导航，横屏使用左侧导航。手机布局来自 `windows/launcher/ui/android.css`。Android 8.0 及以上且系统 WebView 105 及以上使用 Tauri 界面，其余受支持设备使用原生兼容界面。[下载双端发行包](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-mobile-layout)
 
 - Android APK 共 105,301,720 字节，SHA-256 为 `8e72aa53dbb2d255955c89c4161ef737f4bd99089a78a3c2509753adb5fecd49`。MuMu Android 15 验证了同签名更新、手机布局、游戏启动与返回，64 项设备检查通过。

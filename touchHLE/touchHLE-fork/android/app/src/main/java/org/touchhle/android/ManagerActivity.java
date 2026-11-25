@@ -397,16 +397,16 @@ public class ManagerActivity extends Activity {
         } else {
             Button start = button("启动游戏", true, () -> launch(0)); start.setEnabled(editable()); addButton(launch, start);
             Button skip = button("启动并跳过时间", false, this::skipDialog); skip.setEnabled(editable()); addButton(launch, skip);
-            if (settings.optLong("offset", 0) > 0) {
-                Button reset = button("重置累计跳过时间", false, () -> dialogBuilder()
-                    .setTitle("重置累计时间？")
-                    .setMessage("只清除未来启动时使用的累计偏移，不会倒退或改写现有游戏进度。")
+            if (settings.optLong("offset", 0) != 0) {
+                Button reset = button("重置为当前时间", false, () -> dialogBuilder()
+                    .setTitle("重置为当前时间？")
+                    .setMessage("将清除累计快进时间，模拟时间恢复到当前时间，不会修改游戏存档。")
                     .setNegativeButton("取消", null)
                     .setPositiveButton("重置", (dialog, which) -> {
                         String id = selected.appId;
                         task(() -> {
                             storage.settings(id, storage.settings(id).put("offset", 0));
-                            return "累计跳过时间已重置";
+                            return "模拟时间已重置";
                         });
                     }).show());
                 reset.setEnabled(editable()); addButton(launch, reset);

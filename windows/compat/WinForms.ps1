@@ -502,9 +502,19 @@ $tabGame.Controls.Add($btnStartSkip)
 $lblSimulatedTime = New-Object System.Windows.Forms.Label
 $lblSimulatedTime.Text = '模拟时间：读取中…'
 $lblSimulatedTime.Location = New-Object System.Drawing.Point(16, 153)
-$lblSimulatedTime.Size = New-Object System.Drawing.Size(870, 21)
+$lblSimulatedTime.Size = New-Object System.Drawing.Size(670, 21)
 $lblSimulatedTime.Font = $fontSmall
 $tabGame.Controls.Add($lblSimulatedTime)
+
+$btnResetTime = New-Object System.Windows.Forms.Button
+$btnResetTime.Text = '重置为当前时间'
+$btnResetTime.Location = New-Object System.Drawing.Point(704, 150)
+$btnResetTime.Size = New-Object System.Drawing.Size(182, 27)
+$btnResetTime.FlatStyle = 'Flat'
+$btnResetTime.BackColor = $softGreen
+$btnResetTime.ForeColor = $forest
+$btnResetTime.Visible = $false
+$tabGame.Controls.Add($btnResetTime)
 
 # --- settings tab ---------------------------------------------------------
 
@@ -1187,12 +1197,34 @@ $script:UiTimer.Start()
 
 function Update-SimulatedTimeLabel {
     try {
-        $clock = Format-SimulatedTime -Offset (Read-TimeOffset) -Base (Get-SimulatedTimeBase)
+        $offset = Read-TimeOffset
+        $btnResetTime.Visible = $offset -ne 0
+        $clock = Format-SimulatedTime -Offset $offset -Base (Get-SimulatedTimeBase)
         $lblSimulatedTime.Text = "模拟时间：$clock"
     } catch {
+        $btnResetTime.Visible = $true
         $lblSimulatedTime.Text = '模拟时间：无法读取（请检查累计时间偏移）'
     }
 }
+
+$btnResetTime.Add_Click({
+    if (Test-GameRunning) {
+        Update-Status '游戏正在运行，请先退出游戏再重置模拟时间。' 'err'
+        return
+    }
+    $answer = [System.Windows.Forms.MessageBox]::Show(
+        '将清除累计快进时间，模拟时间恢复到当前时间，不会修改游戏存档。',
+        '重置为当前时间？', 'YesNo', 'Question')
+    if ($answer -ne 'Yes') { return }
+    try {
+        Write-TimeOffset -Value 0
+        Update-SimulatedTimeLabel
+        Update-Status '模拟时间已重置。' 'ok'
+    } catch {
+        Update-Status ("重置模拟时间失败：{0}" -f $_.Exception.Message) 'err'
+        [void][System.Windows.Forms.MessageBox]::Show($_.Exception.Message, '重置失败', 'OK', 'Error')
+    }
+})
 
 $clockTimer = New-Object System.Windows.Forms.Timer
 $clockTimer.Interval = 1000
@@ -2474,7 +2506,7 @@ function Set-ManagerPalette {
     Update-IntegrityDisplay
 
     foreach ($button in @(
-        $btnIpaBrowse, $btnStartSkip, $btnApplyCurrency, $btnBackup, $btnRestore,
+        $btnIpaBrowse, $btnStartSkip, $btnResetTime, $btnApplyCurrency, $btnBackup, $btnRestore,
         $btnRefresh, $btnSelectAll, $btnSelectNone, $btnSelectInvert, $btnDelete
     )) {
         $button.BackColor = $script:SoftGreen

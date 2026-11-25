@@ -22,7 +22,10 @@ if ($ExpectedVersionCode -le 18) {
     $expectedIpa = (Get-Content -Raw -Encoding UTF8 -LiteralPath $report | ConvertFrom-Json).output
     $installedName = 'Zombie_Farm_v29fix.ipa'
 }
-$expectedOptions = 'com.playforge.ZombieFarm.ZFR: --landscape-right --fps-limit=60 --device-family=iphone --scale-hack=3 --non-blocking-zero-timeout-run-loop'
+$expectedOptions = 'com.playforge.ZombieFarm.ZFR: --fps-limit=60 --device-family=iphone --scale-hack=3 --non-blocking-zero-timeout-run-loop'
+if ($ExpectedVersionCode -lt 23) {
+    $expectedOptions = $expectedOptions.Replace(': --fps-limit', ': --landscape-right --fps-limit')
+}
 $expectedLibcxxBytes = 1794776
 $expectedLibcxxSha256 = 'F9992C4BA6B7C5A716E3A202FCEB1CE029D6A2B0605838AC6B3219F489DD7970'
 
@@ -115,6 +118,9 @@ try {
     try { $options = $reader.ReadToEnd() }
     finally { $reader.Dispose(); $optionsStream.Dispose() }
     if (-not $options.Contains($expectedOptions)) { throw 'Android default options do not enable the expected ZFR fixes.' }
+    if ($ExpectedVersionCode -ge 23 -and $options -match '(?:^|\s)--landscape-(?:left|right)(?:\s|$)') {
+        throw 'Android default options must use the orientation declared by the selected IPA.'
+    }
     if ($options.Contains('--zf-wheel-zoom-step=')) {
         throw 'Android defaults must use touch pinch zoom.'
     }

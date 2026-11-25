@@ -38,10 +38,6 @@ if (mobile) {
   document.querySelector(".brand > div").replaceWith(heading);
   document.querySelector(".page-header").remove();
 
-  const timeActions = document.createElement("div");
-  timeActions.className = "time-actions";
-  timeActions.append(byId("skip"), byId("reset-time"));
-  document.querySelector(".clock-card").append(timeActions);
   // Let the player review the saved duration before bringing up a keyboard.
   byId("skip-title").tabIndex = -1;
   byId("skip-title").autofocus = true;
@@ -60,10 +56,6 @@ if (mobile) {
   byId("import-save").hidden = false;
   byId("import-save").disabled = true;
   byId("export-backup").hidden = false;
-  byId("reset-time").onclick = () => enqueue(async () => {
-    if (await ask("重置累计快进时间", "模拟时间将恢复为手机当前时间。", "重置时间"))
-      drawSnapshot(await invoke("resetTime"));
-  });
   byId("import-save").onclick = () => enqueue(async () => {
     if (await ask("导入存档或备份", "选择完整备份 ZIP 或 saveGame.bin2。导入会自动备份当前进度。", "选择文件"))
       drawSnapshot(await invoke("importSave", { appId: snapshot.appId }));
@@ -95,6 +87,16 @@ if (mobile) {
     }
   }, 1000);
 }
+
+const timeActions = document.createElement("div");
+timeActions.className = "time-actions";
+if (mobile) timeActions.append(byId("skip"));
+timeActions.append(byId("reset-time"));
+document.querySelector(".clock-card").append(timeActions);
+byId("reset-time").addEventListener("click", () => enqueue(async () => {
+  if (await ask("重置为当前时间？", "将清除累计快进时间，模拟时间恢复到当前时间，不会修改游戏存档。", "重置时间"))
+    drawSnapshot(await invoke("resetTime"));
+}));
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -487,11 +489,9 @@ function drawSnapshot(updated) {
   byId("verify-selection").textContent = picked ? "当前选择：" + picked.name : "当前未选择游戏包。";
   byId("browse").disabled = false;
   byId("settings-fields").disabled = !picked?.appId || (mobile && snapshot.running);
-  if (mobile) {
-    byId("import-save").disabled = !picked?.appId || snapshot.running;
-    byId("reset-time").hidden = !snapshot.offset || !picked?.appId;
-    byId("reset-time").disabled = snapshot.running;
-  }
+  if (mobile) byId("import-save").disabled = !picked?.appId || snapshot.running;
+  byId("reset-time").hidden = !picked?.appId || snapshot.offset === 0;
+  byId("reset-time").disabled = snapshot.running;
   byId("retry").hidden = true;
   for (const select of byId("settings-fields").querySelectorAll("select")) showSetting(select, String(snapshot.settings[select.id]));
   showResolution();

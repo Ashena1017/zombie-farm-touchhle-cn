@@ -45,7 +45,7 @@ public class MainActivity extends SDLActivity {
                 Long.toString(settings.optLong("offset", 0)), true);
             android.system.Os.setenv("TOUCHHLE_ANDROID_RUN_LOOP_FIX",
                 settings.optBoolean("fix", true) ? "1" : "0", true);
-            launchArguments = new String[]{ipa.file.getPath(), "--landscape-right",
+            launchArguments = new String[]{ipa.file.getPath(),
                 "--device-family=" + settings.optString("family", ZfStorage.DEFAULT_FAMILY),
                 "--scale-hack=" + ZfStorage.validScaleOrDefault(settings.optString("scale", ZfStorage.DEFAULT_SCALE)),
                 "--fps-limit=" + settings.optString("fps", "60")};

@@ -145,7 +145,7 @@ if ($NoSkip) {
 # more, because command-line options OVERRIDE touchHLE_options.txt (lib.rs applies
 # them last), so leaving it here would silently defeat the UI's device-size
 # setting. The options file now always specifies it, and the UI writes it.
-$touchHLEArgs = @($game, '--landscape-right')
+$touchHLEArgs = @($game)
 
 if ($Quiet) {
     # Called from the GUI. touchHLE.exe is a console-subsystem program, so if we
