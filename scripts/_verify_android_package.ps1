@@ -66,6 +66,10 @@ try {
     $optionsEntry = $archive.GetEntry('assets/touchHLE_zombiefarm_options.txt')
     $hashEntry = $archive.GetEntry('assets/touchHLE_zombiefarm_ipa.sha256')
     $nativeEntry = $archive.GetEntry('lib/arm64-v8a/libtouchHLE.so')
+    if ($ExpectedVersionCode -ge 21) {
+        $managerEntry = $archive.GetEntry('lib/arm64-v8a/libzf_manager_mobile.so')
+        if (!$managerEntry -or !$managerEntry.Length) { throw 'APK is missing the ARM64 Tauri manager.' }
+    }
     $libcxxEntry = $archive.GetEntry('lib/arm64-v8a/libc++_shared.so')
     foreach ($pair in @(
         @{ Name = 'Android manifest'; Entry = $archive.GetEntry('AndroidManifest.xml') },

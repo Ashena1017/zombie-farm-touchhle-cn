@@ -36,6 +36,7 @@
         </div>
       </div>
       <section class="card clock-card"><div><h2>模拟时间</h2><p id="clock-date">读取中…</p></div><time id="clock">--:--:--</time></section>
+      <button id="reset-time" hidden>重置累计快进时间</button>
       <section class="card">
         <h2><label for="ipa">游戏版本 <span class="qualifier">IPA</span></label></h2>
         <div class="file-picker"><select id="ipa" disabled><option>正在读取游戏版本…</option></select><button id="browse" disabled>浏览…</button></div>
@@ -62,6 +63,7 @@
       <section class="card">
         <div class="spread"><h2>当前存档</h2><button class="text-button" id="open-saves" disabled>打开目录</button></div>
         <p id="live-save" class="detail">读取中…</p>
+        <button id="import-save" hidden>导入存档或备份</button>
         <fieldset class="currency" id="currency-fields" disabled>
           <legend class="sr">金币与脑子</legend>
           <label>金币<input id="gold" inputmode="numeric" maxlength="10"></label>
@@ -75,6 +77,7 @@
         <div id="backup-tools" hidden>
           <div class="selection"><span id="selection-count"></span><div class="actions"><button class="text-button" id="all">全选</button><button class="text-button" id="none">取消选择</button><button class="text-button" id="invert">反选</button></div></div>
           <div class="actions"><button id="restore" disabled>还原所选备份</button><button class="danger-text" id="delete" disabled>删除所选</button></div>
+          <button id="export-backup" hidden>导出所选备份</button>
         </div>
       </section>
     </section>

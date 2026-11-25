@@ -7,6 +7,10 @@
  * has a different license. Please see vendor/SDL/LICENSE.txt for details.
  */
 pluginManagement {
+    plugins {
+        id("com.android.library") version "8.10.1"
+        id("org.jetbrains.kotlin.android") version "2.0.21"
+    }
     repositories {
         google()
         mavenCentral()
@@ -23,5 +27,6 @@ dependencyResolutionManagement {
 }
 
 include(":app")
+apply(from = "tauri.settings.gradle")
 include(":touchhle")
 project(":touchhle").projectDir = file("${rootDir.parentFile}/src")

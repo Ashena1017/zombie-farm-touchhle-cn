@@ -60,3 +60,8 @@ __pycache__/
 *~
 Thumbs.db
 desktop.ini
+
+touchHLE/touchHLE-fork/android/.tauri/
+touchHLE/touchHLE-fork/android/tauri.settings.gradle
+touchHLE/touchHLE-fork/android/app/tauri.build.gradle.kts
+touchHLE/touchHLE-fork/android/app/proguard-tauri.pro

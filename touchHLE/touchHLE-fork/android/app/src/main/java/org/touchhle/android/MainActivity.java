@@ -15,6 +15,8 @@ import android.app.AlertDialog;
 import android.widget.Toast;
 import org.json.JSONObject;
 import android.view.View;
+import android.view.InputDevice;
+import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -69,7 +71,16 @@ public class MainActivity extends SDLActivity {
     }
 
     @Override
-    public void onBackPressed() {
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // SDL consumes hardware Back as a keyboard event before Activity.onBackPressed.
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && !event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) onBackPressed();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override public void onBackPressed() {
         new AlertDialog.Builder(this).setTitle("返回游戏管理？")
             .setNegativeButton("继续游戏", null)
             .setPositiveButton("退出游戏", (dialog, which) -> finish()).show();

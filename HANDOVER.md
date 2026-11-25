@@ -1,10 +1,17 @@
 # 项目维护交接
 
-核对日期为 2026-11-25。旧交接的 §0–§50 保存在 [历史交接](docs/HANDOVER_HISTORY.md)，其中的路径和构建命令对应迁移前的环境。玩家下载和安装见 [README.md](README.md)。
+核对日期为 2026-11-26。旧交接的 §0–§50 保存在 [历史交接](docs/HANDOVER_HISTORY.md)，其中的路径和构建命令对应迁移前的环境。玩家下载和安装见 [README.md](README.md)。
 
 ## 当前发行
 
-[v31fix-appearance](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-appearance) 提供 Windows x64 ZIP 和 Android ARM64 APK（`versionCode` 20）。继续使用 v31 内置 IPA。
+[v31fix-tauri](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-tauri) 提供 Android ARM64（versionCode 21）和 Windows x64。Android 与 Windows 从 windows/launcher/ui/ 构建同一套页面。Android 的 Rust 命令入口在 windows/launcher/src/lib.rs，ManagerPlugin.java 复用 ZfStorage 和旧版外观偏好。ManagerActivity 在 Android 8 和 WebView 105 及以上启动 MobileManagerActivity，其余设备沿用原生页面。
+
+- Android ARM64 APK 共 105,297,997 字节，SHA-256 为 `fc0d2fdcad0c3706ff78cf343437bc34233890cc6599fb9a3dc144d750e617a8`。使用原签名，MuMu Android 15 从上版覆盖安装后存档哈希一致。设备通过 64 项检查，并连续两次从游戏返回管理器后重新启用启动按钮。
+- Windows x64 ZIP 共 98,980,214 字节，SHA-256 为 `0a51eb63738a19e1144f6a920c2b34ca881f68f0931f85a96949b9ba0219e040`。便携包解压到独立目录后，游戏独立运行 45 秒通过。
+
+## v31fix-appearance 记录
+
+[v31fix-appearance](https://github.com/Ashena1017/zombie-farm-touchhle-cn/tree/v31fix-appearance) 提供 Windows x64 ZIP 和 Android ARM64 APK（`versionCode` 20）。继续使用 v31 内置 IPA。
 
 Windows 游戏管理改用 Tauri 和 WebView2，缩短打开管理器的等待时间。WebView2 无法启动时会打开兼容界面。Windows 和 Android 都新增「外观」，可跟随系统、选浅色或深色，并选用七种预设强调色或自定义颜色。
 
@@ -98,7 +105,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_verify_layout_match
 
 ### Android ARM64
 
-使用 JDK 17、Gradle 8.11.1、Android SDK Platform 31、NDK 27.2.12479018 和 Rust Android ARM64 工具链。本机用 `_build_android_local.ps1`，可通过 `-AndroidSdk`、`-Jdk` 和 `-Gradle` 指定工具路径。其他环境配置好工具链后可直接调用 `_build_android.ps1`。Gradle 和 Windows 打包脚本共用 `release.json` 指定的内置 IPA。
+使用 JDK 17、Gradle 8.11.1、Android SDK Platform 36、NDK 27.2.12479018 和 Rust Android ARM64 工具链。本机用 `_build_android_local.ps1`，可通过 `-AndroidSdk`、`-Jdk` 和 `-Gradle` 指定工具路径。其他环境配置好工具链后可直接调用 `_build_android.ps1`。Gradle 和 Windows 打包脚本共用 `release.json` 指定的内置 IPA。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_build_android_local.ps1

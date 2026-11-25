@@ -17,3 +17,5 @@
 Windows 初始化脚本在 [windows/Initialize-Runtime.ps1](../windows/Initialize-Runtime.ps1)。IPA 工具和专题诊断分别见 [tools](../tools/README.md) 和 [_analysis](../_analysis/README.md)。
 
 Android 正式构建在候选包通过原发布证书校验后替换 `dist/android/` 中的 APK。使用自己的测试证书时，给构建入口传 `-TestBuild`，输出在 `dist/android/test/`。
+
+Android 使用 SDK Platform 36 编译，保留原应用 ID 和最低系统版本。构建入口先用 cargo-ndk 编译 [Tauri 管理器](../windows/launcher/src/lib.rs)，生成 Kotlin 宿主和 ARM64 库，再调用 Gradle 打包。首次构建需要下载 AndroidX 与 Tauri 依赖。

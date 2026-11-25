@@ -77,7 +77,7 @@ android {
     ).all { it != null }
 
     ndkVersion = "27.2.12479018"
-    compileSdk = 31
+    compileSdk = 36
     buildFeatures {
         buildConfig = true
     }
@@ -173,6 +173,8 @@ android {
         getByName("main") {
             java.srcDir("${rootDir.parentFile}/vendor/SDL/android-project/app/src/main/java")
             assets.srcDir(generatedZombieFarmAssets)
+            java.srcDir(rootProject.file(".tauri/kotlin"))
+            jniLibs.srcDir(rootProject.file(".tauri/jni"))
         }
     }
 
@@ -241,6 +243,10 @@ cargoNdk {
 }
 
 dependencies {
+    implementation(project(":tauri-android"))
+    implementation("androidx.appcompat:appcompat:1.6.0")
+    implementation("androidx.webkit:webkit:1.12.1")
+    implementation("androidx.lifecycle:lifecycle-process:2.6.2")
     implementation(fileTree("libs") {
         include("*.jar")
     })

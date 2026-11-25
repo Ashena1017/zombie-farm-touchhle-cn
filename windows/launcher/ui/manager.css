@@ -136,6 +136,9 @@ dialog p { font-size: 14px; overflow-wrap: anywhere; }
 .channels dd + dt { margin-top: 7px; }
 .inline-link { padding: 0; min-height: 0; word-break: break-word; text-align: start; text-decoration: underline; user-select: text; }
 .notice-verify { margin-top: 12px; font-size: 12px; }
+.mobile .icon { display: none; }
+.mobile #reset-time, .mobile #import-save, .mobile #export-backup { margin-block: 6px 12px; }
+.mobile .hero::before { -webkit-mask-image: linear-gradient(to right, transparent, black 62%); }
 .time-preview output { display: block; font-variant-numeric: tabular-nums; color: var(--text); }
 #color-picker { width: 45px; height: 40px; padding: 2px; cursor: pointer; }
 #feedback { padding: 9px 12px; margin-bottom: 12px; border-left: 3px solid var(--accent-ink); background: var(--tint); border-radius: 4px; font-size: 13px; overflow-wrap: anywhere; }
@@ -152,7 +155,7 @@ dialog p { font-size: 14px; overflow-wrap: anywhere; }
   .setting-controls { justify-content: end; flex-wrap: wrap; }
   .custom-value { width: 85px; }
 }
-@media (max-width: 575px) {
+@media (max-width: 575px), (pointer: coarse) and (orientation: portrait) {
   body { display: flex; flex-direction: column; }
   .sidebar { flex: none; display: grid; grid-template-columns: 1fr auto; gap: 7px; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line); }
   .brand img { width: 28px; height: 28px; border-radius: 6px; }
@@ -166,4 +169,5 @@ dialog p { font-size: 14px; overflow-wrap: anywhere; }
   .hero-content { margin: 17px; }
   .currency { flex-wrap: wrap; }
   .currency label { min-width: 85px; }
+  .mobile nav button, .mobile .actions button { min-height: 44px; }
 }

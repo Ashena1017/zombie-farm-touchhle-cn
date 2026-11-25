@@ -55,6 +55,8 @@ if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {
 }
 $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
 
+& (Join-Path $PSScriptRoot '_build_android_manager.ps1') -Offline:$Offline
+
 $forkRoot = Split-Path -Parent $androidProject
 $resourceDir = Join-Path $androidProject 'app\src\main\res\drawable-nodpi'
 $resourceLinks = @('icon.png', 'icon_preview.png', 'icon_unofficial.png')
@@ -127,7 +129,7 @@ try {
     }
 
     # Force a fresh merge so a previously cached libc++_shared.so cannot survive.
-    & $gradleCommand.Source --project-dir $androidProject --console=plain @gradleArgs clean assembleRelease
+    & $gradleCommand.Source --project-dir $androidProject --console=plain @gradleArgs :app:clean :app:assembleRelease
     if ($LASTEXITCODE -ne 0) {
         throw "Gradle failed with exit code $LASTEXITCODE."
     }

@@ -2,6 +2,7 @@
 
 const byId = id => document.getElementById(id);
 const invoke = (action, data = {}) => window.__TAURI__.core.invoke("manager", { action, data });
+const mobile = /Android/i.test(navigator.userAgent);
 const projectUrl = "https://github.com/Ashena1017/zombie-farm-touchhle-cn";
 const palette = [
   ["豆沙粉", "#B57B98"], ["珊瑚红", "#CB705D"], ["琥珀橙", "#B57732"],
@@ -21,6 +22,52 @@ let startupNoticeHandled = false;
 let pendingIntegrityWarning = false;
 let verification;
 let verifyResult = null;
+
+if (mobile) {
+  document.documentElement.classList.add("mobile");
+  for (const id of ["fullscreen", "wheel_zoom"]) byId(id).closest(".setting").hidden = true;
+  byId("settings-fields").querySelector(".subhead").hidden = true;
+  byId("open-saves").hidden = true;
+  byId("browse").textContent = "导入 IPA";
+  byId("hours").max = "100000";
+  byId("import-save").hidden = false;
+  byId("import-save").disabled = true;
+  byId("export-backup").hidden = false;
+  byId("reset-time").onclick = () => enqueue(async () => {
+    if (await ask("重置累计快进时间", "模拟时间将恢复为手机当前时间。", "重置时间"))
+      drawSnapshot(await invoke("resetTime"));
+  });
+  byId("import-save").onclick = () => enqueue(async () => {
+    if (await ask("导入存档或备份", "选择完整备份 ZIP 或 saveGame.bin2。导入会自动备份当前进度。", "选择文件"))
+      drawSnapshot(await invoke("importSave", { appId: snapshot.appId }));
+  });
+  byId("export-backup").onclick = () => enqueue(async () => {
+    const [name] = listSelection();
+    if (name) drawSnapshot(await invoke("exportBackup", { appId: snapshot.appId, name }));
+  });
+  window.managerBack = () => {
+    const open = document.querySelector("dialog[open]");
+    if (open) { open.close(); return true; }
+    if (byId("game").hidden) { document.querySelector('[data-page="game"]').click(); return true; }
+    return false;
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && snapshot) refresh();
+  });
+  // Android may resume this page before SDL finishes releasing the save lock.
+  let checkingGameExit = false;
+  setInterval(async () => {
+    if (document.hidden || !snapshot?.running || checkingGameExit) return;
+    checkingGameExit = true;
+    try {
+      if (!(await invoke("gameRunning")).running) await refresh();
+    } catch (error) {
+      report(error);
+    } finally {
+      checkingGameExit = false;
+    }
+  }, 1000);
+}
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -115,6 +162,14 @@ function updateTheme() {
   document.documentElement.dataset.mode = mode;
   document.documentElement.dataset.customColor = String(appearance.isCustom);
   document.documentElement.style.setProperty("--accent", appearance.accent);
+  if (mobile && !CSS.supports("color", "color-mix(in srgb, black, white)")) {
+    const channels = appearance.accent.slice(1).match(/../g).map(c => parseInt(c, 16));
+    const dark = mode === "dark";
+    const mix = (base, weight) => "rgb(" + channels.map((c, i) => Math.round(c * weight + base[i] * (1 - weight))).join(",") + ")";
+    const style = document.documentElement.style;
+    style.setProperty("--accent-ink", mix(dark ? [255,246,254] : [23,20,25], appearance.isCustom ? .39 : .57));
+    style.setProperty("--tint", mix(dark ? [44,41,45] : [255,254,252], .19));
+  }
   for (const radio of document.querySelectorAll("input[name=theme]")) radio.checked = radio.value === appearance.theme;
   for (const button of byId("swatches").children) {
     const custom = !button.dataset.color;
@@ -279,8 +334,11 @@ function simulatedDate(addSeconds = 0) {
 function updateClock() {
   if (!snapshot) return;
   const date = simulatedDate();
-  byId("clock").textContent = date ? clock.format(date) : "--:--:--";
-  byId("clock-date").textContent = date ? calendar.format(date) : "无法读取模拟时间，请检查累计时间偏移。";
+  if (!byId("game").hidden) {
+    byId("clock").textContent = date ? clock.format(date) : "--:--:--";
+    const day = date ? calendar.format(date) : "无法读取模拟时间，请检查累计时间偏移。";
+    if (byId("clock-date").textContent !== day) byId("clock-date").textContent = day;
+  }
   if (!byId("skip-dialog").open) return;
   const hours = byId("hours"), minutes = byId("minutes");
   const valid = hours.validity.valid && minutes.validity.valid;
@@ -306,7 +364,7 @@ byId("skip-form").addEventListener("submit", event => {
 byId("start").addEventListener("click", () => launch(0, 0, false));
 
 function updateLaunchButtons() {
-  byId("start").disabled = busyLaunch || !snapshot?.selected;
+  byId("start").disabled = busyLaunch || !snapshot?.selected || (mobile && snapshot.running);
   byId("skip").disabled = byId("start").disabled || snapshot.offset == null;
 }
 
@@ -345,6 +403,7 @@ function updateSelection() {
   byId("selection-count").textContent = "已选 " + count + " / " + total + " 个备份";
   byId("restore").disabled = count !== 1 || snapshot.running;
   byId("delete").disabled = count === 0 || snapshot.running;
+  if (mobile) byId("export-backup").disabled = count !== 1 || snapshot.running;
 }
 for (const id of ["all", "none", "invert"]) {
   byId(id).addEventListener("click", () => {
@@ -395,7 +454,12 @@ function drawSnapshot(updated) {
     [picked?.appId, picked?.version].filter(Boolean).join(" · ");
   byId("verify-selection").textContent = picked ? "当前选择：" + picked.name : "当前未选择游戏包。";
   byId("browse").disabled = false;
-  byId("settings-fields").disabled = !picked?.appId;
+  byId("settings-fields").disabled = !picked?.appId || (mobile && snapshot.running);
+  if (mobile) {
+    byId("import-save").disabled = !picked?.appId || snapshot.running;
+    byId("reset-time").hidden = !snapshot.offset || !picked?.appId;
+    byId("reset-time").disabled = snapshot.running;
+  }
   byId("retry").hidden = true;
   for (const select of byId("settings-fields").querySelectorAll("select")) showSetting(select, String(snapshot.settings[select.id]));
   showResolution();

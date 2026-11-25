@@ -1,0 +1,7 @@
+{
+  "identifier": "org.touchhle.android",
+  "bundle": { "icon": ["ui/farm-icon.png"] },
+  "app": {
+    "windows": [{ "label": "main", "title": "Zombie Farm 游戏管理" }]
+  }
+}

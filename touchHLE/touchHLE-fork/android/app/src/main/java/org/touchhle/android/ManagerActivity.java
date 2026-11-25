@@ -46,7 +46,7 @@ public class ManagerActivity extends Activity {
     // signed with someone else's key will not match, which is exactly the case
     // worth warning about: re-signed copies are how ads or a paywall get bolted
     // on before resale. Update this constant if the keystore ever changes.
-    private static final String OFFICIAL_CERT =
+    static final String OFFICIAL_CERT =
         "c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f";
 
     private ZfAppearance appearance;
@@ -93,6 +93,15 @@ public class ManagerActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (Build.VERSION.SDK_INT >= 26) {
+            PackageInfo webview = android.webkit.WebView.getCurrentWebViewPackage();
+            if (webview != null && android.text.TextUtils.isDigitsOnly(webview.versionName.split("\\.")[0])
+                    && Integer.parseInt(webview.versionName.split("\\.")[0]) >= 105) {
+                startActivity(new Intent(this, MobileManagerActivity.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+                finish();
+                return;
+            }
+        }
         if (state != null) {
             appearanceOpen = state.getBoolean("appearance_open");
             page = state.getInt("page", 0); pendingId = state.getString("pendingId");
@@ -753,7 +762,7 @@ public class ManagerActivity extends Activity {
 
     private void verifySignature() {
         String actual;
-        try { actual = signatureOfSelf(); }
+        try { actual = signatureOfSelf(this); }
         catch (Exception e) { return; }             // never block the app on this
         if (actual == null || actual.equalsIgnoreCase(OFFICIAL_CERT)) return;
         dialogBuilder()
@@ -766,9 +775,9 @@ public class ManagerActivity extends Activity {
             .show();
     }
 
-    private String signatureOfSelf() throws Exception {
-        PackageManager pm = getPackageManager();
-        String name = getPackageName();
+    static String signatureOfSelf(Activity activity) throws Exception {
+        PackageManager pm = activity.getPackageManager();
+        String name = activity.getPackageName();
         if (Build.VERSION.SDK_INT >= 28) {
             PackageInfo info = pm.getPackageInfo(name, PackageManager.GET_SIGNING_CERTIFICATES);
             if (info.signingInfo == null) return null;

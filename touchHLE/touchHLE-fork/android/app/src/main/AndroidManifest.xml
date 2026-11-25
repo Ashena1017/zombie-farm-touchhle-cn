@@ -80,6 +80,14 @@
         </activity>
 
         <activity
+            android:name=".MobileManagerActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:screenOrientation="sensorPortrait"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name="org.touchhle.android.MainActivity"
             android:alwaysRetainTaskState="true"
             android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
