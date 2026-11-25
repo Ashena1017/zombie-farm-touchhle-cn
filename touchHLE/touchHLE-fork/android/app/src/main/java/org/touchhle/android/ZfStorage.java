@@ -186,10 +186,19 @@ public final class ZfStorage {
     private static boolean hasIpaExtension(String name) {
         return name.toLowerCase(Locale.ROOT).endsWith(".ipa");
     }
-    public ZfIpa selected() throws Exception {
+    private String selectedName() throws Exception {
         String name = config().optString("selected", BUNDLED);
         if (name.contains("/") || name.contains("\\")) throw new IOException("版本选择无效");
-        File file = new File(apps, name);
+        return name;
+    }
+    ZfIpa selectedFrom(List<ZfIpa> available) throws Exception {
+        if (available.isEmpty()) return null;
+        String name = selectedName();
+        for (ZfIpa ipa : available) if (ipa.file.getName().equals(name)) return ipa;
+        return available.get(0);
+    }
+    public ZfIpa selected() throws Exception {
+        File file = new File(apps, selectedName());
         try { return ZfIpa.read(file); }
         catch (Exception unavailable) {
             List<ZfIpa> available = versions();
@@ -205,14 +214,18 @@ public final class ZfStorage {
     public ZfIpa importIpa(InputStream in, String displayName) throws Exception {
         File temp = File.createTempFile("import-", ".tmp", apps);
         try {
-            try (FileOutputStream out = new FileOutputStream(temp)) { copy(in, out, 512L * 1024 * 1024); out.getFD().sync(); }
-            ZfIpa.read(temp);
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            try (FileOutputStream out = new FileOutputStream(temp)) {
+                copy(in, new DigestOutputStream(out, sha), 512L * 1024 * 1024);
+                out.getFD().sync();
+            }
             String safeName = displayName.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
             if (!hasIpaExtension(safeName)) safeName += ".ipa";
             if (safeName.length() > 100) safeName = safeName.substring(0, 96) + ".ipa";
-            File target = new File(apps, hash(temp).substring(0, 12) + "_" + safeName);
+            File target = new File(apps, hex(sha.digest()).substring(0, 12) + "_" + safeName);
+            ZfIpa ipa = ZfIpa.read(temp, target);
             android.system.Os.rename(temp.getPath(), target.getPath());
-            ZfIpa ipa = ZfIpa.read(target); select(ipa); return ipa;
+            select(ipa); return ipa;
         } finally { temp.delete(); }
     }
     public JSONObject settings(String id) throws Exception {

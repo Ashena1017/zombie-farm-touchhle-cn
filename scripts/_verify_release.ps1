@@ -28,7 +28,7 @@ try {
     $log = Join-Path $logDir 'release_verify.log'
 
     Write-Host "bundle: $release"
-    if (-not (Test-Path -LiteralPath $hle)) { Write-Host "FAIL: no touchHLE.exe at $hle"; exit 1 }
+    if (-not (Test-Path -LiteralPath $hle -PathType Leaf)) { throw "Missing emulator: $hle" }
 
     # --- 1. static checks -------------------------------------------------------
     Write-Host ''
@@ -102,10 +102,23 @@ try {
     if (-not $ok) { throw 'The ZIP has an invalid bundle layout.' }
 
     $launcher = Join-Path $release '游戏管理.exe'
-    try {
-        [void][Reflection.AssemblyName]::GetAssemblyName($launcher)
-    } catch [System.BadImageFormatException] {
-        throw "The bundled Windows manager launcher is invalid: $launcher"
+    $nativeManager = Test-Path -LiteralPath (Join-Path $release 'ManagerWorker.ps1') -PathType Leaf
+    if ($nativeManager) {
+        $pe = [IO.BinaryReader]::new([IO.File]::OpenRead($launcher))
+        try {
+            $pe.BaseStream.Position = 0x3C
+            $peHeader = $pe.ReadUInt32()
+            $pe.BaseStream.Position = $peHeader
+            if ($pe.ReadUInt32() -ne 0x4550 -or $pe.ReadUInt16() -ne 0x8664) {
+                throw 'Expected a native x64 manager.'
+            }
+            $pe.BaseStream.Position = $peHeader + 0x5C
+            if ($pe.ReadUInt16() -ne 2) { throw 'Expected a windowed manager executable.' }
+        } finally { $pe.Dispose() }
+    } else {
+        # Released WinForms bundles have a managed launcher and no worker script.
+        try { [void][Reflection.AssemblyName]::GetAssemblyName($launcher) }
+        catch { throw 'A native Windows manager requires ManagerWorker.ps1.' }
     }
     if ($LayoutOnly) {
         Write-Host 'RESULT: PASS - ZIP layout and checksums'
@@ -115,9 +128,17 @@ try {
     # --- 2. actually run it -----------------------------------------------------
     Write-Host ''
     Write-Host '--- checking settings through the bundled Windows manager ---'
-    $managerPath = Join-Path $release 'GameManager.ps1'
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $managerPath -ShowSettings
-    if ($LASTEXITCODE -ne 0) { throw "The bundled Windows manager failed to read settings (exit $LASTEXITCODE)." }
+    if ($nativeManager) {
+        $checkInfo = [Diagnostics.ProcessStartInfo]::new($launcher, '--check-package')
+        $checkInfo.WorkingDirectory = $release
+        $checkInfo.UseShellExecute = $false
+        $proc = [Diagnostics.Process]::Start($checkInfo)
+        if (-not $proc.WaitForExit(60000)) { throw 'The bundled manager package check timed out.' }
+        if ($proc.ExitCode -ne 0) { throw "The bundled manager package check failed (exit $($proc.ExitCode))." }
+    } else {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $release 'GameManager.ps1') -ShowSettings
+        if ($LASTEXITCODE -ne 0) { throw 'The legacy Windows manager could not read settings.' }
+    }
 
     Write-Host ''
     Write-Host '--- launching the bundled copy ---'
@@ -211,7 +232,7 @@ try {
 
     $ran = $windowFound -and $stillRunning -and -not $panic
     if (-not $ran) { $ok = $false }
-    if (-not $ran) { throw 'Standalone launch failed.' }
+    if (-not $ok) { throw 'Standalone launch failed.' }
     Write-Host 'RESULT: PASS - the ZIP runs standalone'
 }
 finally {

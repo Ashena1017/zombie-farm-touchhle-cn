@@ -1,13 +1,14 @@
 ﻿# Assemble and verify the portable Windows ZIP in a disposable staging folder.
 param(
     [string]$Root = (Split-Path -Parent $PSScriptRoot),
+    [string]$OutputDir = (Join-Path $Root 'dist\windows'),
     [switch]$SkipVerify
 )
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path -LiteralPath $Root).Path
 $windowsDir = Join-Path $Root 'windows'
 $hleRoot = Join-Path $Root 'run\windows\touchHLE'
-$outputDir = Join-Path $Root 'dist\windows'
+$OutputDir = [IO.Path]::GetFullPath($OutputDir)
 $outputName = 'zombie-farm-windows-x64'
 $manifestPath = Join-Path $Root 'release.json'
 $releaseInfo = Get-Content -Raw -Encoding UTF8 -LiteralPath $manifestPath | ConvertFrom-Json
@@ -50,14 +51,15 @@ try {
     # --- the manager, at the top level -----------------------------------------
     Log ''
     Log '--- manager (top level) ---'
-    foreach ($f in @('游戏管理.exe', 'GameManager.ps1')) {
+    & (Join-Path $windowsDir 'launcher\build.ps1') -Destination (Join-Path $release '游戏管理.exe')
+    New-Item -ItemType Directory -Path (Join-Path $release 'compat') | Out-Null
+    foreach ($f in @('GameManager.ps1', 'ManagerWorker.ps1', 'compat\WinForms.ps1')) {
         $src = Join-Path $windowsDir $f
         if (-not (Test-Path -LiteralPath $src)) { throw "missing: $src" }
-        Copy-Item -LiteralPath $src -Destination $release
+        Copy-Item -LiteralPath $src -Destination (Join-Path $release $f)
         Log ("  {0,-30} {1,12:N0} B" -f $f, (Get-Item -LiteralPath $src).Length)
     }
     Copy-Item -LiteralPath $manifestPath -Destination $release
-    Log '  (GameManager.ps1 is required: the .exe is only a stub that runs it)'
 
     # --- the non-system DLLs the exe actually imports ---------------------------
     # From dumpbin /dependents. Without these the exe will not start on a machine that
@@ -211,11 +213,11 @@ try {
   <li>全屏 / 窗口模式</li>
   <li>改金币和脑子</li>
   <li>备份、还原、删除存档</li>
+  <li>在「外观」里选择浅色、深色、跟随系统，或自定义强调色</li>
 </ul>
 <div class="tip">设置改完立刻生效，不用点保存。</div>
-<p>每次打开管理器都会先显示一次「免费开源声明」，点「关闭」或按回车就能进去 —— 这是故意的：
-转卖的人就算事先打开过一次，也拦不住你看到这句话。声明最下面一行是<b>文件校验</b>，
-如果显示「与官方发布不一致」，说明这个副本被动过，别继续用。</p>
+<p>每次打开管理器都会显示「免费开源声明」，点击「我知道了」即可进入。后台会核对模拟器和内置 IPA；
+如提示文件缺失或与官方发布不一致，可在「文件校验」查看具体文件并从项目主页重新下载。</p>
 
 <h2>二、设置都是什么意思</h2>
 <p>管理器里每个设置右边都有一个下拉框，下面逐项说明。这一页就是原来的「?」按钮里
@@ -296,7 +298,8 @@ try {
 <table>
   <tr><th>文件 / 文件夹</th><th>作用</th></tr>
   <tr><td>游戏管理.exe</td><td>双击这个启动管理器</td></tr>
-  <tr><td>GameManager.ps1</td><td>管理器的本体（exe 只是启动壳，别删）</td></tr>
+  <tr><td>GameManager.ps1、ManagerWorker.ps1</td><td>管理器读写游戏设置、存档和备份时使用的后台脚本，请与 EXE 一起保留</td></tr>
+  <tr><td>compat\WinForms.ps1</td><td>电脑缺少 WebView2 时使用的兼容界面</td></tr>
   <tr><td>*.dll</td><td>C++ 运行库</td></tr>
   <tr><td>zombie_farm_ipa\</td><td>游戏本体（IPA 文件放这里）</td></tr>
   <tr><td>touchHLE\</td><td>模拟器本体，不用管它</td></tr>
@@ -308,7 +311,7 @@ try {
 <p>想换游戏版本，可以把其他 <code>.ipa</code> 加进 <code>zombie_farm_ipa\</code>，在管理器的「游戏版本 (IPA)」里选择。请保留原有的内置 IPA。它缺失或内容发生变化时，管理器会提示安装包可能是改版。</p>
 
 <h2>四、想跳过游戏时间</h2>
-<p>游戏页显示当前模拟时间。点「启动并跳过时间…」，分别填小时和分钟（例如 6 小时 15 分），确认预览显示的快进后时间，再启动游戏。快进会累加，下次启动继续使用累计值。</p>
+<p>「游戏启动」页显示当前模拟时间。点「快进并启动」，分别填小时和分钟（例如 6 小时 15 分），确认预览显示的快进后时间，再启动游戏。快进会累加，下次启动继续使用累计值。</p>
 <p>「新增备份」会同时记录当时的游戏存档和累计跳过时间；恢复备份后，两者都会回到备份时的状态。旧版管理器创建的备份没有时间记录，恢复时只还原存档，并保留当前累计时间。</p>
 
 <h2>五、存档在哪</h2>
@@ -318,6 +321,7 @@ try {
 <h2>六、电脑要求</h2>
 <ul>
   <li>Windows 10 / 11 64 位</li>
+  <li>新版管理界面使用 Microsoft Edge WebView2 运行时。系统缺少该组件时会打开兼容界面。</li>
   <li>支持 OpenGL 的显卡（近十年的集显或独显都可以）</li>
 </ul>
 
@@ -400,6 +404,8 @@ try {
         @{ Rel = 'touchHLE\touchHLE.exe';                 File = (Join-Path $hleDir 'touchHLE.exe') },
         @{ Rel = ('zombie_farm_ipa\' + $ipaName);         File = (Join-Path (Join-Path $release 'zombie_farm_ipa') $ipaName) },
         @{ Rel = 'GameManager.ps1';                       File = (Join-Path $release 'GameManager.ps1') },
+        @{ Rel = 'ManagerWorker.ps1';                     File = (Join-Path $release 'ManagerWorker.ps1') },
+        @{ Rel = 'compat\WinForms.ps1';                  File = (Join-Path $release 'compat\WinForms.ps1') },
         @{ Rel = 'release.json';                          File = (Join-Path $release 'release.json') },
         @{ Rel = '游戏管理.exe';                          File = (Join-Path $release '游戏管理.exe') },
         @{ Rel = '请勿购买.txt';                          File = (Join-Path $release '请勿购买.txt') }

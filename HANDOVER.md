@@ -4,7 +4,18 @@
 
 ## 当前发行
 
-[v31fix-notice](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-notice) 提供 Windows x64 ZIP 和 Android ARM64 APK（`versionCode` 19）。两端内置 `内置中文版·v31fix·开源免费.ipa`，SHA-256 为 `cfa750f4cba8d5acf0923c595ca3c257b0617c2cafed7d4ee08f4bc37d689e65`。
+[v31fix-appearance](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-appearance) 提供 Windows x64 ZIP 和 Android ARM64 APK（`versionCode` 20）。继续使用 v31 内置 IPA。
+
+Windows 游戏管理改用 Tauri 和 WebView2，缩短打开管理器的等待时间。WebView2 无法启动时会打开兼容界面。Windows 和 Android 都新增「外观」，可跟随系统、选浅色或深色，并选用七种预设强调色或自定义颜色。
+
+Windows 修复损坏的额外 IPA 误用内置游戏存档的问题，并加快设置保存和批量删除备份。Android 减少导入 IPA 时的重复读取，内部版本号为 20，可直接覆盖安装旧版。
+
+- Windows ZIP 共 98,397,748 字节，SHA-256 为 `95ED1A7EF57F0A5BB311D2D671F05656E36583148DA0E471C9651C4725C0AF2E`。WebView2 与兼容界面均通过实测，解压后游戏独立运行 45 秒。
+- Android APK 共 97,379,758 字节，SHA-256 为 `AE811884151E0B819E0DDBADFF711FE19B5615E079F72662C130EE076EE2F191`。MuMu Android 15 上通过 64 项设备检查，覆盖安装前后存档哈希一致。
+
+## v31 关于与内置 IPA 校验
+
+[v31fix-notice](https://github.com/Ashena1017/zombie-farm-touchhle-cn/tree/v31fix-notice) 当时提供 Windows x64 ZIP 和 Android ARM64 APK（`versionCode` 19）。两端内置 `内置中文版·v31fix·开源免费.ipa`，SHA-256 为 `cfa750f4cba8d5acf0923c595ca3c257b0617c2cafed7d4ee08f4bc37d689e65`。
 
 - 启动图在原加载时间内显示「本整合版免费 · 请勿购买」。首页头像的农场选择页在停服说明下指向「设置 → 关于」。首页「关于」在设置画面上显示原游戏创建的单按钮 `UIAlertView`。上半区使用游戏传入的标题、版本、作者和工作室署名，「中文整合与维护」单列社区整合版的免费开源声明、项目地址和 QQ 群。点框内原确认按钮回到设置的原滚动位置。进入农场后的「设置 → 帮助」仍可查看原帮助。
 - 两端单独校验内置 IPA 的固定文件名与 SHA-256，允许额外安装和选择其他 IPA。缺失或被替换时提示可能为改版。Android 还检查已安装 APK 的内置资产，可从通过校验的资产恢复本地副本。原始 IPA、v30 与 v31 的补丁和恢复方法见 [IPA 记录](zombie_farm_ipa/README.md)。

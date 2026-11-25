@@ -115,10 +115,6 @@ try {
         throw 'Android defaults must use touch pinch zoom.'
     }
 
-    if (-not $managerSource.Contains('getBoolean("night_mode", true)')) {
-        throw 'Android manager must default to night mode on first launch.'
-    }
-
     Write-Host "APK: $ApkPath"
     Write-Host "IPA bytes: $($ipaEntry.Length)"
     Write-Host "IPA SHA256: $packagedHash"

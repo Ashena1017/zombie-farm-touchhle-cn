@@ -4,6 +4,8 @@ package org.touchhle.android;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.*;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.*;
@@ -11,6 +13,7 @@ import org.xml.sax.InputSource;
 
 /** Reads IPA metadata without extracting executable content. */
 public final class ZfIpa {
+    private static final Pattern INFO_PLIST = Pattern.compile("Payload/[^/]+\\.app/Info\\.plist");
     public final File file;
     public final String appId, version, name;
     private ZfIpa(File file, String appId, String version) {
@@ -21,12 +24,18 @@ public final class ZfIpa {
     @Override public String toString() { return name; }
 
     public static ZfIpa read(File file) throws Exception {
-        try (ZipFile zip = new ZipFile(file)) {
+        return read(file, file);
+    }
+
+    /** An import is validated in staging but displayed under its final filename. */
+    static ZfIpa read(File archive, File installedFile) throws Exception {
+        try (ZipFile zip = new ZipFile(archive)) {
             ZipEntry info = null;
             Enumeration<? extends ZipEntry> entries = zip.entries();
+            Matcher plistPath = INFO_PLIST.matcher("");
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                if (entry.getName().matches("Payload/[^/]+\\.app/Info\\.plist")) {
+                if (plistPath.reset(entry.getName()).matches()) {
                     if (info != null) throw new IOException("IPA 包含多个应用");
                     info = entry;
                 }
@@ -45,7 +54,7 @@ public final class ZfIpa {
                 throw new IOException("IPA 缺少游戏执行文件");
             String version = string(values.get("CFBundleShortVersionString"));
             if (version.isEmpty()) version = string(values.get("CFBundleVersion"));
-            return new ZfIpa(file, id, version);
+            return new ZfIpa(installedFile, id, version);
         }
     }
 

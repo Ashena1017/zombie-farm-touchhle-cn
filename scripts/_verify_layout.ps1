@@ -3,6 +3,10 @@ $project = Split-Path -Parent $PSScriptRoot
 $required = @(
     'Play-Windows.bat',
     'windows\GameManager.ps1',
+    'windows\compat\WinForms.ps1',
+    'windows\ManagerWorker.ps1',
+    'windows\launcher\Cargo.toml',
+    'windows\launcher\ui\index.html',
     'windows\RepositoryPaths.ps1',
     'windows\touchHLE_options.txt',
     'touchHLE\touchHLE-fork\Cargo.toml',

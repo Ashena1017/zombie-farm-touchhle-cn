@@ -52,9 +52,46 @@ public class ManagerTestRunner extends Instrumentation {
         }
         return bytes.toByteArray();
     }
+    private void checkAppearance() {
+        android.content.SharedPreferences prefs = getTargetContext().getSharedPreferences("appearance_test", 0);
+        prefs.edit().clear().commit();
+        try {
+            ZfAppearance style = new ZfAppearance(prefs);
+            check(style.accent() == ZfAppearance.COLORS[0] && style.dark(true) && !style.dark(false),
+                "new manager follows both system modes and defaults to dusty pink");
+            for (boolean oldDark : new boolean[]{true, false}) {
+                prefs.edit().putBoolean("night_mode", oldDark).apply();
+                style = new ZfAppearance(prefs);
+                check(style.dark(!oldDark) == oldDark, "legacy explicit night_mode " + oldDark + " survives upgrade");
+            }
+            style.choice = ZfAppearance.CUSTOM; style.custom = 0xff00ffaa; style.save();
+            style = new ZfAppearance(prefs);
+            check(!prefs.contains("night_mode") && !style.dark(true) && style.accent() == 0xff00ffaa,
+                "explicit theme and custom color round trip");
+            style.choice = 2; style.save(); style = new ZfAppearance(prefs);
+            check(style.accent() == ZfAppearance.COLORS[2] && style.custom == 0xff00ffaa,
+                "choosing a preset keeps the last custom color");
+            style.reset(); style = new ZfAppearance(prefs);
+            check(style.dark(true) && !style.dark(false) && style.choice == 0 && style.custom == ZfAppearance.COLORS[0],
+                "reset restores system mode and original accent");
+            for (boolean dark : new boolean[]{true, false}) {
+                for (int color : new int[]{0xff000000, 0xffffffff, 0xff808080, 0xffb57b98}) {
+                    ZfAppearance.Palette p = new ZfAppearance.Palette(color, dark);
+                    check(ZfAppearance.contrast(p.accent, p.onAccent) >= 4.5
+                        && ZfAppearance.contrast(p.accentText, p.soft) >= 4.5
+                        && ZfAppearance.contrast(p.accentText, p.background) >= 4.5
+                        && ZfAppearance.contrast(p.accentText, p.surface) >= 4.5,
+                        "readable buttons and text with accent " + Integer.toHexString(color) + " in dark=" + dark);
+                }
+            }
+        } finally {
+            prefs.edit().clear().commit();
+        }
+    }
     @Override public void onStart() {
         Bundle result = new Bundle(); File root = new File(getTargetContext().getCacheDir(), "zf-manager-tests-" + UUID.randomUUID());
         try {
+            checkAppearance();
             root.mkdirs(); ZfStorage store = new ZfStorage(getTargetContext(), root, new File(root, "test.lock"));
             try (ZfStorage.Lease held = store.lock()) {
                 check(store.gameRunning(), "exclusive lock blocks a second operation");
@@ -186,6 +223,13 @@ public class ManagerTestRunner extends Instrumentation {
                     check(versions.size() == 2 && versions.get(0).file.equals(ipa.file)
                         && versions.get(1).file.equals(added.file) && store.selected().file.equals(added.file),
                         "uppercase IPA appears in the version list after the bundled game");
+                    check(added.file.getName().equals(bundledHash.substring(0, 12) + "_测试版本.IPA")
+                        && added.name.equals("测试版本.IPA") && added.appId.equals(id),
+                        "streamed import preserves the content fingerprint, label and app identity");
+                    check(store.selectedFrom(versions) == versions.get(1)
+                        && store.selectedFrom(Collections.singletonList(versions.get(0))) == versions.get(0)
+                        && store.selectedFrom(Collections.emptyList()) == null,
+                        "refresh reuses the scanned selection and falls back when it disappears");
                 }
                 store.select(ipa); check(store.selected().file.equals(ipa.file), "switch back to bundled version");
                 int count = store.backups(id).size(); store.deleteBackup(id, manual);

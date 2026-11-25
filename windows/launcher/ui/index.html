@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Zombie Farm 游戏管理 · 免费开源</title>
+  <link rel="stylesheet" href="manager.css">
+  <script defer src="manager.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><img src="farm-icon.png" width="44" height="44" alt=""><div><strong>Zombie Farm</strong><span>游戏管理</span></div></div>
+    <nav aria-label="游戏管理">
+      <button data-page="game" aria-current="page"><span class="icon" aria-hidden="true">&#xE768;</span>游戏启动</button>
+      <button data-page="settings"><span class="icon" aria-hidden="true">&#xE713;</span>游戏设置</button>
+      <button data-page="saves"><span class="icon" aria-hidden="true">&#xE74E;</span>存档管理</button>
+      <button data-page="verify"><span class="icon" aria-hidden="true">&#xE72E;</span>文件校验</button>
+      <button data-page="appearance"><span class="icon" aria-hidden="true">&#xE790;</span>外观</button>
+    </nav>
+    <button id="notice-link" class="sidebar-footer"><span class="icon" aria-hidden="true">&#xE946;</span>免费开源声明</button>
+  </aside>
+  <main>
+    <header class="page-header"><h1 tabindex="-1" id="heading">游戏启动</h1></header>
+    <div id="feedback" role="status" hidden></div>
+    <button id="retry" hidden>重新读取</button>
+
+    <section id="game" aria-labelledby="heading">
+      <div class="hero">
+        <div class="hero-content">
+          <h2>僵尸农场</h2>
+          <div class="actions">
+            <button class="primary" id="start" disabled><span class="icon" aria-hidden="true">&#xE768;</span>启动游戏</button>
+            <button class="secondary" id="skip" disabled><span class="icon" aria-hidden="true">&#xE823;</span>快进并启动</button>
+          </div>
+        </div>
+      </div>
+      <section class="card clock-card"><div><h2>模拟时间</h2><p id="clock-date">读取中…</p></div><time id="clock">--:--:--</time></section>
+      <section class="card">
+        <h2><label for="ipa">游戏版本 <span class="qualifier">IPA</span></label></h2>
+        <div class="file-picker"><select id="ipa" disabled><option>正在读取游戏版本…</option></select><button id="browse" disabled>浏览…</button></div>
+        <p class="detail" id="ipa-info"></p>
+      </section>
+    </section>
+
+    <section id="settings" hidden aria-labelledby="heading">
+      <p class="intro">设置随所选游戏版本保存，下次启动游戏时生效。</p>
+      <fieldset class="card" id="settings-fields" disabled>
+        <legend class="sr">模拟器设置</legend>
+        <h2>画面</h2>
+        <div class="setting"><label for="window_family">设备画幅</label><select id="window_family"><option value="ipad">iPad（平板）</option><option value="iphone">iPhone（手机）</option></select></div>
+        <div class="setting"><div><label for="window_scale">分辨率倍率</label><p id="resolution"></p></div><div class="setting-controls"><select id="window_scale"></select><input class="custom-value" id="custom-window_scale" aria-label="自定义分辨率倍率" placeholder="例如 7/4" hidden></div></div>
+        <div class="setting"><label for="fullscreen">显示模式</label><select id="fullscreen"><option value="0">窗口模式</option><option value="1">全屏</option></select></div>
+        <div class="setting"><label for="fps_limit">游戏帧率</label><div class="setting-controls"><select id="fps_limit"></select><input class="custom-value" id="custom-fps_limit" aria-label="自定义游戏帧率" inputmode="numeric" placeholder="1–1000" hidden></div></div>
+        <div class="setting"><div><label for="run_loop_fix">高速帧率修复</label><p>允许游戏以高于 30 帧的速度运行。</p></div><select id="run_loop_fix"><option value="1">开启</option><option value="0">关闭</option></select></div>
+        <h2 class="subhead">操作</h2>
+        <div class="setting"><label for="wheel_zoom">滚轮缩放倍率</label><div class="setting-controls"><select id="wheel_zoom"></select><input class="custom-value" id="custom-wheel_zoom" aria-label="自定义滚轮缩放倍率" inputmode="decimal" placeholder="1.01–2" hidden></div></div>
+      </fieldset>
+    </section>
+
+    <section id="saves" hidden aria-labelledby="heading">
+      <section class="card">
+        <div class="spread"><h2>当前存档</h2><button class="text-button" id="open-saves" disabled>打开目录</button></div>
+        <p id="live-save" class="detail">读取中…</p>
+        <fieldset class="currency" id="currency-fields" disabled>
+          <legend class="sr">金币与脑子</legend>
+          <label>金币<input id="gold" inputmode="numeric" maxlength="10"></label>
+          <label>脑子<input id="brains" inputmode="numeric" maxlength="10"></label>
+          <button id="write-currency">写入存档</button>
+        </fieldset>
+      </section>
+      <section class="card">
+        <div class="spread"><h2>备份</h2><div class="actions"><button id="refresh-saves">刷新</button><button id="backup" disabled>新增备份</button></div></div>
+        <div id="save-list"></div>
+        <div id="backup-tools" hidden>
+          <div class="selection"><span id="selection-count"></span><div class="actions"><button class="text-button" id="all">全选</button><button class="text-button" id="none">取消选择</button><button class="text-button" id="invert">反选</button></div></div>
+          <div class="actions"><button id="restore" disabled>还原所选备份</button><button class="danger-text" id="delete" disabled>删除所选</button></div>
+        </div>
+      </section>
+    </section>
+
+    <section id="verify" hidden aria-labelledby="heading">
+      <section class="card">
+        <div class="spread"><h2>官方文件指纹</h2><button id="reverify">重新校验</button></div>
+        <p class="detail" id="verify-headline">正在校验本机文件…</p>
+        <p class="detail" id="verify-selection"></p>
+        <div id="verify-list"></div>
+      </section>
+    </section>
+
+    <section id="appearance" hidden aria-labelledby="heading">
+      <fieldset class="card appearance-card" id="appearance-fields" disabled>
+        <legend class="sr">外观设置</legend>
+        <h2 id="theme-label">主题</h2>
+        <div class="modes" role="radiogroup" aria-labelledby="theme-label">
+          <label><input type="radio" name="theme" value="light"><span><i class="icon" aria-hidden="true">&#xE706;</i>浅色</span></label>
+          <label><input type="radio" name="theme" value="dark"><span><i class="icon" aria-hidden="true">&#xE708;</i>深色</span></label>
+          <label><input type="radio" name="theme" value="system" checked><span><i class="icon" aria-hidden="true">&#xE7F4;</i>跟随系统</span></label>
+        </div>
+        <h2 id="accent-label">强调色</h2>
+        <div class="swatches" role="group" aria-labelledby="accent-label" id="swatches"></div>
+        <button id="reset-appearance">恢复默认外观</button>
+      </fieldset>
+    </section>
+  </main>
+
+  <dialog id="skip-dialog" aria-labelledby="skip-title">
+    <form method="dialog" id="skip-form">
+      <h2 id="skip-title">快进并启动</h2>
+      <div class="duration"><label>小时<input type="number" id="hours" min="0" max="9999" required></label><label>分钟<input type="number" id="minutes" min="0" max="59" required></label></div>
+      <p class="detail time-preview">快进后 <output id="skip-preview"></output></p>
+      <div class="dialog-actions"><button type="button" data-close>取消</button><button class="primary" id="skip-submit">启动游戏</button></div>
+    </form>
+  </dialog>
+  <dialog id="custom-dialog" aria-labelledby="custom-title">
+    <form method="dialog" id="custom-form">
+      <h2 id="custom-title">自定义强调色</h2>
+      <div class="color-editor"><input type="color" aria-label="颜色选择器" id="color-picker"><label>十六进制色值<input id="hex" maxlength="7" pattern="#[0-9a-fA-F]{6}" placeholder="#B57B98" required></label></div>
+      <div class="dialog-actions"><button type="button" data-close>取消</button><button class="primary">应用颜色</button></div>
+    </form>
+  </dialog>
+  <dialog id="notice-dialog" aria-labelledby="notice-title">
+    <h2 id="notice-title">免费开源声明</h2>
+    <p>本整合版免费开源，请勿购买。若已付费，请向卖家申请退款并向平台举报。</p>
+    <p class="detail">《僵尸农场》的游戏与素材版权归原开发商所有。本项目由社区独立整合维护，模拟器 touchHLE 遵循 MPL-2.0 许可。</p>
+    <dl class="channels"><dt>项目主页</dt><dd><button class="inline-link" id="project">github.com/Ashena1017/zombie-farm-touchhle-cn</button></dd><dt>交流 QQ 群</dt><dd>1185712984</dd></dl>
+    <p class="notice-verify" id="notice-verify">正在校验本机文件…</p>
+    <div class="dialog-actions"><button id="copy-project">复制链接</button><button class="primary" data-close autofocus>我知道了</button></div>
+  </dialog>
+  <dialog id="question" aria-labelledby="question-title">
+    <h2 id="question-title"></h2><p id="question-message"></p>
+    <div class="dialog-actions"><button id="question-no" autofocus>取消</button><button id="question-yes" class="primary">确定</button></div>
+  </dialog>
+</body>
+</html>

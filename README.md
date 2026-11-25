@@ -30,12 +30,14 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v31fix-notice.zip) | 解压后运行「游戏管理.exe」，可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v31fix-notice.apk) | 安装后打开「Zombie Farm 游戏管理」。APK 已内置带标题水印的游戏包，支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v31fix-appearance.zip) | 解压后运行「游戏管理.exe」，可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v31fix-appearance.apk) | 安装后打开「Zombie Farm 游戏管理」。APK 已内置带标题水印的游戏包，支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
 两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest)查看。
 
 > Releases 只保留最新版本。历史变更见下方记录。
+
+**2026-11-25 游戏管理与外观更新**　Windows 游戏管理改用 Tauri 和 WebView2，缩短打开管理器的等待时间。WebView2 无法启动时会打开兼容界面。Windows 和 Android 都新增「外观」，可跟随系统、选浅色或深色，并选用七种预设强调色或自定义颜色。Windows 修复损坏的额外 IPA 误用内置游戏存档的问题，并加快设置保存和批量删除备份。Android 减少导入 IPA 时的重复读取，内部版本号为 20，可直接覆盖安装旧版。
 
 **2026-11-25 关于与内置 IPA 校验**　Windows 和 Android 共用 v31fix-notice。首页「设置 → 关于」恢复原作署名，并单独显示社区整合版声明、项目地址和 QQ 群。启动图增加免费提示，游戏管理会在内置 IPA 缺失或被修改时提醒。Android 内部版本号为 19。原始 IPA 可通过[累计补丁](zombie_farm_ipa/README.md)重建本版。
 
@@ -64,7 +66,7 @@
 **2026-10-13 入侵修复更新**：Windows 与 Android 已同步修复 touchHLE 的小堆内存释放错误，并补充 Cocos 调度器同步保护。旧分配器可能在加载战斗纹理时覆盖仍在使用的游戏对象，导致入侵闪退；此次修复不需要修改游戏 IPA 或存档。此前稳定闪退的单次 Windows 海盗入侵已由用户确认完成，日志正常退出；Android 已重新构建并通过包校验，本次尚未进行设备端入侵实测。更新前建议先在管理器里备份存档，Android 可直接覆盖安装。
 
 Android 包面向 **ARM64** 设备（Android 5.0/API 21 或更高）；Windows 包面向 Windows 10/11 x64。
-两个版本首次启动管理器时都默认使用夜间模式。Android 新安装默认 iPhone ×3（1440×960）并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
+两个版本首次启动管理器时默认跟随系统，强调色默认为豆沙粉。Android 新安装默认 iPhone ×3（1440×960）并使用两指缩放；Windows 提供桌面窗口、倍率与滚轮选项。
 交付包不包含任何玩家 sandbox 存档；首次进入游戏后会为玩家创建新存档。
 
 <p align="center">
@@ -203,7 +205,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v31fix-notice.zip) 并解压。
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v31fix-appearance.zip) 并解压。
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 
@@ -211,7 +213,7 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v31fix-notice.apk)。
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v31fix-appearance.apk)。
 2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。`内置中文版·v31fix·开源免费.ipa` 已内置，管理器会校验其完整性，也可选择额外导入的游戏版本。
 
