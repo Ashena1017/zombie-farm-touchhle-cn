@@ -9,14 +9,24 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '_file_hash.ps1')
 $root = Split-Path -Parent $PSScriptRoot
 $androidProject = Join-Path $root 'touchHLE\touchHLE-fork\android'
-$ipaVersion = if ($PSBoundParameters.ContainsKey('ExpectedVersionCode') -and $ExpectedVersionCode -le 17) { 'v29fix' } else { 'v30fix' }
-$ipaPath = Join-Path $root "zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-$ipaVersion-notice.ipa"
+$releaseInfo = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root 'release.json') | ConvertFrom-Json
+if (-not $PSBoundParameters.ContainsKey('ExpectedVersionCode')) {
+    $ExpectedVersionCode = $releaseInfo.android.versionCode
+}
+$expectedIpa = $releaseInfo.ipa
+$installedName = $releaseInfo.android.installedIpaName
+if ($ExpectedVersionCode -le 18) {
+    # Historical APKs can be verified even when the original IPA is in cold storage.
+    $ipaVersion = if ($ExpectedVersionCode -eq 18) { 'v30' } else { 'v29' }
+    $report = Join-Path $root "zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-${ipaVersion}fix-notice.report.json"
+    $expectedIpa = (Get-Content -Raw -Encoding UTF8 -LiteralPath $report | ConvertFrom-Json).output
+    $installedName = 'Zombie_Farm_v29fix.ipa'
+}
 $expectedOptions = 'com.playforge.ZombieFarm.ZFR: --landscape-right --fps-limit=60 --device-family=iphone --scale-hack=3 --non-blocking-zero-timeout-run-loop'
 $expectedLibcxxBytes = 1794776
 $expectedLibcxxSha256 = 'F9992C4BA6B7C5A716E3A202FCEB1CE029D6A2B0605838AC6B3219F489DD7970'
 
 if (-not (Test-Path -LiteralPath $ApkPath -PathType Leaf)) { throw "APK not found: $ApkPath" }
-if (-not (Test-Path -LiteralPath $ipaPath -PathType Leaf)) { throw "Bundled IPA not found: $ipaPath" }
 $ApkPath = (Resolve-Path -LiteralPath $ApkPath).Path
 
 if (-not $AndroidSdk) { $AndroidSdk = $env:ANDROID_HOME }
@@ -41,20 +51,18 @@ $buildTools = Get-ChildItem -LiteralPath (Join-Path $AndroidSdk 'build-tools') -
     Select-Object -First 1
 if (-not $buildTools) { throw "No SDK build-tools containing apksigner and aapt were found in $AndroidSdk." }
 
-if (-not $PSBoundParameters.ContainsKey('ExpectedVersionCode')) {
-    $gradle = [IO.File]::ReadAllText((Join-Path $androidProject 'app\build.gradle.kts'))
-    $configuredVersion = [regex]::Match($gradle, '(?m)^\s*versionCode\s*=\s*(\d+)\s*$')
-    if (-not $configuredVersion.Success) { throw 'Cannot read versionCode from app/build.gradle.kts.' }
-    $ExpectedVersionCode = [int]$configuredVersion.Groups[1].Value
-}
 $managerSource = [IO.File]::ReadAllText((Join-Path $androidProject 'app\src\main\java\org\touchhle\android\ManagerActivity.java'))
 $officialCertificate = [regex]::Match($managerSource, 'OFFICIAL_CERT\s*=\s*"([a-fA-F0-9]{64})"').Groups[1].Value
 if (-not $officialCertificate) { throw 'Cannot read the official certificate fingerprint from ManagerActivity.java.' }
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$archive = [IO.Compression.ZipFile]::OpenRead($ApkPath)
+Add-Type -AssemblyName System.IO.Compression,System.IO.Compression.FileSystem
+# Android asset paths are UTF-8 even when the ZIP entry lacks the language flag.
+$archive = [IO.Compression.ZipFile]::Open($ApkPath, [IO.Compression.ZipArchiveMode]::Read, [Text.Encoding]::UTF8)
 try {
-    $ipaEntry = $archive.GetEntry('assets/Zombie_Farm_v29fix.ipa')
+    $ipaEntry = $archive.GetEntry("assets/$installedName")
+    if (@($archive.Entries | Where-Object { $_.FullName -like 'assets/*.ipa' }).Count -ne 1) {
+        throw 'Expected one bundled IPA in the official APK.'
+    }
     $optionsEntry = $archive.GetEntry('assets/touchHLE_zombiefarm_options.txt')
     $hashEntry = $archive.GetEntry('assets/touchHLE_zombiefarm_ipa.sha256')
     $nativeEntry = $archive.GetEntry('lib/arm64-v8a/libtouchHLE.so')
@@ -79,13 +87,14 @@ try {
     $ipaStream = $ipaEntry.Open()
     try { $packagedHash = Get-Sha256Hex -Stream $ipaStream }
     finally { $ipaStream.Dispose() }
-    $sourceHash = Get-Sha256Hex -Path $ipaPath
-    if ($packagedHash -ne $sourceHash) { throw 'The APK IPA does not match the source IPA.' }
+    if ($packagedHash -ne $expectedIpa.sha256 -or $ipaEntry.Length -ne $expectedIpa.size) {
+        throw "The APK IPA does not match the expected $($expectedIpa.name)."
+    }
     $hashStream = $hashEntry.Open()
     $hashReader = [IO.StreamReader]::new($hashStream, [Text.Encoding]::ASCII)
     try { $declaredHash = $hashReader.ReadToEnd().Trim() }
     finally { $hashReader.Dispose(); $hashStream.Dispose() }
-    if ($declaredHash -ne $sourceHash.ToLowerInvariant()) { throw 'The APK IPA hash stamp does not match its bundled IPA.' }
+    if ($declaredHash -ne $packagedHash) { throw 'The APK IPA hash stamp does not match its bundled IPA.' }
 
     if ($libcxxEntry.Length -ne $expectedLibcxxBytes) {
         throw "The APK libc++_shared.so has unexpected size $($libcxxEntry.Length) bytes; expected $expectedLibcxxBytes."

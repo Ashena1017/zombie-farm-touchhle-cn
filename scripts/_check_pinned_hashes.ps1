@@ -1,70 +1,48 @@
-﻿# Cross-check the fingerprints pinned in GameManager.ps1 against the files that
-# are about to be packaged.
-#
-# Why this exists: the manager paints itself red when touchHLE.exe or the bundled
-# IPA does not match $script:PinnedExeSha256 / $script:PinnedIpaSha256, and
-# touchHLE refuses to start a mismatched IPA at all (src/zfr_integrity.rs). Those
-# constants are maintained by hand, one line each. Forget to update one after a
-# rebuild and the release ships a bundle that argues with itself: every player
-# sees a red 文件校验 line, and the game will not start.
-#
-# So _build_release.ps1 runs this first and stops if anything disagrees. It is
-# also usable on its own:
-#
-#   scripts\_check_pinned_hashes.ps1 -ManagerPath windows\GameManager.ps1 `
-#       -ExePath run\windows\touchHLE\touchHLE.exe -IpaPath 'zombie_farm_ipa\....ipa'
-#
-# Exit code 0 = all pinned values match, 1 = at least one does not.
-
+﻿# Verify the Windows manager's executable pin and the official release IPA.
 param(
     [Parameter(Mandatory = $true)][string]$ManagerPath,
     [Parameter(Mandatory = $true)][string]$ExePath,
-    [Parameter(Mandatory = $true)][string]$IpaPath
+    [Parameter(Mandatory = $true)][string]$IpaPath,
+    [string]$ManifestPath,
+    [switch]$RequireManagerPins
 )
-
 $ErrorActionPreference = 'Stop'
-
 . (Join-Path $PSScriptRoot '_file_hash.ps1')
 
-foreach ($path in @($ManagerPath, $ExePath, $IpaPath)) {
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        Write-Host ("  FAIL  missing file: {0}" -f $path)
-        exit 1
+$manager = [IO.File]::ReadAllText($ManagerPath)
+$exeHash = [regex]::Match($manager, '\$script:PinnedExeSha256\s*=\s*''([a-fA-F0-9]{64})''').Groups[1].Value
+$ipaHash = [regex]::Match($manager, '\$script:PinnedIpaSha256\s*=\s*''([a-fA-F0-9]{64})''').Groups[1].Value
+$ipaName = [regex]::Match($manager, '\$script:BundledIpaName\s*=\s*''([^''\r\n]+)''').Groups[1].Value
+if ($RequireManagerPins -and (-not $ipaHash -or -not $ipaName)) {
+    throw 'The Windows manager must pin the official IPA filename and SHA-256.'
+}
+$ipa = Get-Item -LiteralPath $IpaPath
+if ($ipaName -and $ipa.Name -cne $ipaName) {
+    throw "The IPA filename differs from the manager pin: $ipaName"
+}
+if ($PSBoundParameters.ContainsKey('ManifestPath') -or -not $ipaHash) {
+    if (-not $PSBoundParameters.ContainsKey('ManifestPath')) {
+        $ManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'release.json'
     }
+    $releaseInfo = Get-Content -Raw -Encoding UTF8 -LiteralPath $ManifestPath | ConvertFrom-Json
+    if ($ipa.Name -cne $releaseInfo.ipa.name -or $ipa.Length -ne $releaseInfo.ipa.size) {
+        throw "The IPA filename or size differs from $ManifestPath."
+    }
+    if ($ipaHash -and $ipaHash -ne $releaseInfo.ipa.sha256) {
+        throw "The manager's IPA fingerprint differs from $ManifestPath."
+    }
+    # The v30 manager read its expected IPA identity from the manifest.
+    $ipaHash = $releaseInfo.ipa.sha256
 }
 
-$managerText = [System.IO.File]::ReadAllText($ManagerPath)
-
-$failed = $false
 foreach ($pin in @(
-    @{ Name = 'PinnedExeSha256'; Path = $ExePath; Label = 'touchHLE.exe' },
-    @{ Name = 'PinnedIpaSha256'; Path = $IpaPath; Label = 'game IPA' }
+    @{ Hash = $exeHash; Path = $ExePath; Label = 'touchHLE.exe' },
+    @{ Hash = $ipaHash; Path = $IpaPath; Label = 'game IPA' }
 )) {
-    # Single-quoted prefix so the backslash-dollar reaches the regex as a literal
-    # "$script:", which is how the constants are written in GameManager.ps1.
-    $pattern = '\$script:' + $pin.Name + "\s*=\s*'([0-9A-Fa-f]{64})'"
-    $match = [regex]::Match($managerText, $pattern)
-    if (-not $match.Success) {
-        Write-Host ("  FAIL  {0} not found in {1}" -f $pin.Name, $ManagerPath)
-        $failed = $true
-        continue
-    }
-
-    $expected = $match.Groups[1].Value.ToUpperInvariant()
     $actual = Get-Sha256Hex $pin.Path
-    if ($expected -eq $actual) {
-        Write-Host ("  OK    {0,-13} {1}" -f $pin.Label, $actual)
-    } else {
-        Write-Host ("  FAIL  {0,-13} pinned {1}" -f $pin.Label, $expected)
-        Write-Host ("        {0,-13} actual {1}" -f '', $actual)
-        $failed = $true
+    if ($actual -ne $pin.Hash) {
+        throw "$($pin.Label) SHA-256 mismatch: expected '$($pin.Hash)', got '$actual'."
     }
-}
-
-if ($failed) {
-    Write-Host ''
-    Write-Host '  The pinned hashes in GameManager.ps1 do not match the current files.'
-    Write-Host '  Update $script:PinnedExeSha256 / $script:PinnedIpaSha256 and retry.'
-    exit 1
+    Write-Host ("  OK    {0,-13} {1}" -f $pin.Label, $actual)
 }
 exit 0

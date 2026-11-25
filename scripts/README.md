@@ -4,6 +4,7 @@
 
 | 任务 | 脚本 |
 |---|---|
+| 新检出恢复原生依赖 | [restore_vendor.py](restore_vendor.py)，用 Python 3.12+ 和 Git 恢复锁定的源码及许可证。可用 `--vendor` 指定空目录，`--boost-archive` 复用现有压缩包。 |
 | Windows 增量编译 | [`_build_fork_now.ps1`](_build_fork_now.ps1)，安装到 `run/windows/touchHLE/` |
 | Windows 打包 | [`_build_release.ps1`](_build_release.ps1)，生成 `dist/windows/zombie-farm-windows-x64.zip` |
 | Android 构建 | [`_build_android_local.ps1`](_build_android_local.ps1) 使用本机工具链，[通用入口](_build_android.ps1) 接受另外配置的工具链 |

@@ -1,60 +1,64 @@
 # Rebuild touchHLE and install the emulator the repository launcher uses.
-$ErrorActionPreference = 'Continue'
+param([string]$VsDevCmd)
+$ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-$hleRoot = Join-Path $root 'touchHLE'
 $paths = & (Join-Path $root 'windows\RepositoryPaths.ps1')
+$fork = Join-Path $root 'touchHLE\touchHLE-fork'
+$tools = Join-Path $root 'touchHLE\_build_tools'
+$log = Join-Path $root '_analysis\_build_fork_now.log'
 
-$fork   = Join-Path $hleRoot 'touchHLE-fork'
-$tools  = Join-Path $hleRoot '_build_tools'
-$log    = Join-Path $root '_analysis\_build_fork_now.log'
-
-function Log([string]$m) {
-    $line = "[{0}] {1}" -f (Get-Date -Format 'HH:mm:ss'), $m
-    Write-Host $line
-    Add-Content -LiteralPath $log -Value $line -Encoding utf8
+if (-not $env:CARGO_HOME -and (Test-Path -LiteralPath "$tools\cargo\bin\cargo.exe")) {
+    $env:CARGO_HOME = Join-Path $tools 'cargo'
 }
-Set-Content -LiteralPath $log -Value "build started $(Get-Date -Format o)" -Encoding utf8
-
-$env:RUSTUP_HOME = Join-Path $tools 'rustup'
-$env:CARGO_HOME  = Join-Path $tools 'cargo'
-$env:CARGO_TARGET_DIR = Join-Path $tools 'target-fork'
-$env:Path = "$tools\cargo\bin;$env:Path"
-
-$cmakeBin = & python -c "import cmake,os;print(os.path.join(cmake.CMAKE_BIN_DIR,'cmake.exe'))" 2>$null
-if ($cmakeBin -and (Test-Path $cmakeBin)) {
-    $env:CMAKE = $cmakeBin
-    $env:Path = "$(Split-Path $cmakeBin);$env:Path"
+if (-not $env:RUSTUP_HOME -and (Test-Path -LiteralPath "$tools\rustup\settings.toml")) {
+    $env:RUSTUP_HOME = Join-Path $tools 'rustup'
+}
+if ($env:CARGO_HOME -and (Test-Path -LiteralPath "$env:CARGO_HOME\bin\cargo.exe")) {
+    $env:Path = "$env:CARGO_HOME\bin;$env:Path"
+}
+if (-not (Get-Command cargo.exe -ErrorAction SilentlyContinue)) {
+    throw 'Install Rust with the x86_64-pc-windows-msvc toolchain or set CARGO_HOME.'
+}
+if (-not $env:CARGO_TARGET_DIR) {
+    $env:CARGO_TARGET_DIR = if (Test-Path -LiteralPath $tools) {
+        Join-Path $tools 'target-fork'
+    } else { Join-Path $fork 'target' }
+}
+if (-not [IO.Path]::IsPathRooted($env:CARGO_TARGET_DIR)) {
+    $env:CARGO_TARGET_DIR = Join-Path $fork $env:CARGO_TARGET_DIR
 }
 $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
 
-$vsDevCmd = 'C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat'
-$cargo = Join-Path $tools 'rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\cargo.exe'
+$activate = $VsDevCmd -or $env:VSCMD_ARG_TGT_ARCH -ne 'x64' -or -not (Get-Command cl.exe -ErrorAction SilentlyContinue)
+if ($activate -and -not $VsDevCmd) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (Test-Path -LiteralPath $vswhere) {
+        $vsRoot = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if ($vsRoot) { $VsDevCmd = Join-Path $vsRoot 'Common7\Tools\VsDevCmd.bat' }
+    }
+}
+if ($activate -and (-not $VsDevCmd -or -not (Test-Path -LiteralPath $VsDevCmd -PathType Leaf))) {
+    throw 'Open an x64 Visual Studio developer shell or provide -VsDevCmd with the path to VsDevCmd.bat.'
+}
 
-Push-Location $fork
+$command = 'cargo.exe build --locked --release --bin touchHLE'
+if ($activate) {
+    $env:ZF_DEV_CMD = (Resolve-Path -LiteralPath $VsDevCmd).Path
+    $command = 'call "%ZF_DEV_CMD%" -no_logo -arch=x64 -host_arch=x64 && ' + $command
+}
+Push-Location -LiteralPath $fork
 try {
-    $out = Join-Path $env:TEMP 'thle_fork_build_now.out'
-    Log 'cargo build --release --bin touchHLE'
-    $inner = "`"$vsDevCmd`" -no_logo -arch=x64 -host_arch=x64 && set `"CARGO_TARGET_DIR=$env:CARGO_TARGET_DIR`" && `"$cargo`" build --release --bin touchHLE"
-    & cmd.exe /c $inner *> $out
-    $code = $LASTEXITCODE
-    Log "cargo exit=$code"
-    if (Test-Path $out) { Get-Content -LiteralPath $out -Tail 60 | ForEach-Object { Log "  | $_" } }
-
+    $env:ZF_BUILD_LOG = $log
+    Write-Host "Building Windows x64. Compiler log: $log"
+    & cmd.exe /d /c "($command) > `"%ZF_BUILD_LOG%`" 2>&1"
+    $status = $LASTEXITCODE
+    Get-Content -LiteralPath $log -Tail 25
+    if ($status -ne 0) { throw "Windows build failed with exit code $status. See $log" }
     $exe = Join-Path $env:CARGO_TARGET_DIR 'release\touchHLE.exe'
-    if ($code -ne 0) {
-        Log 'BUILD FAILED - binary NOT copied'
-        exit 1
-    }
-    if (Test-Path $exe) {
-        Log "BUILT: $exe ($((Get-Item $exe).Length) bytes, $((Get-Item $exe).LastWriteTime))"
-        New-Item -ItemType Directory -Path $paths.Emulator -Force -ErrorAction Stop | Out-Null
-        $dest = Join-Path $paths.Emulator 'touchHLE.exe'
-        Copy-Item -LiteralPath $exe -Destination $dest -Force -ErrorAction Stop
-        Log "copied to $dest"
-    } else {
-        Log 'NO BINARY'
-        exit 1
-    }
-} finally { Pop-Location }
-Log 'build DONE'
+    New-Item -ItemType Directory -Path $paths.Emulator -Force | Out-Null
+    Copy-Item -LiteralPath $exe -Destination $paths.Emulator -Force
+    Write-Host "Installed $exe to $($paths.Emulator)"
+} finally {
+    Pop-Location
+}

@@ -16,7 +16,8 @@ import java.util.zip.*;
 
 /** Manager operations share an exclusive lock with the separate game process. */
 public final class ZfStorage {
-    public static final String BUNDLED = "Zombie_Farm_v29fix.ipa";
+    public static final String BUNDLED = BuildConfig.BUNDLED_IPA_NAME;
+    private static final String LEGACY_BUNDLED = "Zombie_Farm_v29fix.ipa";
     static final String DEFAULT_FAMILY = "iphone";
     static final String DEFAULT_SCALE = "3";
     static final long MAX_GAME_EPOCH = 2147483000L;
@@ -27,14 +28,18 @@ public final class ZfStorage {
     private static final int MAX_BACKUP_METADATA_BYTES = 65536;
     public final File root, apps;
     private final Context context;
-    private final File lockFile;
+    private final File lockFile, bundledReceipt;
     public ZfStorage(Context context) throws IOException {
-        this(context, context.getExternalFilesDir(null), new File(context.getFilesDir(), "zf_game.lock"));
+        this(context, context.getExternalFilesDir(null), new File(context.getFilesDir(), "zf_game.lock"),
+            new File(context.getNoBackupFilesDir(), "zf_bundled_ipa.receipt"));
     }
     // Allows instrumentation to exercise real Android I/O in an isolated fixture directory.
     ZfStorage(Context context, File root, File lockFile) throws IOException {
+        this(context, root, lockFile, new File(lockFile.getParentFile(), "zf_bundled_ipa.receipt"));
+    }
+    private ZfStorage(Context context, File root, File lockFile, File bundledReceipt) throws IOException {
         if (root == null) throw new IOException("应用存储暂不可用");
-        this.context = context; this.root = root; this.lockFile = lockFile;
+        this.context = context; this.root = root; this.lockFile = lockFile; this.bundledReceipt = bundledReceipt;
         apps = new File(root, "touchHLE_apps"); mkdir(apps);
     }
     public static final class Lease implements AutoCloseable {
@@ -68,11 +73,14 @@ public final class ZfStorage {
         catch (IOException e) { writer.failWrite(out); throw e; }
     }
     public static String hash(File file) throws Exception {
-        MessageDigest sha = MessageDigest.getInstance("SHA-256");
         try (InputStream in = new FileInputStream(file)) {
-            byte[] b = new byte[65536]; int n;
-            while ((n = in.read(b)) != -1) sha.update(b, 0, n);
+            return hash(in);
         }
+    }
+    private static String hash(InputStream in) throws Exception {
+        MessageDigest sha = MessageDigest.getInstance("SHA-256");
+        byte[] b = new byte[65536]; int n;
+        while ((n = in.read(b)) != -1) sha.update(b, 0, n);
         return hex(sha.digest());
     }
     private static String hex(byte[] bytes) {
@@ -80,43 +88,78 @@ public final class ZfStorage {
         for (byte b : bytes) s.append(String.format(Locale.ROOT, "%02x", b & 255));
         return s.toString();
     }
-    /** Prepare the asset for the manager UI. The game process verifies the bytes before use. */
-    public void prepareBundled() throws Exception { ensureBundled(false); }
-
-    public void ensureBundled() throws Exception {
-        ensureBundled(true);
-    }
-    private void ensureBundled(boolean verifyInstalledBytes) throws Exception {
-        String expected;
-        try (InputStream in = context.getAssets().open("touchHLE_zombiefarm_ipa.sha256")) {
-            expected = new String(ZfIpa.readLimited(in, 1024), StandardCharsets.US_ASCII).trim();
+    /** Caller holds the lease. Return any integrity warning, including a successfully repaired deletion. */
+    public String ensureBundled() {
+        try { return checkAndInstallBundled(); }
+        catch (Exception e) {
+            Log.w("ZombieFarm", "Could not verify or restore the bundled IPA", e);
+            return "无法校验或恢复内置的正式 IPA，请检查可用存储空间和文件。";
         }
-        File target = new File(apps, BUNDLED), stamp = new File(apps, BUNDLED + ".sha256");
-        if (target.isFile() && stamp.isFile()
-                && new String(bytes(stamp), StandardCharsets.US_ASCII).trim().equals(expected)) {
-            if (verifyInstalledBytes) {
-                if (hash(target).equals(expected)) return;
+    }
+    private String checkAndInstallBundled() throws Exception {
+        String expected = BuildConfig.BUNDLED_IPA_SHA256;
+        File target = new File(apps, BUNDLED);
+        String previous;
+        try (InputStream in = new AtomicFile(bundledReceipt).openRead()) {
+            previous = new String(ZfIpa.readLimited(in, 8192), StandardCharsets.UTF_8);
+        } catch (FileNotFoundException firstInstall) { previous = ""; }
+        // Android changes the installed APK location or update time on reinstall.
+        // Only its immutable asset can reuse a receipt. Always hash the player's writable copy.
+        String[] prior = previous.split("\n", -1);
+        String previousName = prior.length == 4 ? prior[1] : LEGACY_BUNDLED;
+        String installation = expected + "\n" + BUNDLED + "\n" + context.getApplicationInfo().sourceDir + "\n"
+            + context.getPackageManager().getPackageInfo(context.getPackageName(), 0).lastUpdateTime;
+        String installed = target.isFile() ? hash(target) : null;
+        String warning = null;
+        // AssetManager may merge assets from other packages. Check the actual installed base APK.
+        try (ZipFile apk = new ZipFile(context.getApplicationInfo().sourceDir)) {
+            ZipEntry entry = apk.getEntry("assets/" + BUNDLED);
+            if (entry == null || entry.isDirectory()) return "APK 中缺少内置的正式 IPA。";
+            if (expected.equals(installed)) {
+                if (installation.equals(previous)) return null;
+                try (InputStream asset = apk.getInputStream(entry)) {
+                    if (!expected.equals(hash(asset))) return "APK 内置的 IPA 与正式版本不一致。";
+                }
             } else {
+                if (installed == null) {
+                    if (target.exists() || (prior.length == 4 && BUNDLED.equals(previousName)) || new File(apps, BUNDLED + ".sha256").exists())
+                        warning = "游戏目录中缺少内置的正式 IPA。";
+                } else if (!previous.startsWith(installed + "\n")) {
+                    warning = "游戏目录中的内置 IPA 已被替换或损坏。";
+                }
+                File temp = File.createTempFile("bundled-", ".tmp", apps);
                 try {
-                    ZfIpa.read(target);
-                    return;
-                } catch (Exception damaged) {
-                    // Reinstall unreadable packages so they remain selectable in the manager.
+                    MessageDigest sha = MessageDigest.getInstance("SHA-256");
+                    try (InputStream asset = apk.getInputStream(entry); FileOutputStream out = new FileOutputStream(temp)) {
+                        copy(asset, new DigestOutputStream(out, sha), 512L * 1024 * 1024);
+                        out.getFD().sync();
+                    }
+                    if (!expected.equals(hex(sha.digest()))) return "APK 内置的 IPA 与正式版本不一致。";
+                    android.system.Os.rename(temp.getPath(), target.getPath());
+                } finally { temp.delete(); }
+            }
+        }
+        if (!installation.equals(previous)) {
+            if (!BUNDLED.equals(previousName)) {
+                JSONObject preferences = config();
+                if (previousName.equals(preferences.optString("selected")) && previousName.equals(new File(previousName).getName())) {
+                    File old = new File(apps, previousName);
+                    if (old.isFile()) {
+                        String digest = hash(old);
+                        if (prior.length == 4 ? digest.equals(prior[0]) : legacyBundled(digest))
+                            writeConfig(preferences.put("selected", BUNDLED));
+                    }
                 }
             }
+            atomic(bundledReceipt, installation.getBytes(StandardCharsets.UTF_8));
         }
-        File temp = File.createTempFile("bundled-", ".ipa", apps);
-        try {
-            MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            try (InputStream in = context.getAssets().open(BUNDLED); FileOutputStream out = new FileOutputStream(temp)) {
-                copy(in, new DigestOutputStream(out, sha), 512L * 1024 * 1024);
-                out.getFD().sync();
-            }
-            if (!hex(sha.digest()).equals(expected)) throw new IOException("内置 IPA 校验失败");
-            ZfIpa.read(temp);
-            android.system.Os.rename(temp.getPath(), target.getPath());
-            atomic(stamp, expected.getBytes(StandardCharsets.US_ASCII));
-        } finally { temp.delete(); }
+        return warning == null ? null : warning + "已从 APK 恢复正式文件。";
+    }
+    // These versions predate the private installation receipt and used the same Android filename.
+    private static boolean legacyBundled(String sha) {
+        return sha.equals("e5951f945d23e88f25d0d1e7dc84e39ab524c566e28460173600ba05423c9ded")
+            || sha.equals("7bb214498b149e11deca49c19e5a21b9aa7f763646537206b85cbbab86582ffc")
+            || sha.equals("9c7a4cbafe0b7636b541f9d8f7d40bc7f0dcdd33c3440beba3fc3c731b718339");
     }
     private JSONObject config() throws Exception {
         AtomicFile file = new AtomicFile(new File(root, "zf_manager.json"));
@@ -147,8 +190,12 @@ public final class ZfStorage {
         String name = config().optString("selected", BUNDLED);
         if (name.contains("/") || name.contains("\\")) throw new IOException("版本选择无效");
         File file = new File(apps, name);
-        if (!file.isFile()) file = new File(apps, BUNDLED);
-        return ZfIpa.read(file);
+        try { return ZfIpa.read(file); }
+        catch (Exception unavailable) {
+            List<ZfIpa> available = versions();
+            if (available.isEmpty()) throw new IOException("没有可运行的 IPA，可在游戏管理中导入版本。", unavailable);
+            return available.get(0);
+        }
     }
     public void select(ZfIpa ipa) throws Exception {
         if (!ipa.file.getCanonicalFile().getParentFile().equals(apps.getCanonicalFile()))

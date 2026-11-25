@@ -100,8 +100,13 @@ pub extern "C" fn SDL_main(
         vec![String::new()]
     };
     if args.len() == 1 {
-        args.push(paths::user_data_base_path().join(paths::APPS_DIR)
-            .join("Zombie_Farm_v29fix.ipa").to_string_lossy().into_owned());
+        args.push(
+            paths::user_data_base_path()
+                .join(paths::APPS_DIR)
+                .join(zfr_integrity::OFFICIAL_IPA_NAME)
+                .to_string_lossy()
+                .into_owned(),
+        );
     }
     match main(args.into_iter()) {
         Ok(_) => echo!("touchHLE finished"),
@@ -196,6 +201,12 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
         return Ok(());
     }
 
+    // Android checks the packaged asset and its installed copy in Java before launching SDL.
+    #[cfg(not(target_os = "android"))]
+    if !just_info {
+        zfr_integrity::warn_if_bundled_ipa_changed();
+    }
+
     let bundle_path = if let Some(bundle_path) = bundle_path {
         bundle_path
     } else {
@@ -224,15 +235,6 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
     #[cfg(windows)]
     if let Some(fixed) = bundle_path.to_str().and_then(|s| s.strip_suffix('"')) {
         log!("Warning: The bundle path has a trailing quotation mark! This often happens accidentally on Windows when tab-completing, because '\\\"' gets interpreted by Rust in the wrong way. Did you meant to write {:?}?", fixed);
-    }
-
-    // 僵尸农场中文移植：官方发行版自带的那个 IPA 必须还在。
-    //
-    // 标题画面上的免费声明是画在 IPA 里的图片上的，删掉它再换一个干净的包进去
-    // 是最省事的偷法。这里只查「在不在」：运行哪个包不限制，官方包被删就拒绝
-    // 启动。`--info` 只读元数据、不运行游戏，跳过以便排查问题。
-    if !just_info {
-        zfr_integrity::verify_official_ipa_present()?;
     }
 
     let bundle_data = fs::BundleData::open_any(&bundle_path)

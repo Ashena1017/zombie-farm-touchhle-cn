@@ -57,10 +57,11 @@ if (Test-Path -LiteralPath $repositoryPaths -PathType Leaf) {
 # touchHLE resolves resources against its current directory. Start-GameProcess
 # launches it with HleDir as its working directory.
 $script:OptionsFile = Join-Path $script:HleDir 'touchHLE_options.txt'
-$script:BundledIpaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
+$script:BundledIpaName = '内置中文版·v31fix·开源免费.ipa'
 $script:SupersededIpaNames = @(
     'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa',
-    'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
+    'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa',
+    'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
 )
 # Records which IPA the user picked, so the choice survives a restart. Kept at the
 # top level, since it describes the manager's state rather than touchHLE's.
@@ -101,22 +102,13 @@ $script:NoticeFile = Join-Path $script:RuntimeRoot 'launcher_notice_seen.txt'
 # manager says so in red on the 文件校验 page and again every time it starts,
 # and the player can compare against the numbers published with the release.
 #
-# The IPA half is the one that matters. The free-software notice on the title
-# screen is painted into an image inside that IPA, so swapping the IPA is how
-# somebody would try to strip the notice and resell the result. touchHLE refuses
-# to start when that file has been *deleted* (src/zfr_integrity.rs); running some
-# other IPA is explicitly allowed, so this row is what distinguishes "replaced"
-# from "removed".
-#
-# Updated with every release. scripts\_build_release.ps1 reads these two
-# values and refuses to package a bundle that does not match them.
-$script:PinnedExeSha256 = '61A5E5FA82055B7D38161E1C628E149532BA98428D7BE64C7A22714436340AC1'
-$script:PinnedIpaSha256 = '9C7A4CBAFE0B7636B541F9D8F7D40BC7F0DCDD33C3440BEBA3FC3C731B718339'
+# The packager checks these pins and the IPA name against release.json. The
+# installed manager can still check the official files if that manifest changes.
+$script:PinnedExeSha256 = 'C925A60E194CB432A24BFFDB7E3B0FFAAF6320F0114FAFEA73B45A901BC3A9B5'
+$script:PinnedIpaSha256 = 'CFA750F4CBA8D5ACF0923C595CA3C257B0617C2CAFED7D4EE08F4BC37D689E65'
 
 # Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.
 $script:IntegrityRows = @()
-# One line describing which IPA is currently selected, for the 文件校验 page.
-$script:IntegritySelection = ''
 
 # NOTE: this manager is self-contained. It does NOT call
 # StartZombieFarmNextHour.ps1 or SetZombieFarmCurrency.ps1 -- the launching and
@@ -364,40 +356,30 @@ function Get-PinnedIpaPath {
     return $null
 }
 
-function Resolve-IpaSelectionPath {
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    if ($script:SupersededIpaNames -contains [System.IO.Path]::GetFileName($Path)) {
-        $pinned = Get-PinnedIpaPath
-        if ($pinned) { return $pinned }
-    }
-    return $Path
-}
-
 function Get-IpaList {
     if (-not (Test-Path -LiteralPath $script:IpaDir)) { return @() }
-    $pinned = Get-PinnedIpaPath
-    return @(Get-ChildItem -LiteralPath $script:IpaDir -Filter '*.ipa' -File |
-        Where-Object { -not $pinned -or $script:SupersededIpaNames -notcontains $_.Name } |
-        Sort-Object Name)
+    return @(Get-ChildItem -LiteralPath $script:IpaDir -Filter '*.ipa' -File | Sort-Object Name)
 }
 
 # The remembered choice, or the built-in default if that file is missing or names
 # an IPA that no longer exists.
 function Get-DefaultIpaPath {
+    $pinned = Get-PinnedIpaPath
     if (Test-Path -LiteralPath $script:SelectionFile) {
         $saved = ([System.IO.File]::ReadAllText($script:SelectionFile)).Trim()
         if ($saved) {
+            # Older managers remembered the release default as a bare filename.
+            if ($pinned -and $script:SupersededIpaNames -contains $saved) { return $pinned }
             $candidate = if ([System.IO.Path]::IsPathRooted($saved)) {
                 $saved
             } else {
                 Join-Path $script:IpaDir $saved
             }
-            $candidate = Resolve-IpaSelectionPath -Path $candidate
-            if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                return [System.IO.Path]::GetFullPath($candidate)
+            }
         }
     }
-    $pinned = Get-PinnedIpaPath
     if ($pinned) { return $pinned }
     $any = Get-IpaList | Select-Object -First 1
     if ($any) { return $any.FullName }
@@ -406,9 +388,14 @@ function Get-DefaultIpaPath {
 
 function Save-IpaSelection {
     param([Parameter(Mandatory = $true)][string]$Path)
-    # Store just the file name so the folder can be moved.
+    $saved = [System.IO.Path]::GetFullPath($Path)
+    if ([System.IO.Path]::GetDirectoryName($saved) -eq $script:IpaDir) {
+        $saved = [System.IO.Path]::GetFileName($saved)
+        # Distinguish an explicit choice of an old IPA from a pre-upgrade default.
+        if ($script:SupersededIpaNames -contains $saved) { $saved = '.\' + $saved }
+    }
     [System.IO.File]::WriteAllText(
-        $script:SelectionFile, [System.IO.Path]::GetFileName($Path),
+        $script:SelectionFile, $saved,
         (New-Object System.Text.UTF8Encoding($false)))
 }
 
@@ -1147,7 +1134,7 @@ function Get-PanicSummary {
 function Get-BackupFiles {
     param([string]$Directory = $script:SaveDir)
 
-    if (-not (Test-Path -LiteralPath $Directory)) { return @() }
+    if (-not $Directory -or -not (Test-Path -LiteralPath $Directory)) { return @() }
     $prefix = $script:BackupPrefix
     return @(Get-ChildItem -LiteralPath $Directory -File |
         Where-Object {
@@ -1451,7 +1438,7 @@ function Get-CurrencyLayout {
 function Get-Currency {
     param([string]$SavePath = $script:LiveSave)
 
-    if (-not (Test-Path -LiteralPath $SavePath)) { return $null }
+    if (-not $SavePath -or -not (Test-Path -LiteralPath $SavePath)) { return $null }
     try {
         $data = [System.IO.File]::ReadAllBytes($SavePath)
         $layout = Get-CurrencyLayout -Data $data
@@ -3472,7 +3459,7 @@ function Update-SaveTab {
     $listSaves.BeginUpdate()
     $listSaves.Items.Clear()
 
-    $hadLive = Test-Path -LiteralPath $script:LiveSave
+    $hadLive = $script:LiveSave -and (Test-Path -LiteralPath $script:LiveSave)
     if (-not $hadLive) {
         $lblSaveInfo.Text = '找不到当前存档。'
         $lblSaveInfo.ForeColor = $red
@@ -3712,25 +3699,18 @@ function Start-GameProcess {
     if (-not (Test-Path -LiteralPath $paths.TouchHLE)) {
         throw "找不到 touchHLE.exe：$($paths.TouchHLE)"
     }
-    if (-not (Test-Path -LiteralPath $paths.Ipa)) {
-        throw "找不到游戏 IPA：$($paths.Ipa)"
+    $integrity = Invoke-IntegrityCheck
+    if (-not $paths.Ipa -or -not (Test-Path -LiteralPath $paths.Ipa -PathType Leaf)) {
+        $hint = "请选择一个可用的 IPA，或从项目主页重新下载整合包。`r`n$($script:ProjectUrl)"
+        if ($integrity.Level -ne 'ok') { throw ($integrity.Text + "`r`n`r`n" + $hint) }
+        throw ("找不到所选的游戏 IPA。`r`n`r`n" + $hint)
     }
-
-    # Independent check of the two files the release ships. touchHLE refuses to
-    # start when the bundled IPA is gone (src/zfr_integrity.rs); this is the
-    # manager's own look at the same files, and it also covers the other half --
-    # a replaced touchHLE.exe -- while the manager window is still on screen,
-    # instead of after the game window has covered it.
-    #
-    # It warns, it does not block: a mismatched hash is not proof of anything on
-    # its own (the player may be running a build of their own), and a manager
-    # that refuses to start the game is worse than one that tells the truth.
-    $integrity = Invoke-IntegrityCheck -IpaPath $paths.Ipa
     if ($integrity.Level -ne 'ok') {
         Write-ManagerLog ('integrity check: {0}' -f $integrity.Text)
-        [void][System.Windows.Forms.MessageBox]::Show(
-            ($integrity.Text + "`r`n`r`n" + '详细对比在管理器的「文件校验」页。'),
-            '文件校验', 'OK', 'Warning')
+        $answer = [System.Windows.Forms.MessageBox]::Show($form,
+            ($integrity.Text + "`r`n`r`n项目主页：$($script:ProjectUrl)`r`n`r`n继续启动所选的 IPA 吗？"),
+            '文件校验', 'YesNo', 'Warning')
+        if ($answer -ne 'Yes') { return }
     }
 
     # Cumulative offset bookkeeping, same as the command-line launcher.
@@ -3765,6 +3745,8 @@ function Start-GameProcess {
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $paths.TouchHLE
+    # The manager has already shown any warning for this launch.
+    $psi.EnvironmentVariables['ZFR_MANAGER_IPA_CHECKED'] = '1'
     # Quotes matter: the IPA file name contains spaces.
     #
     # --no-error-popup: on a guest panic touchHLE would otherwise show a modal
@@ -4282,6 +4264,7 @@ function Apply-IpaSelection {
 
     Update-IpaInfoLabel
     if ($script:UiReady) {
+        Update-IntegrityDisplay
         if ($script:AppId -cne $previousId) {
             $script:UiReady = $false
             try {
@@ -4298,12 +4281,14 @@ function Apply-IpaSelection {
 
 function Initialize-IpaList {
     $script:IpaEntries = @()
-    $script:IpaInfoCache = @{}
-
+    $wanted = Get-DefaultIpaPath
+    $files = @(Get-IpaList)
+    if ($wanted -and $files.FullName -notcontains $wanted) {
+        $files += Get-Item -LiteralPath $wanted
+    }
     $idCounts = @{}
-    foreach ($f in (Get-IpaList)) {
+    foreach ($f in $files) {
         $info = Read-IpaInfo -Path $f.FullName
-        $script:IpaInfoCache[$f.FullName] = $info
         $script:IpaEntries += $info
         $id = if ($info.AppId) { $info.AppId } else { '<未知>' }
         if (-not $idCounts.ContainsKey($id)) { $idCounts[$id] = 0 }
@@ -4327,7 +4312,6 @@ function Initialize-IpaList {
     }
 
     # Preselect the remembered/default IPA.
-    $wanted = Get-DefaultIpaPath
     $index = 0
     for ($i = 0; $i -lt $script:IpaEntries.Count; $i++) {
         if ($script:IpaEntries[$i].Path -eq $wanted) { $index = $i; break }
@@ -4364,7 +4348,7 @@ $btnIpaBrowse.Add_Click({
     $dlg.InitialDirectory = $script:IpaDir
     if ($dlg.ShowDialog($form) -ne 'OK') { $dlg.Dispose(); return }
 
-    $chosen = Resolve-IpaSelectionPath -Path $dlg.FileName
+    $chosen = $dlg.FileName
     $dlg.Dispose()
 
     $info = Read-IpaInfo -Path $chosen
@@ -4459,14 +4443,17 @@ function New-IntegrityRow {
     param([string]$Name, [string]$Path, [string]$Expected)
 
     $actual = $null
-    if ($Path -and (Test-Path -LiteralPath $Path -PathType Leaf)) {
-        try { $actual = Get-Sha256Hex $Path } catch { $actual = $null }
+    try {
+        $state = 'missing'
+        if ($Path -and (Test-Path -LiteralPath $Path -PathType Leaf -ErrorAction Stop)) {
+            $actual = Get-Sha256Hex $Path
+            $state = if (-not $Expected) { 'info' }
+                     elseif ($actual -eq $Expected) { 'ok' }
+                     else { 'bad' }
+        }
+    } catch {
+        $state = 'unreadable'
     }
-
-    $state = if (-not $actual) { 'missing' }
-             elseif (-not $Expected) { 'info' }
-             elseif ($actual -eq $Expected) { 'ok' }
-             else { 'bad' }
 
     return [pscustomobject]@{
         Name     = $Name
@@ -4485,25 +4472,7 @@ function New-IntegrityRow {
 # official file look missing. What is being watched is the shipped file, not the
 # player's choice of what to run.
 function Get-IntegrityReport {
-    param([string]$IpaPath)
-
-    if (-not $IpaPath) {
-        if ($null -ne $script:CurrentIpa -and $script:CurrentIpa.Path) {
-            $IpaPath = $script:CurrentIpa.Path
-        } else {
-            $IpaPath = Get-DefaultIpaPath
-        }
-    }
-
-    $bundled = Get-PinnedIpaPath
-    $script:IntegritySelection = if (-not $IpaPath) {
-        '当前选择：没有可用的游戏包'
-    } elseif (Test-BundledIpa $IpaPath) {
-        '当前选择：官方内置的游戏包'
-    } else {
-        ('当前选择：{0}　（不是官方内置包；运行它是允许的，上面的校验针对官方文件本身）' -f
-            (Split-Path -Leaf $IpaPath))
-    }
+    $bundled = Join-Path $script:IpaDir $script:BundledIpaName
 
     $rows = New-Object System.Collections.ArrayList
     [void]$rows.Add((New-IntegrityRow 'touchHLE.exe' `
@@ -4518,11 +4487,17 @@ function Get-IntegrityReport {
 function Get-IntegrityHeadline {
     param($Rows)
 
-    $bad = @($Rows | Where-Object { $_.State -eq 'bad' -or $_.State -eq 'missing' })
+    $bundled = $Rows | Where-Object { $_.Name -eq '内置游戏 IPA' }
+    switch ($bundled.State) {
+        'missing' { return [pscustomobject]@{ Level = 'bad'; Text = '文件校验：缺少内置游戏 IPA，你拿到的可能是改版。' } }
+        'bad' { return [pscustomobject]@{ Level = 'bad'; Text = '文件校验：内置游戏 IPA 与官方版本不符，你拿到的可能是改版。' } }
+        'unreadable' { return [pscustomobject]@{ Level = 'warn'; Text = '文件校验：无法读取内置游戏 IPA，请检查文件权限或占用后重新校验。' } }
+    }
+    $bad = @($Rows | Where-Object { $_.State -notin @('ok','info') })
     if ($bad.Count -gt 0) {
         return [pscustomobject]@{
             Level = 'bad'
-            Text  = ('文件校验：{0} 与官方发布不一致，可能被替换过（详见「文件校验」页）' -f
+            Text  = ('文件校验：{0} 校验未通过，详见「文件校验」页。' -f
                 (($bad | ForEach-Object { $_.Name }) -join '、'))
         }
     }
@@ -4549,34 +4524,29 @@ function Update-IntegrityDisplay {
         $row = $rows[$i]
         $ui.Name.Text = $row.Name
         $ui.Expect.Text = if ($row.Expected) { $row.Expected.Substring(0, 16) + '…' } else { '（无固定值）' }
-        $ui.Actual.Text = if ($row.Actual) { $row.Actual.Substring(0, 16) + '…' } else { '（找不到文件）' }
+        $ui.Actual.Text = if ($row.Actual) { $row.Actual.Substring(0, 16) + '…' } else { '—' }
         switch ($row.State) {
             'ok'      { $ui.Verdict.Text = '✓ 与官方一致';   $ui.Verdict.ForeColor = $script:Forest }
             'bad'     { $ui.Verdict.Text = '✗ 与官方不一致'; $ui.Verdict.ForeColor = $script:Red }
             'missing' { $ui.Verdict.Text = '✗ 文件不存在';   $ui.Verdict.ForeColor = $script:Red }
+            'unreadable' { $ui.Verdict.Text = '无法读取文件'; $ui.Verdict.ForeColor = $script:Amber }
             default   { $ui.Verdict.Text = '仅显示 · 与 Release 说明比对'; $ui.Verdict.ForeColor = $script:Grey }
         }
     }
 
-    if ($script:LblVerifySelection) { $script:LblVerifySelection.Text = $script:IntegritySelection }
+    $script:LblVerifySelection.Text = if (-not $script:CurrentIpa.Path) {
+        '当前选择：没有可用的游戏包'
+    } elseif (Test-BundledIpa $script:CurrentIpa.Path) {
+        '当前选择：内置游戏 IPA'
+    } else {
+        ('当前选择：{0}　（自选游戏包）' -f (Split-Path -Leaf $script:CurrentIpa.Path))
+    }
 }
 
 # Recompute everything and refresh the page. Returns the headline, so callers do
 # not have to look inside $script:IntegrityRows.
 function Invoke-IntegrityCheck {
-    param([string]$IpaPath)
-
-    if (-not $IpaPath) {
-        # $script:CurrentIpa is the whole IPA record (Path, AppId, ...), not a
-        # path string. Stringifying it produces "@{Path=...}" and every Test-Path
-        # on it fails, which made the page report the game IPA as missing.
-        if ($null -ne $script:CurrentIpa -and $script:CurrentIpa.Path) {
-            $IpaPath = $script:CurrentIpa.Path
-        } else {
-            $IpaPath = Get-DefaultIpaPath
-        }
-    }
-    $script:IntegrityRows = @(Get-IntegrityReport -IpaPath $IpaPath)
+    $script:IntegrityRows = @(Get-IntegrityReport)
     Update-IntegrityDisplay
     return (Get-IntegrityHeadline $script:IntegrityRows)
 }

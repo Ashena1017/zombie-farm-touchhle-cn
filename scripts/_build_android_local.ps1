@@ -31,7 +31,6 @@ $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 $env:PATH = @(
     (Join-Path $jdk 'bin'),
     (Split-Path -Parent $Gradle),
-    (Join-Path $env:ProgramFiles 'Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'),
     (Join-Path $repoTools 'cargo\bin'),
     (Join-Path $env:ANDROID_HOME 'platform-tools'),
     $env:PATH

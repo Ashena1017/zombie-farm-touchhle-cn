@@ -6,7 +6,9 @@
 //! Help and the offline farm picker in Zombie Farm 1.0.
 
 use super::{zombie_farm_object_class_name, zombie_farm_read_object_ivar};
+use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::{ns_string, ns_url_connection};
+use crate::frameworks::uikit::ui_font::UITextAlignmentCenter;
 use crate::frameworks::uikit::ui_view::ui_control::UIControlStateNormal;
 use crate::objc::{id, nil, release};
 use crate::zfr_integrity::PROJECT_URL;
@@ -85,6 +87,40 @@ fn finish_offline_farm_picker(env: &mut Environment, controller: id) {
         let _: () = msg![env; online_button setTitle:unavailable forState:UIControlStateNormal];
         let _: () = msg![env; online_button setTitleColor:white forState:UIControlStateNormal];
         let _: () = msg![env; online_button setUserInteractionEnabled:false];
+        set_farm_picker_credit(env, footer, online_button);
     }
     let _: () = msg![env; table reloadData];
+}
+
+fn set_farm_picker_credit(env: &mut Environment, footer: id, online_button: id) {
+    // The guest may supply its profiles repeatedly to the same table footer.
+    const CREDIT_TAG: i32 = 0x5a464352;
+    let existing: id = msg![env; footer viewWithTag:CREDIT_TAG];
+    if existing != nil {
+        return;
+    }
+    let mut footer_frame: CGRect = msg![env; footer frame];
+    let button_frame: CGRect = msg![env; online_button frame];
+    let y = button_frame.origin.y + button_frame.size.height;
+    let frame = CGRect {
+        origin: CGPoint { x: 0.0, y },
+        size: CGSize {
+            width: footer_frame.size.width,
+            height: 20.0,
+        },
+    };
+    footer_frame.size.height = footer_frame.size.height.max(y + frame.size.height);
+    let _: () = msg![env; footer setFrame:footer_frame];
+    let label: id = msg_class![env; UILabel alloc];
+    let label: id = msg![env; label initWithFrame:frame];
+    let font: id = msg_class![env; UIFont systemFontOfSize:11.0_f32];
+    let color: id = msg_class![env; UIColor colorWithWhite:0.82_f32 alpha:1.0_f32];
+    let credit = ns_string::get_static_str(env, "本整合版免费，项目地址见「设置 → 关于」");
+    let _: () = msg![env; label setTag:CREDIT_TAG];
+    let _: () = msg![env; label setTextAlignment:UITextAlignmentCenter];
+    let _: () = msg![env; label setTextColor:color];
+    let _: () = msg![env; label setFont:font];
+    let _: () = msg![env; label setText:credit];
+    let _: () = msg![env; footer addSubview:label];
+    release(env, label);
 }

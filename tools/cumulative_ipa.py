@@ -1,8 +1,10 @@
-"""Rebuild the v30 notice IPA from the original unsigned IPA (Python 3.14+)."""
+"""Rebuild the release IPA from the original unsigned IPA (Python 3.14+)."""
 
 import argparse
 import hashlib
+import json
 import os
+import sys
 import tempfile
 from compression import zstd
 from copy import copy
@@ -12,13 +14,15 @@ from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 
 IPA_DIR = Path(__file__).resolve().parents[1] / "zombie_farm_ipa"
-BASE = IPA_DIR / "ZFR 1.0.zh-CN-unsigned.ipa"
-TARGET = IPA_DIR / "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa"
-PATCH = IPA_DIR / "unsigned-to-v30fix-notice.zst"
-BASE_SHA256 = "e7ce2d18bc77e513b4b4b382e4a9af9bb8a7133e5513b5a73955d3f3ee9a8f60"
-TARGET_SHA256 = "9c7a4cbafe0b7636b541f9d8f7d40bc7f0dcdd33c3440beba3fc3c731b718339"
-STORED_TARGET_SIZE = 71_191_773
-STORED_TARGET_SHA256 = "d1f1ae9afd199831e4cc208303fb9833e0ba16db644540a3d6246a8cb7519cae"
+RELEASE = json.loads((IPA_DIR.parent / "release.json").read_text(encoding="utf-8"))
+CUMULATIVE = RELEASE["cumulativePatch"]
+BASE = IPA_DIR / CUMULATIVE["baseName"]
+TARGET = IPA_DIR / RELEASE["ipa"]["name"]
+PATCH = IPA_DIR / CUMULATIVE["name"]
+BASE_SHA256 = CUMULATIVE["baseSha256"]
+TARGET_SHA256 = RELEASE["ipa"]["sha256"]
+STORED_TARGET_SIZE = CUMULATIVE["storedTargetSize"]
+STORED_TARGET_SHA256 = CUMULATIVE["storedTargetSha256"]
 
 
 def verify(data, expected_hash, label):
@@ -98,9 +102,11 @@ def run(args):
 
 
 def main():
+    # Redirected Windows output can use a code page without the bundled filename's characters.
+    sys.stdout.reconfigure(errors="backslashreplace")
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    apply = commands.add_parser("apply", help="reconstruct and verify the v30 IPA")
+    apply = commands.add_parser("apply", help="reconstruct and verify the release IPA")
     apply.add_argument("--base", type=Path, default=BASE)
     apply.add_argument("--patch", type=Path, default=PATCH)
     apply.add_argument("--output", type=Path, default=TARGET)

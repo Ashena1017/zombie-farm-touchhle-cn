@@ -4,16 +4,27 @@
 
 ## 当前发行
 
-[v30fix-notice](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v30fix-notice) 包含 Windows 和 Android 两个安装包，Android `versionCode` 为 18。本版裁小三张位图字体，去掉仓库出售详情的重复正文绘制，并在查询 IPA 文件属性时直接读取目录。使用原始 `ZFR 1.0.zh-CN-unsigned.ipa` 可通过 `python tools/cumulative_ipa.py apply` 重建两端共用的游戏包。[IPA 补丁记录](zombie_farm_ipa/README.md)
+[v31fix-notice](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-notice) 提供 Windows x64 ZIP 和 Android ARM64 APK（`versionCode` 19）。两端内置 `内置中文版·v31fix·开源免费.ipa`，SHA-256 为 `cfa750f4cba8d5acf0923c595ca3c257b0617c2cafed7d4ee08f4bc37d689e65`。
+
+- 启动图在原加载时间内显示「本整合版免费 · 请勿购买」。首页头像的农场选择页在停服说明下指向「设置 → 关于」。首页「关于」在设置画面上显示原游戏创建的单按钮 `UIAlertView`。上半区使用游戏传入的标题、版本、作者和工作室署名，「中文整合与维护」单列社区整合版的免费开源声明、项目地址和 QQ 群。点框内原确认按钮回到设置的原滚动位置。进入农场后的「设置 → 帮助」仍可查看原帮助。
+- 两端单独校验内置 IPA 的固定文件名与 SHA-256，允许额外安装和选择其他 IPA。缺失或被替换时提示可能为改版。Android 还检查已安装 APK 的内置资产，可从通过校验的资产恢复本地副本。原始 IPA、v30 与 v31 的补丁和恢复方法见 [IPA 记录](zombie_farm_ipa/README.md)。
+- 原 IPA 使用 iPhone OS 5.1 SDK，最低系统版本为 3.0。「关于」原文和 `Ok` 取自游戏创建的提示框，深色面板、社区分栏及按钮外观由本项目绘制，尚无原机同页截图可用于外观比对。Windows（iPhone、iPad 画幅）和 MuMu Android 15 已验证框外触摸被拦截、确认后恢复原设置位置、重复开启和退出；实图见本机 `_analysis/dumps/splash-v31/about-alert-iphone-dialog.png`、`about-alert-ipad-dialog.png` 与 `android-alert-open.png`。
+
+- Windows x64 ZIP 共 95,585,585 字节，SHA-256 为 `3CC579B37FBFE32596239FB55B3AF0E7C91BA6BB8F8FCCF443B4A2610ABE4706`。解压后独立启动 45 秒通过。
+- Android ARM64 APK 共 97,370,611 字节，SHA-256 为 `B75116E5B3D4B55F7E89650820D987F530C8A2B2A12BA274162F690160144E9D`。正式签名、设备升级与存档核对通过。Android 管理器通过 50 项设备检查，共用模拟器通过 70 项 Rust 库测试。
+
+## 上一版记录
+
+[v30fix-notice 源码](https://github.com/Ashena1017/zombie-farm-touchhle-cn/tree/v30fix-notice) 对应 Android `versionCode` 18。这一版裁小三张位图字体，去掉仓库出售详情的重复正文绘制，并在查询 IPA 文件属性时直接读取目录。[IPA 补丁记录](zombie_farm_ipa/README.md)
 
 - Windows ZIP 的 SHA-256 为 `3B3DDBB73ACE535133768D37C50130E081565932421280801B117CBE43462178`。
 - Android APK 的 SHA-256 为 `FC68ED878A77D135977A67787141CEBED91E77D07741CF4D76863A2C609DEDD2`。
 
 - Windows Release 的 `Image::from_bytes` 对三张字体的 PNG 字节执行 RGBA 解码和像素预乘。同进程交替测量，预热 4 轮，每版取 40 组三张合计耗时的中位数，v29 为 51.294 ms，v30 为 3.782 ms。计时不包含磁盘、ZIP 解压、纹理上传或游戏绘制。三张图的 366 个字形均逐像素相同。
 - Windows ZIP 已通过解压独立启动和管理器自检。69 项 Rust 库测试和使用 v30 IPA 的列表回归通过。MuMu Android 15 从 v17 覆盖安装 v18 后，首次启动前的存档 SHA-256 一致，39 项设备检查全部通过。
-- 两端均实测打开仓库「瞬间成熟」详情，显示完整三行正文和两个按钮。点「卖出」进入 10 金币确认框，取消后库存仍为 ×2。截图、设备测试输出及原存档还原校验在本机 `_analysis/dumps/ipa-v30/`。
+- 两端均实测打开仓库「瞬间成熟」详情，显示完整三行正文和两个按钮。点「卖出」进入 10 金币确认框，取消后库存仍为 ×2。
 
-## 上一版记录
+## v29 记录
 
 [v29fix-maintenance 源码](https://github.com/Ashena1017/zombie-farm-touchhle-cn/tree/v29fix-maintenance) 包含管理器设置保存、备份恢复、启动校验和高倍率合成修复。Android `versionCode` 为 17。两端共用带标题水印的 v29fix-notice IPA。
 
@@ -51,12 +62,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File windows\Initialize-Runtime.p
 
 ## 构建与核验
 
-以下命令从仓库根目录运行。当前 fork 基于上游 `fa3d09511d471f505e41abed7c535e4dfbd7c59c`。新环境需准备 Rust、CMake、平台工具链，以及 fork 的 `vendor/` 依赖。现有 Windows 增量脚本使用本机的 Visual Studio 2022 Community 和 `touchHLE/_build_tools/`。上游依赖布局见 [fork 的 .gitmodules](touchHLE/touchHLE-fork/.gitmodules)，本机补齐部分依赖的旧脚本见 [_restore_vendor.ps1](_analysis/_restore_vendor.ps1)。
+以下命令从仓库根目录运行。当前 fork 基于上游 `fa3d09511d471f505e41abed7c535e4dfbd7c59c`。新检出先用 Python 3.12 或更新版和 Git 运行 `python scripts/restore_vendor.py`，脚本按提交或 SHA-256 恢复六组原生依赖。已有 Boost 源码归档时可传 `--boost-archive <tar.gz>`。目标目录需为空，可用 `--vendor <目录>` 异地验证。本机已安装依赖的工作区可直接构建。[依赖来源与校验值](scripts/restore_vendor.py)
+
+2026-11-25 在独立检出中恢复完整原生依赖后，Windows x64 成功编译，便携包解压后进入游戏窗口，CPU 仿真运行 45 秒。Android ARM64 测试 APK 完成 43 项 Gradle 任务，通过包内 IPA、ABI、NDK 运行库、默认设置、应用 ID、版本和签名检查。新编译的 SDL 库使用 NDK 27 的非阻塞传感器轮询接口 `ALooper_pollOnce`。
 
 ### Windows x64
 
 1. 修改含中文的 PowerShell 脚本后，用 `scripts/_ensure_bom.ps1` 检查编码和语法，再执行管理器自检。
-2. 修改 Rust 后关闭本地游戏，运行增量构建。脚本将成功构建的 EXE 安装到 `run/windows/touchHLE/touchHLE.exe`。用其 SHA-256 更新 `windows/GameManager.ps1` 的 `$script:PinnedExeSha256`。
+2. 修改 Rust 后关闭本地游戏，运行增量构建。脚本识别已配置的 x64 开发者终端，或用 `vswhere` 查找带 C++ 工具链的 Visual Studio。也可用 `-VsDevCmd` 指定入口。成功构建的 EXE 安装到 `run/windows/touchHLE/touchHLE.exe`。确定用于 Windows 打包的 EXE 后，用其 SHA-256 更新 `windows/GameManager.ps1` 的 `$script:PinnedExeSha256`。
 3. 打包脚本使用 `windows/touchHLE_options.txt`、空 sandbox 和共用 IPA 生成便携 ZIP。它在临时目录核验 `SHA256SUMS.txt` 并启动解压后的游戏，验证通过后把 ZIP 写入 `dist/windows/`。说明书模板在打包脚本里。
 
 ```powershell
@@ -74,7 +87,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_verify_layout_match
 
 ### Android ARM64
 
-使用 JDK 17、Gradle 8.11.1、Android SDK Platform 31、NDK 27.2.12479018 和 Rust Android ARM64 工具链。本机用 `_build_android_local.ps1`，可通过 `-AndroidSdk`、`-Jdk` 和 `-Gradle` 指定工具路径。其他环境配置好工具链后可直接调用 `_build_android.ps1`。Gradle 读取 Windows 打包使用的同一份 `zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa`。
+使用 JDK 17、Gradle 8.11.1、Android SDK Platform 31、NDK 27.2.12479018 和 Rust Android ARM64 工具链。本机用 `_build_android_local.ps1`，可通过 `-AndroidSdk`、`-Jdk` 和 `-Gradle` 指定工具路径。其他环境配置好工具链后可直接调用 `_build_android.ps1`。Gradle 和 Windows 打包脚本共用 `release.json` 指定的内置 IPA。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_build_android_local.ps1
@@ -86,11 +99,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_verify_android_pack
 ### 准备发行
 
 1. 按改动选场景实测。菜单相关覆盖冷启动设置、帮助滚动与返回、头像页选择与返回。渲染相关记录 Android 设备、系统版本和 GPU，区分 MuMu 与真机结果。涉及共用适配时记录两端各自的验证范围。
-2. Windows ZIP 使用单一顶层目录，记录两端最终附件的大小和 SHA-256。更换 IPA 时同时核对 Windows 管理器的 `$script:PinnedIpaSha256`、两端的包内内容和标题水印。
+2. Windows ZIP 使用单一顶层目录，记录两端最终附件的大小和 SHA-256。更新[发行清单](release.json)中的 IPA 文件名、大小、哈希、版本和累计补丁参数，然后核对两端的包内内容、签名和标题水印。清单随新的 Windows 便携包分发。
 3. 使用个人 `git-hosting` 技能核对提交范围，并把 tag 指向与附件对应的源码提交。上传后回读校验两个资产，公开后核对 `releases/latest` 和 README 下载链接。发布证据的目录结构可参照 `_analysis/dumps/release-help-profile-20261121/`。
 
 ## 后续维护
 
-- 优先把本机 Windows 构建脚本中的 Visual Studio 路径、Android 快捷脚本中的工具链目录参数化，再在干净检出中验证依赖准备流程。
 - 保留两端最近一次实测的版本、设备与场景。Android 的界面或渲染修复尽量在报告问题的真机复测，尤其是昼夜 FBO、商店空文字纹理和列表裁剪。
 - 维护当前发行信息时更新本页和 README 下载区。历史根因与长日志按对应问题补进 `_analysis/reports/`，旧交接的编号继续用于查档。

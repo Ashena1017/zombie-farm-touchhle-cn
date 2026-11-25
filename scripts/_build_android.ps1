@@ -43,6 +43,16 @@ $sdkNinja = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'cmake') -Filter ninj
 if ($sdkNinja) {
     $env:Path = "$(Split-Path $sdkNinja.FullName);$env:Path"
 }
+if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+    if (Test-Path -LiteralPath $vswhere) {
+        $ninja = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.CMake.Project -find '**\CMake\Ninja\ninja.exe' | Select-Object -First 1
+        if ($ninja) { $env:Path = "$(Split-Path $ninja);$env:Path" }
+    }
+    if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {
+        throw 'Install Ninja on PATH or install CMake and Ninja using the Android SDK or Visual Studio installer.'
+    }
+}
 $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
 
 $forkRoot = Split-Path -Parent $androidProject
@@ -76,6 +86,9 @@ try {
         $assetPath = Join-Path $assetDir $name
         $linkText = [System.IO.File]::ReadAllText($assetPath).Trim()
         $targetPath = Join-Path $forkRoot $name
+        if ($name -eq 'touchHLE_default_options.txt') {
+            $targetPath = Join-Path $root 'touchHLE\touchHLE_default_options.txt'
+        }
         $expectedLink = "../../../../../$name/"
         if ($linkText -eq $expectedLink -or $linkText -eq $expectedLink.TrimEnd('/')) {
             if (-not (Test-Path -LiteralPath $targetPath)) {

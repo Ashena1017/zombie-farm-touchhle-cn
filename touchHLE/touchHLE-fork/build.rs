@@ -16,6 +16,35 @@ pub fn main() {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let package_root = Path::new(env!("CARGO_MANIFEST_DIR"));
 
+    let manifest_path = package_root.join("../../release.json");
+    rerun_if_changed(&manifest_path);
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).expect("read release.json"))
+            .expect("parse release.json");
+    let name = if std::env::var("CARGO_CFG_TARGET_OS").unwrap() == "android" {
+        &manifest["android"]["installedIpaName"]
+    } else {
+        &manifest["ipa"]["name"]
+    };
+    let name = name.as_str().expect("bundled IPA filename in release.json");
+    let size = manifest["ipa"]["size"]
+        .as_u64()
+        .expect("IPA byte size in release.json");
+    let hash = manifest["ipa"]["sha256"]
+        .as_str()
+        .expect("IPA SHA-256 in release.json")
+        .to_ascii_lowercase();
+    assert!(hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit()));
+    std::fs::write(
+        out_dir.join("zfr_release.rs"),
+        format!(
+            "pub(crate) const OFFICIAL_IPA_NAME: &str = {name:?};\n\
+             #[cfg(not(target_os = \"android\"))] const OFFICIAL_IPA_SIZE: u64 = {size};\n\
+             #[cfg(not(target_os = \"android\"))] const OFFICIAL_IPA_SHA256: &str = {hash:?};\n"
+        ),
+    )
+    .unwrap();
+
     // Generate a list of dependencies with license and author information.
     // This is used in license.rs
 

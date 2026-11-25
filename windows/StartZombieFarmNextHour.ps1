@@ -17,7 +17,8 @@ $hleRoot = $paths.Emulator
 $env:PATH = "$PSScriptRoot;$env:PATH"
 
 $offsetFile = Join-Path $hleRoot 'touchHLE_time_offset_seconds.txt'
-$game = Join-Path $paths.Ipa 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
+$releaseInfo = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'release.json') | ConvertFrom-Json
+$game = Join-Path $paths.Ipa $releaseInfo.ipa.name
 $touchHLE = Join-Path $hleRoot 'touchHLE.exe'
 
 if ($Reset -and $NoSkip) {

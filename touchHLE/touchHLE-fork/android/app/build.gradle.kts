@@ -7,7 +7,7 @@
  * has a different license. Please see vendor/SDL/LICENSE.txt for details.
  */
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
-import org.gradle.api.tasks.Copy
+import groovy.json.JsonSlurper
 import java.security.MessageDigest
 
 plugins {
@@ -16,23 +16,12 @@ plugins {
     id("org.jetbrains.kotlin.android") version("2.0.21")
 }
 
-fun runTouchHLEVersionTool(wantBranding: Boolean): String {
+fun getTouchHLEBranding(): String {
     val output = providers.exec {
-        commandLine("cargo", "run", "--package", "touchHLE_version")
-        if (wantBranding) {
-            args("--", "--branding")
-        }
+        commandLine("cargo", "run", "--package", "touchHLE_version", "--", "--branding")
     }.standardOutput.asText.get().trim()
 
     return output
-}
-
-fun getTouchHLEBranding(): String {
-    return runTouchHLEVersionTool(/* wantBranding: */ true)
-}
-
-fun getTouchHLEVersionName(): String {
-    return runTouchHLEVersionTool(/* wantBranding: */ false)
 }
 
 fun join(prefix: String, separator: String, branding: String): String {
@@ -43,22 +32,35 @@ fun env(name: String): String? {
     return System.getenv(name)?.takeIf { it.isNotBlank() }
 }
 
-val bundledZombieFarmIpa = rootDir.parentFile.parentFile.parentFile.resolve(
-    "zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa"
-)
+val repositoryRoot = rootDir.parentFile.parentFile.parentFile
+val releaseInfo = JsonSlurper().parse(repositoryRoot.resolve("release.json"), "UTF-8") as Map<*, *>
+val ipaInfo = releaseInfo["ipa"] as Map<*, *>
+val androidInfo = releaseInfo["android"] as Map<*, *>
+val bundledZombieFarmIpa = repositoryRoot.resolve("zombie_farm_ipa").resolve(ipaInfo["name"] as String)
+val bundledIpaHash = ipaInfo["sha256"] as String
+val installedIpaName = androidInfo["installedIpaName"] as String
 val generatedZombieFarmAssets = layout.buildDirectory.dir("generated/zombieFarmAssets")
-val bundleZombieFarmIpa = tasks.register<Copy>("bundleZombieFarmIpa") {
-    from(bundledZombieFarmIpa)
-    into(generatedZombieFarmAssets)
-    // Keep the installed filename so existing selections update in place.
-    rename { "Zombie_Farm_v29fix.ipa" }
-    outputs.file(generatedZombieFarmAssets.map { it.file("touchHLE_zombiefarm_ipa.sha256") })
+val bundleZombieFarmIpa = tasks.register("bundleZombieFarmIpa") {
+    val expectedSize = (ipaInfo["size"] as Number).toLong()
+    inputs.file(bundledZombieFarmIpa)
+    inputs.property("ipaSha256", bundledIpaHash)
+    inputs.property("ipaSize", expectedSize)
+    inputs.property("installedIpaName", installedIpaName)
+    outputs.dir(generatedZombieFarmAssets)
     doLast {
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(bundledZombieFarmIpa.readBytes())
+        val ipa = bundledZombieFarmIpa.readBytes()
+        val digest = MessageDigest.getInstance("SHA-256").digest(ipa)
             .joinToString("") { "%02x".format(it) }
-        generatedZombieFarmAssets.get().file("touchHLE_zombiefarm_ipa.sha256")
-            .asFile.writeText(digest)
+        check(ipa.size.toLong() == expectedSize && digest == bundledIpaHash) {
+            "Bundled IPA differs from release.json: ${bundledZombieFarmIpa.name}, SHA-256 $digest"
+        }
+        val dest = generatedZombieFarmAssets.get().asFile
+        dest.mkdirs()
+        // A renamed built-in must not leave another playable IPA in the merged APK assets.
+        dest.listFiles { file -> file.isFile && file.extension.equals("ipa", true) && file.name != installedIpaName }
+            ?.forEach { check(it.delete()) { "Could not remove stale generated asset: ${it.name}" } }
+        dest.resolve(installedIpaName).writeBytes(ipa)
+        dest.resolve("touchHLE_zombiefarm_ipa.sha256").writeText(digest)
     }
 }
 
@@ -88,7 +90,7 @@ android {
         // 7: the statement now appears on every launch, plus the QQ group.
         // 8: launching any IPA is allowed again; only the bundled one is watched.
         // 12: empty Cocos text textures keep zero layout with transparent backing.
-        versionCode = 18
+        versionCode = (androidInfo["versionCode"] as Number).toInt()
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }
@@ -96,7 +98,9 @@ android {
         buildConfigField("String", "APP_NAME", "\"${join("Zombie Farm 游戏管理", " ", branding)}\"")
         manifestPlaceholders["icon"] = "@drawable/zombie_farm_icon"
         buildConfigField("int", "APP_ICON", "org.touchhle.android.R.drawable.zombie_farm_icon")
-        versionName = join(getTouchHLEVersionName(), " ", branding)
+        versionName = join(releaseInfo["tag"] as String, " ", branding)
+        buildConfigField("String", "BUNDLED_IPA_NAME", "\"$installedIpaName\"")
+        buildConfigField("String", "BUNDLED_IPA_SHA256", "\"$bundledIpaHash\"")
 
         minSdk = 21 // first version with AArch64
         targetSdk = 31
@@ -199,6 +203,7 @@ cargoNdk {
     extraCargoEnv = mapOf(
         "ANDROID_NDK" to android.ndkDirectory.toString(),
         "ANDROID_NDK_HOME" to android.ndkDirectory.toString(),
+        "SDL2_TOOLCHAIN" to rootProject.file("sdl2/ndk-compat.cmake").absolutePath,
     )
 
     if (DefaultNativePlatform.host().operatingSystem.isWindows) {

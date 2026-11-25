@@ -9,7 +9,9 @@ $windowsDir = Join-Path $Root 'windows'
 $hleRoot = Join-Path $Root 'run\windows\touchHLE'
 $outputDir = Join-Path $Root 'dist\windows'
 $outputName = 'zombie-farm-windows-x64'
-$ipaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
+$manifestPath = Join-Path $Root 'release.json'
+$releaseInfo = Get-Content -Raw -Encoding UTF8 -LiteralPath $manifestPath | ConvertFrom-Json
+$ipaName = $releaseInfo.ipa.name
 
 function Log([string]$message) { Write-Host $message }
 
@@ -54,6 +56,7 @@ try {
         Copy-Item -LiteralPath $src -Destination $release
         Log ("  {0,-30} {1,12:N0} B" -f $f, (Get-Item -LiteralPath $src).Length)
     }
+    Copy-Item -LiteralPath $manifestPath -Destination $release
     Log '  (GameManager.ps1 is required: the .exe is only a stub that runs it)'
 
     # --- the non-system DLLs the exe actually imports ---------------------------
@@ -302,7 +305,7 @@ try {
   <tr><td>校验.bat</td><td>双击核对文件有没有被改过（用系统自带的 certutil，不联网、不改文件）</td></tr>
   <tr><td>SHA256SUMS.txt</td><td>包内每个文件的 SHA-256，可手动或脚本核对</td></tr>
 </table>
-<p>想换游戏版本，就把别的 <code>.ipa</code> 放进 <code>zombie_farm_ipa\</code>，然后在管理器的「游戏版本 (IPA)」里选。</p>
+<p>想换游戏版本，可以把其他 <code>.ipa</code> 加进 <code>zombie_farm_ipa\</code>，在管理器的「游戏版本 (IPA)」里选择。请保留原有的内置 IPA。它缺失或内容发生变化时，管理器会提示安装包可能是改版。</p>
 
 <h2>四、想跳过游戏时间</h2>
 <p>游戏页显示当前模拟时间。点「启动并跳过时间…」，分别填小时和分钟（例如 6 小时 15 分），确认预览显示的快进后时间，再启动游戏。快进会累加，下次启动继续使用累计值。</p>
@@ -369,19 +372,16 @@ try {
     Log '  licenses copied'
 
     # --- fingerprints -----------------------------------------------------------
-    # The manager pins the SHA-256 of touchHLE.exe and of the bundled IPA, and
-    # touchHLE refuses to run a mismatched IPA. Those constants are edited by hand,
-    # so a rebuild that forgets one would ship a bundle that argues with itself:
-    # every player sees a red 文件校验 line and the game does not start. Fail here
-    # instead, where the cause is obvious.
+    # Check the staged files against the same pins the bundled manager reads.
     Log ''
     Log '--- pinned hashes (GameManager.ps1 vs the files being packaged) ---'
     & (Join-Path $PSScriptRoot '_check_pinned_hashes.ps1') `
         -ManagerPath (Join-Path $release 'GameManager.ps1') `
+        -RequireManagerPins -ManifestPath (Join-Path $release 'release.json') `
         -ExePath (Join-Path $hleDir 'touchHLE.exe') `
         -IpaPath (Join-Path (Join-Path $release 'zombie_farm_ipa') $ipaName)
     if ($LASTEXITCODE -ne 0) {
-        throw 'the bundle does not match the hashes pinned in GameManager.ps1; fix the constants and retry'
+        throw 'The staged files do not match the pinned executable and release IPA.'
     }
 
     . (Join-Path $PSScriptRoot '_file_hash.ps1')
@@ -393,15 +393,14 @@ try {
     # script hashes the files itself with certutil, which ships with Windows, and
     # says which ones do not match.
     #
-    # Written as GBK, not UTF-8: cmd.exe decodes a .bat file with the OEM code page,
-    # so a UTF-8 batch file full of Chinese renders as mojibake on a zh-CN system.
-    # The verdict tokens are ASCII on purpose -- they stay readable either way.
+    # Switch code pages on an ASCII line before cmd.exe reads the Unicode IPA name.
     Log ''
     Log '--- 校验.bat ---'
     $checkTargets = @(
         @{ Rel = 'touchHLE\touchHLE.exe';                 File = (Join-Path $hleDir 'touchHLE.exe') },
         @{ Rel = ('zombie_farm_ipa\' + $ipaName);         File = (Join-Path (Join-Path $release 'zombie_farm_ipa') $ipaName) },
         @{ Rel = 'GameManager.ps1';                       File = (Join-Path $release 'GameManager.ps1') },
+        @{ Rel = 'release.json';                          File = (Join-Path $release 'release.json') },
         @{ Rel = '游戏管理.exe';                          File = (Join-Path $release '游戏管理.exe') },
         @{ Rel = '请勿购买.txt';                          File = (Join-Path $release '请勿购买.txt') }
     )
@@ -409,7 +408,7 @@ try {
     $bat = New-Object System.Collections.Generic.List[string]
     foreach ($line in @(
         '@echo off',
-        'chcp 936 >nul',
+        'chcp 65001 >nul',
         'setlocal enabledelayedexpansion',
         'cd /d "%~dp0"',
         'set "FAILS=0"',
@@ -460,7 +459,7 @@ try {
     )) { $bat.Add($line) }
 
     [System.IO.File]::WriteAllLines((Join-Path $release '校验.bat'), $bat,
-        [System.Text.Encoding]::GetEncoding(936))
+        (New-Object System.Text.UTF8Encoding($false)))
     Log ("  {0,-30} {1,12:N0} B" -f '校验.bat', (Get-Item -LiteralPath (Join-Path $release '校验.bat')).Length)
 
     # --- SHA256SUMS.txt ---------------------------------------------------------

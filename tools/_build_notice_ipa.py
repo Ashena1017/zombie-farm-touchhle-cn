@@ -4,59 +4,106 @@ Every other member is written back with its original content, order, compression
 method and timestamp, and is verified byte-identical afterwards.  The Mach-O
 executable hash is unchanged, so the notice layer is the only difference.
 
-Run _make_notice_texture.py first.
+Run _make_notice_texture.py first. For a different notice, pass both
+--texture <png> and --output <new.ipa>.
 """
+import argparse
 import datetime
 import hashlib
 import json
 import os
+from pathlib import Path
 import tempfile
 import zipfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-IPADIR = os.path.join(ROOT, "zombie_farm_ipa")
+ROOT = Path(__file__).resolve().parents[1]
+IPADIR = ROOT / "zombie_farm_ipa"
 
 BASE = "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa"
 OUT = "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa"
+BASE_SHA256 = "E5951F945D23E88F25D0D1E7DC84E39AB524C566E28460173600BA05423C9DED"
+OUT_SHA256 = "7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC"
 MEMBER = "Payload/ZFR.app/MainMenuBG.png"
 EXE = "Payload/ZFR.app/ZFR"
-TEXTURE = os.path.join(ROOT, "_analysis", "dumps", "release-assets", "MainMenuBG.notice.png")
+TEXTURE = ROOT / "_analysis" / "dumps" / "release-assets" / "MainMenuBG.notice.png"
 
 
 def sha256_bytes(b):
     return hashlib.sha256(b).hexdigest().upper()
 
 
-def sha256_file(p):
+def sha256_stream(stream):
     h = hashlib.sha256()
-    with open(p, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
+    for chunk in iter(lambda: stream.read(1 << 20), b""):
+        h.update(chunk)
     return h.hexdigest().upper()
 
 
-def main():
-    src = os.path.join(IPADIR, BASE)
-    dst = os.path.join(IPADIR, OUT)
-    report_name = OUT.replace(".ipa", ".report.json")
-    with open(TEXTURE, "rb") as f:
-        png = f.read()
-    print("texture", len(png), sha256_bytes(png))
+def sha256_file(p):
+    with open(p, "rb") as stream:
+        return sha256_stream(stream)
 
-    with tempfile.TemporaryDirectory(prefix=".notice-build-", dir=IPADIR) as stage:
-        candidate = os.path.join(stage, OUT)
-        candidate_report = os.path.join(stage, report_name)
-        report = build_candidate(src, candidate, png)
+
+def check_existing_ipa(path, report):
+    if sha256_file(path) != report["output"]["sha256"]:
+        raise ValueError(f"existing IPA differs: {path}; choose another --output")
+
+
+def check_existing_report(path, report):
+    with path.open(encoding="utf-8-sig") as stream:
+        existing = json.load(stream)
+    # An identical build keeps the original report, including its timestamp.
+    if (not isinstance(existing, dict) or not isinstance(existing.get("generated"), str)
+            or existing != {**report, "generated": existing["generated"]}):
+        raise ValueError(f"existing report differs: {path}; choose another --output")
+
+
+def install_missing(candidate, path, check_existing, report):
+    try:
+        if os.name == "nt":
+            candidate.rename(path)
+        else:
+            os.link(candidate, path)
+    except FileExistsError:
+        check_existing(path, report)
+
+
+def build(src, texture, dst):
+    report_path = dst.with_suffix(".report.json")
+    if dst.suffix.lower() != ".ipa" or {src.resolve(), texture.resolve()} & {
+        dst.resolve(), report_path.resolve()
+    }:
+        raise ValueError("--output must be a separate .ipa file")
+    png = texture.read_bytes()
+    if not png.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise ValueError("expected a PNG notice texture")
+
+    with tempfile.TemporaryDirectory(prefix=".notice-build-", dir=dst.parent) as stage:
+        candidate = Path(stage) / dst.name
+        candidate_report = Path(stage) / report_path.name
+        with src.open("rb") as source:
+            if sha256_stream(source) != BASE_SHA256:
+                raise ValueError("expected the original v29fix IPA as input")
+            source.seek(0)
+            report = build_candidate(source, candidate, png)
+        if dst.name.casefold() == OUT.casefold() and report["output"]["sha256"] != OUT_SHA256:
+            raise ValueError("build differs from the historical v29fix-notice IPA; choose another --output")
         with open(candidate_report, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
             f.write("\n")
-        os.replace(candidate, dst)
-        os.replace(candidate_report, os.path.join(IPADIR, report_name))
-
-    print("wrote", os.path.join(IPADIR, report_name))
-    print("size", report["output"]["size"], "sha256", report["output"]["sha256"])
-    print("exe", report["output"]["executable_sha256"], "(unchanged)")
+        # Check both before publishing either. Publish the verified IPA first
+        # so an interrupted run can fill in its missing report on the next run.
+        files = ((candidate, dst, check_existing_ipa),
+                 (candidate_report, report_path, check_existing_report))
+        missing = []
+        for staged, path, check_existing in files:
+            if path.exists():
+                check_existing(path, report)
+            else:
+                missing.append((staged, path, check_existing))
+        for staged, path, check_existing in missing:
+            install_missing(staged, path, check_existing, report)
+    return report
 
 
 def build_candidate(src, dst, png):
@@ -99,7 +146,6 @@ def build_candidate(src, dst, png):
         if sha256_bytes(z.read(MEMBER)) != sha256_bytes(png):
             raise SystemExit("texture did not round-trip")
 
-    src_sha = sha256_file(src)
     dst_sha = sha256_file(dst)
     return {
         "generated": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -121,14 +167,28 @@ def build_candidate(src, dst, png):
         ],
         "member_count": len(before),
         "other_members_unchanged": len(before) - 1,
-        "input": {"name": BASE, "size": os.path.getsize(src), "sha256": src_sha},
+        "input": {"name": BASE, "size": os.fstat(src.fileno()).st_size, "sha256": BASE_SHA256},
         "output": {
-            "name": OUT,
+            "name": dst.name,
             "size": os.path.getsize(dst),
             "sha256": dst_sha,
             "executable_sha256": before[EXE].upper(),
         },
     }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input", type=Path, default=IPADIR / BASE)
+    parser.add_argument("--texture", type=Path, default=TEXTURE)
+    parser.add_argument("--output", type=Path, default=IPADIR / OUT)
+    args = parser.parse_args()
+    try:
+        report = build(args.input, args.texture, args.output)
+    except (OSError, ValueError, zipfile.BadZipFile) as error:
+        parser.exit(1, f"error: {error}\n")
+    print(f"{args.output}  {report['output']['size']:,} bytes  SHA-256 {report['output']['sha256']}")
+    print(f"report: {args.output.with_suffix('.report.json')}")
 
 
 if __name__ == "__main__":

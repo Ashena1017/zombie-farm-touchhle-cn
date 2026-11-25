@@ -32,10 +32,11 @@ public class MainActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        String bundledWarning = null;
         try {
             ZfStorage storage = new ZfStorage(this);
             gameLease = storage.lock();
-            storage.ensureBundled();
+            bundledWarning = storage.ensureBundled();
             ZfIpa ipa = storage.selected();
             JSONObject settings = storage.settings(ipa.appId);
             android.system.Os.setenv("TOUCHHLE_TIME_OFFSET_SECONDS",
@@ -47,13 +48,15 @@ public class MainActivity extends SDLActivity {
                 "--scale-hack=" + ZfStorage.validScaleOrDefault(settings.optString("scale", ZfStorage.DEFAULT_SCALE)),
                 "--fps-limit=" + settings.optString("fps", "60")};
         } catch (Exception e) {
-            Toast.makeText(this, "无法启动：" + e.getMessage(), Toast.LENGTH_LONG).show();
+            String detail = bundledWarning == null ? "" : bundledWarning + "你拿到的可能是改版。\n";
+            Toast.makeText(this, detail + "无法启动：" + e.getMessage(), Toast.LENGTH_LONG).show();
             super.onCreate(savedInstanceState);
             finish();
             return;
         }
         super.onCreate(savedInstanceState);
         hideSystemBars();
+        if (bundledWarning != null) ManagerActivity.showBundledWarning(this, bundledWarning);
     }
 
     @Override

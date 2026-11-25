@@ -54,6 +54,7 @@ public class ManagerActivity extends Activity {
     private List<ZfIpa> versions = new ArrayList<>();
     private List<File> backups = new ArrayList<>();
     private ZfIpa selected;
+    private String bundledWarning;
     private JSONObject settings = new JSONObject();
     private ZfSave currency;
     private String saveMessage = "还没有存档，请先进入游戏";
@@ -169,22 +170,31 @@ public class ManagerActivity extends Activity {
         busy = true; render();
         worker.execute(() -> {
             Exception failure = null;
+            String warning = bundledWarning;
             try {
                 if (install && !storage.gameRunning()) {
-                    try (ZfStorage.Lease ignored = storage.lock()) { storage.prepareBundled(); }
+                    try (ZfStorage.Lease ignored = storage.lock()) { warning = storage.ensureBundled(); }
                 }
-                versions = storage.versions(); selected = storage.selected(); settings = storage.settings(selected.appId);
+                versions = storage.versions();
+                selected = versions.isEmpty() ? null : storage.selected();
                 running = storage.gameRunning(); currency = null;
-                if (!running) {
-                    try { currency = storage.currency(selected.appId); saveMessage = "当前存档已校验"; }
-                    catch (Exception e) { saveMessage = storage.live(selected.appId).exists() ? e.getMessage() : "还没有存档，请先进入游戏"; }
-                } else saveMessage = "游戏运行中，退出后可管理存档";
-                backups = storage.backups(selected.appId);
+                if (selected != null) {
+                    settings = storage.settings(selected.appId);
+                    if (!running) {
+                        try { currency = storage.currency(selected.appId); saveMessage = "当前存档已校验"; }
+                        catch (Exception e) { saveMessage = storage.live(selected.appId).exists() ? e.getMessage() : "还没有存档，请先进入游戏"; }
+                    } else saveMessage = "游戏运行中，退出后可管理存档";
+                    backups = storage.backups(selected.appId);
+                }
             } catch (Exception e) { failure = e; }
             final Exception problem = failure;
+            final String checkedWarning = warning;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
+                boolean notify = checkedWarning != null && !checkedWarning.equals(bundledWarning);
+                bundledWarning = checkedWarning;
                 busy = false; render(); if (problem != null) error(problem);
+                if (notify) showBundledWarning(this, checkedWarning);
             });
         });
     }
@@ -279,7 +289,14 @@ public class ManagerActivity extends Activity {
         footer.setOnClickListener(v -> showProjectNotice(false));
         shell.addView(footer, new LinearLayout.LayoutParams(-1, -2));
         setContentView(shell);
-        if (selected == null) { card("正在准备游戏", "首次打开会安装内置中文版，请稍候。"); return; }
+        if (selected == null) {
+            if (busy || bundledWarning == null) card("正在准备游戏", "首次打开会安装内置中文版，请稍候。");
+            else {
+                LinearLayout empty = card("没有可用的游戏版本", bundledWarning);
+                addButton(empty, button("导入 IPA", false, () -> chooseFile(IMPORT_IPA)));
+            }
+            return;
+        }
         if (page == 0) gamePage(); else if (page == 1) settingsPage(); else savePage();
     }
     private Spinner spinner(String[] values) {
@@ -647,6 +664,13 @@ public class ManagerActivity extends Activity {
             .setPositiveButton("知道了", null).show();
     }
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_LONG).show(); }
+
+    static void showBundledWarning(Activity activity, String detail) {
+        new AlertDialog.Builder(activity)
+            .setTitle("内置 IPA 校验提醒")
+            .setMessage(detail + "\n\n你拿到的可能是改版。项目正式版可从以下地址免费下载。\n" + PROJECT_URL)
+            .setPositiveButton("知道了", null).show();
+    }
 
     // --- free / open-source statement --------------------------------------
 

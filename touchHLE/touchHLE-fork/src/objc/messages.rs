@@ -435,6 +435,9 @@ fn objc_msgSend_inner(
                 }
                 log_dbg!("Found method on: {}", name);
                 let zombie_farm_bundle = zombie_farm_uses_playforge_bundle(env);
+                let zfr_about = selector_name == "aboutTapped" && name == "OptionsMenu"
+                    && env.bundle.bundle_identifier() == "com.playforge.ZombieFarm.ZFR"
+                    && env.bundle.bundle_version() == "1.0";
                 let zombie_farm_debug_enabled =
                     zombie_farm_bundle && crate::zombie_farm_debug::enabled();
                 let zombie_farm_scroll_profile_enabled =
@@ -701,7 +704,13 @@ Type mismatch when sending message {} to {:?}!
                         // We can't create a new stack frame, because that would
                         // interfere with pass-through of stack arguments.
                         IMP::Guest(guest_imp) => {
-                            super::zombie_farm_scheduler::call_guest_imp(env, orig_class, guest_imp)
+                            let previous = zfr_about.then(|| {
+                                env.objc.zfr_about_presenter.replace((env.current_thread, receiver))
+                            });
+                            super::zombie_farm_scheduler::call_guest_imp(env, orig_class, guest_imp);
+                            if let Some(previous) = previous {
+                                env.objc.zfr_about_presenter = previous;
+                            }
                         }
                     }
                 }

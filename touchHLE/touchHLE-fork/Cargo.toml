@@ -87,6 +87,7 @@ rusqlite = { version = "0.32.1", features = ["bundled"] }
 
 [build-dependencies]
 cargo-license = "0.5.1"
+serde_json = "1.0"
 cc = { workspace = true }
 cmake = { workspace = true }
 gl_generator = { workspace = true }

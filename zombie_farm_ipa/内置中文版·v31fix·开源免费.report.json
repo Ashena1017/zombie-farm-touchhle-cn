@@ -1,0 +1,21 @@
+{
+  "tool": "patch_zfr_v31.py",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa",
+    "size": 59560883,
+    "sha256": "9c7a4cbafe0b7636b541f9d8f7d40bc7f0dcdd33c3440beba3fc3c731b718339"
+  },
+  "output": {
+    "name": "内置中文版·v31fix·开源免费.ipa",
+    "size": 59565719,
+    "sha256": "cfa750f4cba8d5acf0923c595ca3c257b0617c2cafed7d4ee08f4bc37d689e65"
+  },
+  "launch_notice": "本整合版免费 · 请勿购买",
+  "members": {
+    "Payload/ZFR.app/Default.png": {
+      "before": "719503887f84362959b8fd6b2aec4303d4799c2b21f295aec2925d1ce9e4be5f",
+      "after": "df7dd9e486f8508da9ccd0d2bde86927958113f896f53696ea105cec27dbaace"
+    }
+  },
+  "other_members_unchanged": 1085
+}

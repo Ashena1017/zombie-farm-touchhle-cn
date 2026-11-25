@@ -218,16 +218,13 @@ pub fn prepopulate_user_data_dir() {
 
     let apps_dir_readme = apps_dir.join("README.txt");
     if !apps_dir_readme.is_file() {
-        let content = include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/touchHLE_apps/README.txt"
-        ));
+        let content = include_str!("../res/templates/apps-readme.txt");
         create_file(&apps_dir_readme, content);
     }
 
     let user_options = base_path.join(USER_OPTIONS_FILE);
     if !user_options.is_file() {
-        let content = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/touchHLE_options.txt"));
+        let content = include_str!("../res/templates/user-options.txt");
         create_file(&user_options, content);
     }
 
@@ -239,7 +236,7 @@ pub fn prepopulate_user_data_dir() {
 
 #[cfg(target_os = "android")]
 fn install_bundled_zfr_ipa(apps_dir: &Path) {
-    const ASSET_NAME: &str = "Zombie_Farm_v29fix.ipa";
+    use crate::zfr_integrity::OFFICIAL_IPA_NAME as ASSET_NAME;
     const HASH_ASSET_NAME: &str = "touchHLE_zombiefarm_ipa.sha256";
     let destination = apps_dir.join(ASSET_NAME);
     let temporary = apps_dir.join(format!("{ASSET_NAME}.tmp"));
