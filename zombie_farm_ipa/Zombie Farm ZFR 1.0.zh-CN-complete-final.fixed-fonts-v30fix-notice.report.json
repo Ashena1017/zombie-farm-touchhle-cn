@@ -1,0 +1,36 @@
+{
+  "tool": "patch_zfr_v30.py",
+  "input": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa",
+    "sha256": "7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC"
+  },
+  "output": {
+    "name": "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa",
+    "size": 59560883,
+    "sha256": "9C7A4CBAFE0B7636B541F9D8F7D40BC7F0DCDD33C3440BEBA3FC3C731B718339"
+  },
+  "members": {
+    "Payload/ZFR.app/ABD26.fnt": "580A8A893B73D53A54660B3068209C9D0B0B59B7FA5F48827B878691B66B785A",
+    "Payload/ZFR.app/ABD26.png": "FA0A56F6B96FB7678B0C1DCFA5861C3A5AD313CCA7E0FAEA2EF377EDEE9DB875",
+    "Payload/ZFR.app/ATWBD26.fnt": "B18E0885068F78007833507E1E3844D76A1376420FE7E7A2AE96E26189F6D6F1",
+    "Payload/ZFR.app/ATWBD26.png": "E1F119D690A596B21EC4F07D43999349CC145342713FBE61A0682ED15CB79C4A",
+    "Payload/ZFR.app/ATWBO26.fnt": "3EEF53E8ABF90CE25F6AD157F77BC99FCB33193DF2B0B4F1E52132623662BC48",
+    "Payload/ZFR.app/ATWBO26.png": "8196950054B1AFDC407C287B73DBDF33EF22E3F8B0C68D2EFAB47C636DDFE5A3",
+    "Payload/ZFR.app/ZFR": "107F7AF4B9087530F7E8C4F7873B7DE92DB5257089073413F92301E32268C56D"
+  },
+  "font_atlas_dimensions": {
+    "before": [
+      2048,
+      2048
+    ],
+    "after": [
+      2048,
+      64
+    ],
+    "glyphs_per_atlas": 122
+  },
+  "removed_duplicate_body_call": {
+    "sub6": "0x1b500",
+    "sub9": "0x14fe4"
+  }
+}

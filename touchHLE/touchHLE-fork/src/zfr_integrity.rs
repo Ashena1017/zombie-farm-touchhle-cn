@@ -27,12 +27,12 @@ use std::path::PathBuf;
 /// Android 侧的资产名被 `ZfStorage` / `ZfIpa` 按文件名匹配，是冻结的短名。
 #[cfg(not(target_os = "android"))]
 const OFFICIAL_IPA_NAME: &str =
-    "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa";
+    "Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa";
 #[cfg(target_os = "android")]
 const OFFICIAL_IPA_NAME: &str = "Zombie_Farm_v29fix.ipa";
 
 /// 官方 IPA 的字节数。只比大小、不读内容 —— 这一道只管「还在不在」。
-const OFFICIAL_IPA_SIZE: u64 = 59_570_028;
+const OFFICIAL_IPA_SIZE: u64 = 59_560_883;
 
 pub const PROJECT_URL: &str = "https://github.com/Ashena1017/zombie-farm-touchhle-cn";
 

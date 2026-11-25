@@ -9,7 +9,7 @@ $windowsDir = Join-Path $Root 'windows'
 $hleRoot = Join-Path $Root 'run\windows\touchHLE'
 $outputDir = Join-Path $Root 'dist\windows'
 $outputName = 'zombie-farm-windows-x64'
-$ipaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
+$ipaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
 
 function Log([string]$message) { Write-Host $message }
 

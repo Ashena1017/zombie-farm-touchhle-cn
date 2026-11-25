@@ -7,8 +7,7 @@
 //! filesystem.
 use crate::fs::{FsNode, GuestPath};
 use crate::libc::time::{calendar_date_to_timestamp, time_t, tm};
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::cell::{OnceCell, RefCell};
 use std::fmt::Debug;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
@@ -146,8 +145,6 @@ impl BundleData {
             BundleData::HostDirectory(path) => FsNode::from_host_dir(&path, false),
             BundleData::Zip { zip, bundle_path } => {
                 let archive = Rc::new(RefCell::new(zip));
-                let archive_cache = Rc::new(RefCell::new(HashMap::new()));
-                let metadata_map = Rc::new(RefCell::new(HashMap::new()));
 
                 let mut archive_guard = (*archive).borrow_mut();
 
@@ -164,9 +161,10 @@ impl BundleData {
                                 path,
                                 FsNode::bundle_zip_file(IpaFileRef {
                                     archive: archive.clone(),
-                                    archive_files_cache: archive_cache.clone(),
-                                    metadata_map: metadata_map.clone(),
                                     index: i,
+                                    size: file.size(),
+                                    modified: file.last_modified(),
+                                    contents: OnceCell::new(),
                                 }),
                             );
                         }
@@ -197,14 +195,6 @@ impl BundleData {
     }
 }
 
-#[derive(Debug)]
-struct ArchivedFileMetadata {
-    /// Unix timestamp of file modification
-    last_modified: i64,
-    /// Uncompressed file size
-    size: u64,
-}
-
 /// Shared (refcounted) copy of the decompressed version of a file in an IPA.
 ///
 /// Seeking in compressed files is hard, so the simple solution is to read the
@@ -216,9 +206,10 @@ type DecompressedFile = Rc<[u8]>;
 #[derive(Debug)]
 pub struct IpaFileRef {
     archive: Rc<RefCell<ZipArchive<std::fs::File>>>,
-    archive_files_cache: Rc<RefCell<HashMap<usize, DecompressedFile>>>,
-    metadata_map: Rc<RefCell<HashMap<usize, ArchivedFileMetadata>>>,
     index: usize,
+    size: u64,
+    modified: zip::DateTime,
+    contents: OnceCell<DecompressedFile>,
 }
 
 impl IpaFileRef {
@@ -229,8 +220,7 @@ impl IpaFileRef {
         // done each time, which is extremely slow.
         // The solution here is to cache unzipped data in memory, which should
         // be OK as early iOS IPA files are relatively small in size.
-        let mut archive_cache = (*self.archive_files_cache).borrow_mut();
-        archive_cache.entry(self.index).or_insert_with(|| {
+        let contents = self.contents.get_or_init(|| {
             let mut archive = (*self.archive).borrow_mut();
             let mut file = match archive.by_index(self.index) {
                 Ok(file) => file,
@@ -243,59 +233,28 @@ impl IpaFileRef {
                 // always have a valid index
                 Err(e) => panic!("BUG: could not open file from IPA bundle: {e}"),
             };
-            let mut metadata_map = (*self.metadata_map).borrow_mut();
-            assert!(!metadata_map.contains_key(&self.index));
-            let modified = file.last_modified();
-            // This is not the cleanest way!
-            // TODO: just use `time` or `chrono` crates for time conversions
-            // (this also entails a lot of refactoring in [crate::libc:time])
-            let tm = tm::from(
-                modified.year(),
-                modified.month(),
-                modified.day(),
-                modified.hour(),
-                modified.minute(),
-                modified.second(),
-            );
-            let timestamp = calendar_date_to_timestamp(tm);
-            metadata_map.insert(
-                self.index,
-                ArchivedFileMetadata {
-                    last_modified: timestamp.into(),
-                    size: file.size(),
-                },
-            );
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).unwrap();
             Rc::from(buf)
         });
-        let cached_file = Rc::clone(archive_cache.get(&self.index).unwrap());
         IpaFile {
-            file: Cursor::new(cached_file),
+            file: Cursor::new(Rc::clone(contents)),
         }
     }
 
     pub fn get_last_modified(&self) -> time_t {
-        if !self.metadata_map.borrow().contains_key(&self.index) {
-            // This will force metadata loading
-            // TODO: get metadata without reading the file
-            _ = self.open();
-        }
-        self.metadata_map
-            .borrow()
-            .get(&self.index)
-            .unwrap()
-            .last_modified
-            .try_into()
-            .unwrap()
+        let date = self.modified;
+        calendar_date_to_timestamp(tm::from(
+            date.year(),
+            date.month(),
+            date.day(),
+            date.hour(),
+            date.minute(),
+            date.second(),
+        ))
     }
     pub fn get_size(&self) -> u64 {
-        if !self.metadata_map.borrow().contains_key(&self.index) {
-            // This will force metadata loading
-            // TODO: get metadata without reading the file
-            _ = self.open();
-        }
-        self.metadata_map.borrow().get(&self.index).unwrap().size
+        self.size
     }
 }
 
@@ -321,5 +280,62 @@ impl Read for IpaFile {
 impl std::io::Seek for IpaFile {
     fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
         self.file.seek(pos)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fs::FileLocation;
+    use std::io::{Seek, SeekFrom, Write};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use zip::{write::FileOptions, CompressionMethod, DateTime, ZipWriter};
+
+    #[test]
+    fn ipa_metadata_leaves_contents_unopened() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("touchhle-ipa-{}-{nonce}.ipa", std::process::id()));
+        let payload = b"0123456789";
+        let options = FileOptions::default()
+            .compression_method(CompressionMethod::Deflated)
+            .last_modified_time(DateTime::from_date_and_time(2000, 1, 1, 0, 0, 0).unwrap());
+        let mut writer = ZipWriter::new(std::fs::File::create_new(&path).unwrap());
+        writer
+            .start_file("Payload/Test.app/sample", options)
+            .unwrap();
+        writer.write_all(payload).unwrap();
+        drop(writer.finish().unwrap());
+
+        let bundle = BundleData::open_ipa(&path).unwrap().into_fs_node();
+        let FsNode::Directory { children, .. } = &bundle else {
+            panic!("expected bundle contents");
+        };
+        let FsNode::File {
+            location: FileLocation::IpaFileRef(file),
+            ..
+        } = &children["sample"]
+        else {
+            panic!("expected an archived file");
+        };
+        assert_eq!(file.get_size(), payload.len() as u64);
+        assert_eq!(file.get_last_modified(), 946_684_800);
+        assert!(file.contents.get().is_none());
+
+        let mut first = file.open();
+        first.seek(SeekFrom::End(-2)).unwrap();
+        let mut second = file.open();
+        assert!(Rc::ptr_eq(first.file.get_ref(), second.file.get_ref()));
+        let mut bytes = Vec::new();
+        second.read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, payload);
+        bytes.clear();
+        first.read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, b"89");
+        drop(bundle);
+        std::fs::remove_file(path).unwrap();
     }
 }

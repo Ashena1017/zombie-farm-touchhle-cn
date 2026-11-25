@@ -1,10 +1,21 @@
 # 项目维护交接
 
-核对日期为 2026-11-23。旧交接的 §0–§50 保存在 [历史交接](docs/HANDOVER_HISTORY.md)，其中的路径和构建命令对应迁移前的环境。玩家下载和安装见 [README.md](README.md)。
+核对日期为 2026-11-25。旧交接的 §0–§50 保存在 [历史交接](docs/HANDOVER_HISTORY.md)，其中的路径和构建命令对应迁移前的环境。玩家下载和安装见 [README.md](README.md)。
 
 ## 当前发行
 
-[v29fix-maintenance](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v29fix-maintenance) 包含管理器设置保存、备份恢复、启动校验和高倍率合成修复。Android `versionCode` 为 17，沿用正式签名。两端共用带标题水印的 v29fix-notice IPA。两份附件的完整 SHA-256 及下载地址见 [Release 页面](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest)。
+[v30fix-notice](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v30fix-notice) 包含 Windows 和 Android 两个安装包，Android `versionCode` 为 18。本版裁小三张位图字体，去掉仓库出售详情的重复正文绘制，并在查询 IPA 文件属性时直接读取目录。使用原始 `ZFR 1.0.zh-CN-unsigned.ipa` 可通过 `python tools/cumulative_ipa.py apply` 重建两端共用的游戏包。[IPA 补丁记录](zombie_farm_ipa/README.md)
+
+- Windows ZIP 的 SHA-256 为 `3B3DDBB73ACE535133768D37C50130E081565932421280801B117CBE43462178`。
+- Android APK 的 SHA-256 为 `FC68ED878A77D135977A67787141CEBED91E77D07741CF4D76863A2C609DEDD2`。
+
+- Windows Release 的 `Image::from_bytes` 对三张字体的 PNG 字节执行 RGBA 解码和像素预乘。同进程交替测量，预热 4 轮，每版取 40 组三张合计耗时的中位数，v29 为 51.294 ms，v30 为 3.782 ms。计时不包含磁盘、ZIP 解压、纹理上传或游戏绘制。三张图的 366 个字形均逐像素相同。
+- Windows ZIP 已通过解压独立启动和管理器自检。69 项 Rust 库测试和使用 v30 IPA 的列表回归通过。MuMu Android 15 从 v17 覆盖安装 v18 后，首次启动前的存档 SHA-256 一致，39 项设备检查全部通过。
+- 两端均实测打开仓库「瞬间成熟」详情，显示完整三行正文和两个按钮。点「卖出」进入 10 金币确认框，取消后库存仍为 ×2。截图、设备测试输出及原存档还原校验在本机 `_analysis/dumps/ipa-v30/`。
+
+## 上一版记录
+
+[v29fix-maintenance 源码](https://github.com/Ashena1017/zombie-farm-touchhle-cn/tree/v29fix-maintenance) 包含管理器设置保存、备份恢复、启动校验和高倍率合成修复。Android `versionCode` 为 17。两端共用带标题水印的 v29fix-notice IPA。
 
 - Windows ZIP 的 SHA-256 为 `7B5DCD5972A378B36B5A4930EAF9CBD94CC7F90ED09CAEDB431601C43CD795F4`。新 EXE 的指纹已同步到管理器。解压包通过独立启动，两个不同 app ID 的设置切换和无效倍率输入通过 WinForms 实测。
 - Android APK 的 SHA-256 为 `519D40BC0BAA57AA1D3A77A8589406083EB51E1EBA91EDCA2AB848D6E4095979`。MuMu Android 15 从 v16 覆盖升级后，首次运行前的存档 SHA-256 与升级前一致。已实测进入农场、返回管理器和跨日快进预览。39 项设备回归通过。API 21 的排序兼容性通过 DEX 检查，待旧系统真机复测。
@@ -63,7 +74,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_verify_layout_match
 
 ### Android ARM64
 
-使用 JDK 17、Gradle 8.11.1、Android SDK Platform 31、NDK 27.2.12479018 和 Rust Android ARM64 工具链。本机用 `_build_android_local.ps1`，其他环境配置好工具链后可直接调用 `_build_android.ps1`。Gradle 读取 Windows 打包使用的同一份 `zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa`。
+使用 JDK 17、Gradle 8.11.1、Android SDK Platform 31、NDK 27.2.12479018 和 Rust Android ARM64 工具链。本机用 `_build_android_local.ps1`，可通过 `-AndroidSdk`、`-Jdk` 和 `-Gradle` 指定工具路径。其他环境配置好工具链后可直接调用 `_build_android.ps1`。Gradle 读取 Windows 打包使用的同一份 `zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa`。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_build_android_local.ps1

@@ -57,8 +57,11 @@ if (Test-Path -LiteralPath $repositoryPaths -PathType Leaf) {
 # touchHLE resolves resources against its current directory. Start-GameProcess
 # launches it with HleDir as its working directory.
 $script:OptionsFile = Join-Path $script:HleDir 'touchHLE_options.txt'
-$script:BundledIpaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
-$script:SupersededIpaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa'
+$script:BundledIpaName = 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
+$script:SupersededIpaNames = @(
+    'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa',
+    'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
+)
 # Records which IPA the user picked, so the choice survives a restart. Kept at the
 # top level, since it describes the manager's state rather than touchHLE's.
 $script:SelectionFile = Join-Path $script:RuntimeRoot 'launcher_selected_ipa.txt'
@@ -107,8 +110,8 @@ $script:NoticeFile = Join-Path $script:RuntimeRoot 'launcher_notice_seen.txt'
 #
 # Updated with every release. scripts\_build_release.ps1 reads these two
 # values and refuses to package a bundle that does not match them.
-$script:PinnedExeSha256 = 'CD5010AA1562CCC3E3395BA015B1ED9888396CB45FAE78822A4B349CEEA24D0F'
-$script:PinnedIpaSha256 = '7BB214498B149E11DECA49C19E5A21B9AA7F763646537206B85CBBAB86582FFC'
+$script:PinnedExeSha256 = '61A5E5FA82055B7D38161E1C628E149532BA98428D7BE64C7A22714436340AC1'
+$script:PinnedIpaSha256 = '9C7A4CBAFE0B7636B541F9D8F7D40BC7F0DCDD33C3440BEBA3FC3C731B718339'
 
 # Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.
 $script:IntegrityRows = @()
@@ -364,8 +367,7 @@ function Get-PinnedIpaPath {
 function Resolve-IpaSelectionPath {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    # The notice build replaces the old v29fix package and uses the same save.
-    if ([System.IO.Path]::GetFileName($Path) -eq $script:SupersededIpaName) {
+    if ($script:SupersededIpaNames -contains [System.IO.Path]::GetFileName($Path)) {
         $pinned = Get-PinnedIpaPath
         if ($pinned) { return $pinned }
     }
@@ -376,7 +378,7 @@ function Get-IpaList {
     if (-not (Test-Path -LiteralPath $script:IpaDir)) { return @() }
     $pinned = Get-PinnedIpaPath
     return @(Get-ChildItem -LiteralPath $script:IpaDir -Filter '*.ipa' -File |
-        Where-Object { -not $pinned -or $_.Name -ne $script:SupersededIpaName } |
+        Where-Object { -not $pinned -or $script:SupersededIpaNames -notcontains $_.Name } |
         Sort-Object Name)
 }
 

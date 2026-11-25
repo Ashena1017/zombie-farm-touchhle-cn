@@ -58,7 +58,7 @@ public class ManagerTestRunner extends Instrumentation {
                     zip.putNextEntry(new ZipEntry("Payload/ZFR.app/ZFR")); zip.write(new byte[]{1}); zip.closeEntry();
                 }
                 check(ZfIpa.read(xmlIpa).version.equals("1.0"), "XML IPA plist with external DTD");
-                String bundledHash = "7bb214498b149e11deca49c19e5a21b9aa7f763646537206b85cbbab86582ffc";
+                String bundledHash = "9c7a4cbafe0b7636b541f9d8f7d40bc7f0dcdd33c3440beba3fc3c731b718339";
                 check(ZfStorage.hash(ipa.file).equals(bundledHash), "bundled IPA bytes unchanged");
                 try (RandomAccessFile altered = new RandomAccessFile(ipa.file, "rw")) {
                     altered.seek(altered.length());

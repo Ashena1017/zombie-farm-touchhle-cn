@@ -9,7 +9,8 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '_file_hash.ps1')
 $root = Split-Path -Parent $PSScriptRoot
 $androidProject = Join-Path $root 'touchHLE\touchHLE-fork\android'
-$ipaPath = Join-Path $root 'zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
+$ipaVersion = if ($PSBoundParameters.ContainsKey('ExpectedVersionCode') -and $ExpectedVersionCode -le 17) { 'v29fix' } else { 'v30fix' }
+$ipaPath = Join-Path $root "zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-$ipaVersion-notice.ipa"
 $expectedOptions = 'com.playforge.ZombieFarm.ZFR: --landscape-right --fps-limit=60 --device-family=iphone --scale-hack=3 --non-blocking-zero-timeout-run-loop'
 $expectedLibcxxBytes = 1794776
 $expectedLibcxxSha256 = 'F9992C4BA6B7C5A716E3A202FCEB1CE029D6A2B0605838AC6B3219F489DD7970'
@@ -79,7 +80,7 @@ try {
     try { $packagedHash = Get-Sha256Hex -Stream $ipaStream }
     finally { $ipaStream.Dispose() }
     $sourceHash = Get-Sha256Hex -Path $ipaPath
-    if ($packagedHash -ne $sourceHash) { throw 'The APK IPA does not match the repository v29fix IPA.' }
+    if ($packagedHash -ne $sourceHash) { throw 'The APK IPA does not match the source IPA.' }
     $hashStream = $hashEntry.Open()
     $hashReader = [IO.StreamReader]::new($hashStream, [Text.Encoding]::ASCII)
     try { $declaredHash = $hashReader.ReadToEnd().Trim() }

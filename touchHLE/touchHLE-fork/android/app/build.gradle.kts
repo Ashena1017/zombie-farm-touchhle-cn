@@ -44,14 +44,13 @@ fun env(name: String): String? {
 }
 
 val bundledZombieFarmIpa = rootDir.parentFile.parentFile.parentFile.resolve(
-    "zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa"
+    "zombie_farm_ipa/Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa"
 )
 val generatedZombieFarmAssets = layout.buildDirectory.dir("generated/zombieFarmAssets")
 val bundleZombieFarmIpa = tasks.register<Copy>("bundleZombieFarmIpa") {
     from(bundledZombieFarmIpa)
     into(generatedZombieFarmAssets)
-    // Asset name is frozen: ZfStorage.BUNDLED / ZfIpa match on it at runtime.
-    // It keeps saying "v29fix" even when the source IPA is the -notice build.
+    // Keep the installed filename so existing selections update in place.
     rename { "Zombie_Farm_v29fix.ipa" }
     outputs.file(generatedZombieFarmAssets.map { it.file("touchHLE_zombiefarm_ipa.sha256") })
     doLast {
@@ -89,7 +88,7 @@ android {
         // 7: the statement now appears on every launch, plus the QQ group.
         // 8: launching any IPA is allowed again; only the bundled one is watched.
         // 12: empty Cocos text textures keep zero layout with transparent backing.
-        versionCode = 17
+        versionCode = 18
         if (!branding.isEmpty()) {
             applicationIdSuffix = branding.lowercase()
         }

@@ -15,8 +15,8 @@ public final class ZfIpa {
     public final String appId, version, name;
     private ZfIpa(File file, String appId, String version) {
         this.file = file; this.appId = appId; this.version = version;
-        this.name = file.getName().equals("Zombie_Farm_v29fix.ipa")
-            ? "内置中文版 · v29fix" : file.getName().replaceFirst("^[0-9a-f]{12}_", "");
+        this.name = file.getName().equals(ZfStorage.BUNDLED)
+            ? "内置中文版 · v30fix" : file.getName().replaceFirst("^[0-9a-f]{12}_", "");
     }
     @Override public String toString() { return name; }
 

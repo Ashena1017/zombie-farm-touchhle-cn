@@ -17,7 +17,7 @@ $hleRoot = $paths.Emulator
 $env:PATH = "$PSScriptRoot;$env:PATH"
 
 $offsetFile = Join-Path $hleRoot 'touchHLE_time_offset_seconds.txt'
-$game = Join-Path $paths.Ipa 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa'
+$game = Join-Path $paths.Ipa 'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
 $touchHLE = Join-Path $hleRoot 'touchHLE.exe'
 
 if ($Reset -and $NoSkip) {
