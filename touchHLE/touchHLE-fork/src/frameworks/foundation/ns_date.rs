@@ -8,7 +8,7 @@
 use super::ns_string::{from_rust_ordering, from_rust_string, get_static_str};
 use super::{NSComparisonResult, NSTimeInterval};
 use crate::frameworks::core_foundation::time::{
-    apple_epoch, CFAbsoluteTimeGetGregorianDate, SECS_FROM_UNIX_TO_APPLE_EPOCHS,
+    absolute_time, CFAbsoluteTimeGetGregorianDate, SECS_FROM_UNIX_TO_APPLE_EPOCHS,
 };
 use crate::libc::time::emulated_system_time;
 use crate::objc::{
@@ -17,8 +17,6 @@ use crate::objc::{
 };
 
 use crate::frameworks::foundation::ns_keyed_unarchiver::decode_current_date;
-use std::ops::{Add, Sub};
-use std::time::{Duration, SystemTime};
 
 #[derive(Default)]
 pub(super) struct NSDateHostObject {
@@ -48,10 +46,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (NSTimeInterval)timeIntervalSinceReferenceDate {
-    emulated_system_time()
-        .duration_since(apple_epoch())
-        .unwrap()
-        .as_secs_f64()
+    absolute_time(emulated_system_time())
 }
 
 + (id)date {
@@ -62,13 +57,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)distantFuture {
-    // As of 2024, this approximately corresponds to 20 years into the future.
-    // While `distantFuture` docs are talking in terms of centuries,
-    // this should be OK to use for our purposes.
-    let time_interval = emulated_system_time()
-        .duration_since(apple_epoch())
-        .unwrap()
-        .as_secs_f64() * 2.0;
+    // Foundation represents distantFuture as 4001-01-01 UTC.
+    let time_interval = 63_113_904_000.0;
     let host_object = Box::new(NSDateHostObject {
         time_interval
     });
@@ -121,10 +111,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)init {
     // "Date objects are immutable, representing an invariant time interval
     // relative to an absolute reference date (00:00:00 UTC on 1 January 2001)."
-    let time_interval = emulated_system_time()
-        .duration_since(apple_epoch())
-        .unwrap()
-        .as_secs_f64();
+    let time_interval = absolute_time(emulated_system_time());
     env.objc.borrow_mut::<NSDateHostObject>(this).time_interval = time_interval;
     this
 }
@@ -137,10 +124,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithTimeIntervalSinceNow:(NSTimeInterval)secs {
-    let time_interval = emulated_system_time()
-        .duration_since(apple_epoch())
-        .unwrap()
-        .as_secs_f64();
+    let time_interval = absolute_time(emulated_system_time());
     env.objc.borrow_mut::<NSDateHostObject>(this).time_interval = time_interval + secs;
     this
 }
@@ -195,24 +179,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (NSTimeInterval)timeIntervalSinceNow {
     let host_object = env.objc.borrow::<NSDateHostObject>(this);
-    let time_interval = emulated_system_time()
-        .duration_since(apple_epoch())
-        .unwrap()
-        .as_secs_f64();
+    let time_interval = absolute_time(emulated_system_time());
     host_object.time_interval - time_interval
 }
 
 - (NSTimeInterval)timeIntervalSince1970 {
     let time_interval = env.objc.borrow::<NSDateHostObject>(this).time_interval;
-    let new_time = if time_interval >= 0.0 {
-        apple_epoch().add(Duration::from_secs_f64(time_interval))
-    } else {
-        apple_epoch().sub(Duration::from_secs_f64(-time_interval))
-    };
-    new_time
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs_f64()
+    time_interval + SECS_FROM_UNIX_TO_APPLE_EPOCHS as f64
 }
 
 - (id)addTimeInterval:(NSTimeInterval)seconds {

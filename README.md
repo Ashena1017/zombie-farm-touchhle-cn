@@ -30,12 +30,14 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v31fix-time-reset.zip) | 解压后运行「游戏管理.exe」，可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v31fix-time-reset.apk) | 安装后打开「Zombie Farm 游戏管理」。APK 已内置带标题水印的游戏包，支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v32fix.zip) | 解压后运行「游戏管理.exe」，可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v32fix.apk) | 安装后打开「Zombie Farm 游戏管理」。APK 已内置带标题水印的游戏包，支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
 两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest)查看。
 
 > 最新版本下载见 Releases，历史变更见下方记录。
+
+**2026-11-28 v32fix**　旧农场仓库里已经集齐的马戏团旗帜和同类任务物品，现在会计入活动任务并领取原有奖励。修正麦老爹入侵介绍、机器人关失败提示及部分物品的中文，改善双端存档写入、备份恢复和快进失败后的时间处理。Android 内部版本号为 24，可覆盖安装 v23。
 
 **2026-11-26 模拟时间重置更新**　Windows 和 Android 管理器现在都可把累计快进时间清零并恢复为当前时间，确认窗口说明不会改动游戏存档。游戏启动不再传入横屏方向参数，初始方向由 IPA 声明决定。Android 内部版本号为 23，可直接覆盖安装。
 
@@ -211,7 +213,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v31fix-time-reset.zip) 并解压。
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v32fix.zip) 并解压。
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 
@@ -219,9 +221,9 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v31fix-time-reset.apk)。
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v32fix.apk)。
 2. 打开应用 **「Zombie Farm 游戏管理」**；
-3. 选择版本并启动。`内置中文版·v31fix·开源免费.ipa` 已内置，管理器会校验其完整性，也可选择额外导入的游戏版本。
+3. 选择版本并启动。`内置中文版·v32fix·开源免费.ipa` 已内置，管理器会校验其完整性，也可选择额外导入的游戏版本。
 
 Android 管理器还支持按需从系统文件选择器导入 IPA、iPhone/iPad 画面、帧率与修复选项、模拟时间显示、快进预览和重置、金币/脑子及存档管理。触屏缩放直接使用游戏的两指捏合手势；默认横屏、iPhone ×3（1440×960）与 60 FPS。已保存的分辨率设置会保留。
 
@@ -280,7 +282,7 @@ commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*）。主要扩�
 
 ## 游戏 IPA 补丁谱系
 
-早期补丁采用等宽原地改写。当前内置的 v31fix-notice 保留标题水印，并在原有启动图上标明整合版免费。
+早期补丁采用等宽原地改写。当前内置的 v32fix 保留标题水印，并在原有启动图上标明整合版免费。
 
 | 版本 | 内容 |
 |---|---|
@@ -295,6 +297,7 @@ commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*）。主要扩�
 | **v29fix-notice** | 在标题背景加入免费开源水印 |
 | **v30fix-notice** | 两端共用的发行 IPA，裁小三张位图字体，去掉仓库出售详情重复的正文绘制 |
 | **v31fix-notice** | 在 v30 基础上修改启动图，沿用游戏可执行文件和其他资源 |
+| **v32fix** | 修正两组装饰动画的资源路径、两段入侵提示的中文匹配及部分物品名 |
 
 每个版本都有独立的 verifier，逐指令比对期望序列（而不是做关键词探测），
 并确认改动范围之外的字节零变化。取证过程见 `_analysis/reports/`。
@@ -303,7 +306,7 @@ commit `fa3d095`（*"Fix Zombie Farm action manager corruption"*）。主要扩�
 
 ## 从源码构建
 
-构建源码需要 Rust、CMake 和对应平台的工具链。原生依赖可用[恢复脚本](scripts/restore_vendor.py)准备。打包还需要模拟器运行资源和 v31fix-notice IPA，可以从官方 Windows 发行包取得。依赖与构建命令见[维护交接](HANDOVER.md#构建与核验)。
+构建源码需要 Rust、CMake 和对应平台的工具链。原生依赖可用[恢复脚本](scripts/restore_vendor.py)准备。打包还需要模拟器运行资源和 v32fix IPA，可以从官方 Windows 发行包取得。依赖与构建命令见[维护交接](HANDOVER.md#构建与核验)。
 
 ---
 

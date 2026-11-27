@@ -3,14 +3,16 @@
     # --offline: dependency cache only. This machine's network occasionally leaves
     # Gradle waiting on a resolve that never returns; offline fails fast instead.
     [switch]$Offline,
-    [switch]$TestBuild
+    [switch]$TestBuild,
+    [switch]$WithDeviceTests,
+    [string]$OutputDir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist\android')
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $androidProject = Join-Path $root 'touchHLE\touchHLE-fork\android'
 $builtApk = Join-Path $androidProject 'app\build\outputs\apk\release\app-release.apk'
-$outputDir = Join-Path $root 'dist\android'
+$outputDir = [IO.Path]::GetFullPath($OutputDir)
 $outputName = 'touchHLE-zombiefarm-android-arm64-fixed.apk'
 if ($TestBuild) {
     $outputDir = Join-Path $outputDir 'test'
@@ -19,13 +21,28 @@ if ($TestBuild) {
 $outputApk = Join-Path $outputDir $outputName
 $localPropertiesPath = Join-Path $androidProject 'local.properties'
 
-$gradleCommand = Get-Command $Gradle -ErrorAction Stop
+if ($WithDeviceTests -and -not $TestBuild) { throw '-WithDeviceTests requires -TestBuild.' }
+$tasks = @(':app:clean', ':app:assembleRelease')
+if ($WithDeviceTests) { $tasks += ':app:assembleReleaseAndroidTest' }
 $gradleArgs = @(); if ($Offline) { $gradleArgs += '--offline' }
+if ($TestBuild) {
+    $gradleArgs += '-PzfTestSigning=true'
+} else {
+    foreach ($name in @('ANDROID_KEYSTORE_PATH', 'ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD')) {
+        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+            throw "Release signing requires $name. Use -TestBuild for a test APK."
+        }
+    }
+    if (-not (Test-Path -LiteralPath $env:ANDROID_KEYSTORE_PATH -PathType Leaf)) {
+        throw 'The configured Android release keystore is missing.'
+    }
+}
+$gradleCommand = Get-Command $Gradle -ErrorAction Stop
 $sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { $null }
 if (-not $sdkRoot -and (Test-Path -LiteralPath $localPropertiesPath -PathType Leaf)) {
     $sdkLine = Get-Content -LiteralPath $localPropertiesPath -Raw -Encoding ASCII | Select-String -Pattern '(?m)^sdk\.dir=(.+)$'
     if ($sdkLine) {
-        $sdkRoot = $sdkLine.Matches[0].Groups[1].Value.Trim() -replace '/', '\\'
+        $sdkRoot = $sdkLine.Matches[0].Groups[1].Value.Trim().Replace('\:', ':').Replace('\\', '\')
     }
 }
 if (-not $sdkRoot) {
@@ -55,7 +72,7 @@ if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {
 }
 $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
 
-& (Join-Path $PSScriptRoot '_build_android_manager.ps1') -Offline:$Offline
+& (Join-Path $PSScriptRoot '_build_android_manager.ps1') -Offline:$Offline -AndroidSdk $sdkRoot
 
 $forkRoot = Split-Path -Parent $androidProject
 $resourceDir = Join-Path $androidProject 'app\src\main\res\drawable-nodpi'
@@ -129,7 +146,7 @@ try {
     }
 
     # Force a fresh merge so a previously cached libc++_shared.so cannot survive.
-    & $gradleCommand.Source --project-dir $androidProject --console=plain @gradleArgs :app:clean :app:assembleRelease
+    & $gradleCommand.Source --project-dir $androidProject --console=plain @gradleArgs @tasks
     if ($LASTEXITCODE -ne 0) {
         throw "Gradle failed with exit code $LASTEXITCODE."
     }
@@ -158,7 +175,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $candidateApk = Join-Path $outputDir ('.touchHLE-{0}.apk' -f [guid]::NewGuid())
 try {
     Copy-Item -LiteralPath $builtApk -Destination $candidateApk
-    & (Join-Path $PSScriptRoot '_verify_android_package.ps1') -ApkPath $candidateApk -AndroidSdk $sdkRoot -TestBuild:$TestBuild
+    & (Join-Path $PSScriptRoot '_verify_android_package.ps1') -ApkPath $candidateApk -AndroidSdk $sdkRoot -TestBuild:$TestBuild -Require16K
 
     # Keep the previous APK usable if validation fails or the copy is interrupted.
     if ([IO.File]::Exists($outputApk)) {
@@ -172,3 +189,8 @@ try {
     }
 }
 Write-Host "Built Android APK: $outputApk"
+
+if ($WithDeviceTests) {
+    $runner = Join-Path $androidProject 'app\build\outputs\apk\androidTest\release\app-release-androidTest.apk'
+    Copy-Item -LiteralPath $runner -Destination (Join-Path $outputDir 'manager-instrumentation.apk') -Force
+}

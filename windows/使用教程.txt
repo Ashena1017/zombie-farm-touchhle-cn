@@ -21,7 +21,7 @@ Windows
 	或在 windows 目录右键选择“在终端中打开”，运行  ".\StartZombieFarmNextHour.ps1 -Hours 6 -Minutes 15"
 	上面的示例会使游戏时间快进 6 小时 15 分钟。
 
-	如果要重置在 ..\run\windows\touchHLE\touchHLE_time_offset_seconds.txt 中累计的时间并重新增加 1 小时，可以运行：
+	如果要重置在 ..\run\windows\touchHLE\touchHLE_sandbox\com.playforge.ZombieFarm.ZFR\touchHLE_time_offset_seconds.txt 中累计的时间并重新增加 1 小时，可以运行：
 	.\StartZombieFarmNextHour.ps1 -Hours 1 -Reset
 
 四、游戏存档目录位置：

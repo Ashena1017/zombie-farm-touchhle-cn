@@ -265,9 +265,9 @@ byId("custom-form").addEventListener("submit", event => {
 });
 
 const customSettings = {
-  fps_limit: { options: ["30", "60", "90", "120", "off"], label: v => v === "off" ? "不限帧" : v + " 帧", initial: "75", min: 1, max: 1000 },
-  wheel_zoom: { options: ["1.1", "1.2", "1.5"], label: v => "×" + v, initial: "1.1", min: 1.01, max: 2 },
-  window_scale: { options: ["1", "1.25", "1.5", "1.75", "2", "3", "4", "5", "6"], label: v => "×" + v, initial: "7/4", min: 1, max: 6 }
+  fps_limit: { options: ["30", "60", "90", "120", "off"], label: v => v === "off" ? "不限帧" : v + " 帧", min: 1, max: 1000 },
+  wheel_zoom: { options: ["1.1", "1.2", "1.5"], label: v => "×" + v, min: 1.01, max: 2 },
+  window_scale: { options: ["1", "1.25", "1.5", "1.75", "2", "3", "4", "5", "6"], label: v => "×" + v, min: 1, max: 6 }
 };
 
 function settingNumber(key, text) {
@@ -329,8 +329,15 @@ for (const select of byId("settings-fields").querySelectorAll("select")) {
       const valid = numeric >= config.min && numeric <= config.max;
       editor.setAttribute("aria-invalid", String(!valid));
       if (key === "window_scale") showResolution();
-      if (valid) writeSetting(key, value);
-      else notify("请输入 " + config.min + " 至 " + config.max + " 的有效值。", true);
+      if (!valid) notify("请输入 " + config.min + " 至 " + config.max + " 的有效值。", true);
+    });
+    editor.addEventListener("change", () => {
+      const value = editor.value.trim();
+      const numeric = settingNumber(key, value);
+      if (numeric >= config.min && numeric <= config.max) writeSetting(key, value);
+    });
+    editor.addEventListener("keydown", event => {
+      if (event.key === "Enter") editor.blur();
     });
   }
   select.addEventListener("change", () => {
@@ -338,8 +345,8 @@ for (const select of byId("settings-fields").querySelectorAll("select")) {
     if (select.value === "custom") {
       editor.focus();
       editor.select();
-      editor.dispatchEvent(new Event("input"));
     } else {
+      if (config) editor.value = select.value;
       writeSetting(key, select.value);
     }
     showResolution();
@@ -354,7 +361,7 @@ function showSetting(select, value) {
   if (config) {
     const editor = byId("custom-" + key);
     editor.hidden = !custom;
-    editor.value = custom ? value : config.initial;
+    editor.value = value;
     editor.removeAttribute("aria-invalid");
   }
 }
@@ -408,7 +415,7 @@ function launch(hours, minutes, remember) {
   updateLaunchButtons();
   enqueue(async () => {
     try {
-      const data = { hours, minutes, remember, allowModified: false };
+      const data = { appId: snapshot.appId, hours, minutes, remember, allowModified: false };
       let result = await invoke("launch", data);
       while (!result.started) {
         if (result.warning && !data.allowModified) {
@@ -589,10 +596,10 @@ function drawIntegrity(result) {
   }
 }
 
-function verify() {
+function verify(startup = false) {
   if (verification) return verification;
   byId("reverify").disabled = true;
-  verification = invoke("verify").catch(error => ({ text: "文件校验失败：" + String(error), level: "warn", rows: [] })).then(result => {
+  verification = invoke("verify", { startup }).catch(error => ({ text: "文件校验失败：" + String(error), level: "warn", rows: [] })).then(result => {
     const initial = !verifyResult;
     drawIntegrity(result);
     if (result.level !== "ok" && initial && !byId("notice-dialog").open) {
@@ -621,4 +628,4 @@ window.__TAURI__.event.listen("game-exit", event => {
   refresh();
 }).catch(report);
 // The storage worker is serial. Let the player reach Start before hashing the package.
-refresh().then(verify);
+refresh().then(() => verify(true));

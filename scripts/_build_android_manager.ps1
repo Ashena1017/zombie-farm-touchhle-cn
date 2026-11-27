@@ -1,5 +1,5 @@
 # Build the Android Tauri library before Gradle configures its generated Kotlin sources.
-param([switch]$Offline)
+param([switch]$Offline, [string]$AndroidSdk = $(if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { $env:ANDROID_SDK_ROOT }))
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $android = Join-Path $root 'touchHLE/touchHLE-fork/android'
@@ -8,7 +8,9 @@ $env:WRY_ANDROID_PACKAGE = 'org.touchhle.android'
 $env:WRY_ANDROID_LIBRARY = 'zf_manager_mobile'
 $env:WRY_ANDROID_KOTLIN_FILES_OUT_DIR = Join-Path $generated 'kotlin'
 $env:TAURI_ANDROID_PROJECT_PATH = $android
-$env:ANDROID_NDK_HOME = Join-Path $env:ANDROID_HOME 'ndk/27.2.12479018'
+if (-not $AndroidSdk) { throw 'Pass -AndroidSdk or configure ANDROID_HOME / ANDROID_SDK_ROOT.' }
+$env:ANDROID_HOME = $AndroidSdk
+$env:ANDROID_NDK_HOME = Join-Path $AndroidSdk 'ndk/27.2.12479018'
 New-Item -ItemType Directory -Force $env:WRY_ANDROID_KOTLIN_FILES_OUT_DIR | Out-Null
 $extra = @()
 if ($Offline) { $extra += '--offline' }

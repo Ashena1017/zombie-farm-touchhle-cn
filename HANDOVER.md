@@ -1,8 +1,23 @@
 # 项目维护交接
 
-核对日期为 2026-11-26。旧交接的 §0–§50 保存在 [历史交接](docs/HANDOVER_HISTORY.md)，其中的路径和构建命令对应迁移前的环境。玩家下载和安装见 [README.md](README.md)。
+核对日期为 2026-11-28。旧交接的 §0–§50 保存在 [历史交接](docs/HANDOVER_HISTORY.md)，其中的路径和构建命令对应迁移前的环境。玩家下载和安装见 [README.md](README.md)。
 
 ## 当前发行
+
+Windows x64 和 Android ARM64 现共用 v32 中文 IPA。原有农场存档可以继续使用。
+
+- 修复旧农场仓库里已经有马戏团旗帜、任务却停在 0/3 的问题。集齐三色旗可领取原游戏的 200 经验。同色旗只算一次，重新进入农场不会重复发奖。
+- 修正麦老爹的入侵介绍、机器人关的失败提示与部分节日物品的中文，并修正爱尔兰清泉和旗帜的动画资源路径。
+- 两端改进写档与备份。Android 可用有效备份恢复受损的主档。Windows 修正备份排序，并在游戏启动失败时回滚本次快进。
+
+| 下载文件 | 大小（字节） | SHA-256 |
+| --- | ---: | --- |
+| `zombie-farm-windows-x64-v32fix.zip` | 98,405,051 | `2ba22b6f0eea93ccf651077ad4b3e48df21ab37f94e5070eb1e7546c36486042` |
+| `zombie-farm-android-arm64-v32fix.apk` | 105,108,086 | `c274f18b6e019f0c3efcfb5baaeaa480dd8301ed07d470ed3c531663ea0fb5fe` |
+
+Windows 便携 ZIP 在空目录解压后，管理器自检通过，游戏窗口运行 45 秒并记录到 CPU 模拟启动。Android 正式包在 MuMu 从 v23 同签名覆盖到 v24，已核对已安装 APK、主存档、模拟器选项和管理器设置。独立 QA 包通过 85 项设备检查。 [下载与源码](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v32fix)
+
+## v31fix-time-reset 记录
 
 Windows x64 和 Android ARM64 共用 v31 中文 IPA。用过「快进并启动」后，在管理器的「模拟时间」处选择「重置为当前时间」并确认，即可清零累计偏移。游戏使用 IPA 声明的初始方向。[下载双端发行包](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v31fix-time-reset)
 
@@ -126,7 +141,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_build_android_local
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\_verify_android_package.ps1
 ```
 
-产物在 `dist/android/touchHLE-zombiefarm-android-arm64-fixed.apk`。正式更新需提高 `versionCode` 并使用原发布证书签名。Gradle 读取 `ANDROID_KEYSTORE_PATH`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`，缺少签名配置时使用本机 debug 密钥。打包脚本通过 Android SDK 的 `apksigner` 和 `aapt` 核对候选包的实际证书、应用 ID、启动入口、版本号与 ABI，再替换发行文件。使用其他测试证书时传 `-TestBuild`，APK 单独写入 `dist/android/test/`。设备验证从官方包覆盖安装、启动与读档开始。
+产物在 `dist/android/touchHLE-zombiefarm-android-arm64-fixed.apk`。正式更新需提高 `versionCode` 并使用原发布证书签名。Gradle 读取 `ANDROID_KEYSTORE_PATH`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`，正式构建会校验发布签名，测试包使用独立签名。打包脚本通过 Android SDK 的 `apksigner` 和 `aapt` 核对候选包的实际证书、应用 ID、启动入口、版本号与 ABI，再替换发行文件。使用其他测试证书时传 `-TestBuild`，APK 单独写入 `dist/android/test/`。设备验证从官方包覆盖安装、启动与读档开始。
 
 ### 准备发行
 

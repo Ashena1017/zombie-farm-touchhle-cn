@@ -1,8 +1,9 @@
-param(
+﻿param(
     [string]$ApkPath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist\android\touchHLE-zombiefarm-android-arm64-fixed.apk'),
     [string]$AndroidSdk,
     [ValidateRange(1, 2100000000)][int]$ExpectedVersionCode,
-    [switch]$TestBuild
+    [switch]$TestBuild,
+    [switch]$Require16K
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,6 +22,10 @@ if ($ExpectedVersionCode -le 18) {
     $report = Join-Path $root "zombie_farm_ipa\Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-${ipaVersion}fix-notice.report.json"
     $expectedIpa = (Get-Content -Raw -Encoding UTF8 -LiteralPath $report | ConvertFrom-Json).output
     $installedName = 'Zombie_Farm_v29fix.ipa'
+} elseif ($ExpectedVersionCode -le 23) {
+    $report = Join-Path $root 'zombie_farm_ipa\内置中文版·v31fix·开源免费.report.json'
+    $expectedIpa = (Get-Content -Raw -Encoding UTF8 -LiteralPath $report | ConvertFrom-Json).output
+    $installedName = $expectedIpa.name
 }
 $expectedOptions = 'com.playforge.ZombieFarm.ZFR: --fps-limit=60 --device-family=iphone --scale-hack=3 --non-blocking-zero-timeout-run-loop'
 if ($ExpectedVersionCode -lt 23) {
@@ -80,6 +85,7 @@ try {
         @{ Name = 'bundled IPA'; Entry = $ipaEntry },
         @{ Name = 'default options'; Entry = $optionsEntry },
         @{ Name = 'IPA hash'; Entry = $hashEntry },
+        @{ Name = 'SDL2'; Entry = $archive.GetEntry('lib/arm64-v8a/libSDL2.so') },
         @{ Name = 'arm64 touchHLE library'; Entry = $nativeEntry },
         @{ Name = 'arm64 libc++ shared library'; Entry = $libcxxEntry }
     )) {
@@ -136,12 +142,20 @@ finally {
     $archive.Dispose()
 }
 
+if ($Require16K -or $TestBuild -or $ExpectedVersionCode -ge 24) {
+    & python (Join-Path $PSScriptRoot 'verify_android_elf.py') $ApkPath
+    if ($LASTEXITCODE) { throw 'ARM64 ELF page alignment check failed.' }
+    & (Join-Path $buildTools.FullName 'zipalign.exe') -c -P 16 4 $ApkPath
+    if ($LASTEXITCODE) { throw 'APK ZIP page alignment check failed.' }
+}
+
 $badging = & (Join-Path $buildTools.FullName 'aapt.exe') dump badging $ApkPath
 if ($LASTEXITCODE -ne 0) { throw "aapt could not inspect the APK (exit $LASTEXITCODE)." }
 $badgingText = $badging -join "`n"
 $manifestPackage = [regex]::Match($badgingText, "(?m)^package: name='([^']+)' versionCode='(\d+)'")
-if (-not $manifestPackage.Success -or $manifestPackage.Groups[1].Value -cne 'org.touchhle.zombiefarm') {
-    throw 'The APK must have application ID org.touchhle.zombiefarm.'
+$expectedId = if ($TestBuild) { 'org.touchhle.zombiefarm.qa' } else { 'org.touchhle.zombiefarm' }
+if (-not $manifestPackage.Success -or $manifestPackage.Groups[1].Value -cne $expectedId) {
+    throw "The APK must have application ID $expectedId."
 }
 $versionCode = [int]$manifestPackage.Groups[2].Value
 if ($versionCode -ne $ExpectedVersionCode) {
@@ -161,6 +175,9 @@ if ($signers.Count -ne 1) { throw 'The APK must have exactly one signing certifi
 $actualCertificate = $signers[0].Groups[1].Value
 if (-not $TestBuild -and $actualCertificate -ne $officialCertificate) {
     throw "The APK signing certificate is $actualCertificate; expected the official certificate $officialCertificate."
+}
+if ($TestBuild -and $actualCertificate -eq $officialCertificate) {
+    throw 'Test APKs must use a different certificate from the player release.'
 }
 
 Write-Host "Android application ID: $($manifestPackage.Groups[1].Value)"

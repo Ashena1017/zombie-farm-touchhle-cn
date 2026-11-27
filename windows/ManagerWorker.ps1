@@ -40,7 +40,7 @@ function Get-ManagerSnapshot {
             @{ name = $file.Name; kind = '当前存档'; size = $file.Length; modified = $file.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'); live = $true }
         }
         foreach ($file in (Get-BackupFiles)) {
-            @{ name = $file.Name; kind = (Get-BackupKind $file); size = $file.Length; modified = $file.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'); live = $false }
+            @{ name = $file.Name; kind = $file.BackupKind; size = $file.Length; modified = $file.BackupTime.ToString('yyyy-MM-dd HH:mm:ss'); live = $false }
         }
     })
     $amounts = Get-Currency
@@ -109,7 +109,7 @@ function Start-ManagerGame($data) {
     $process = New-GameChildProcess -Paths $paths -SkipSeconds $skip
     $script:Session = @{
         process = $process; started = (Get-Date); seenWindow = $false; lastWindow = (Get-Date); offered = $false
-        stdout = $process.StandardOutput.ReadToEndAsync(); stderr = $process.StandardError.ReadToEndAsync()
+        output = [ZfGameOutput]::new($process, $script:HleDir)
     }
     if ($data.remember) { Save-SkipMemory -Hours $data.hours -Minutes $data.minutes }
     return @{ started = $true }
@@ -135,15 +135,10 @@ function Get-ManagerGameStatus {
     }
     $process.WaitForExit()
     $code = $process.ExitCode
-    $out = $session.stdout.Result
-    $err = $session.stderr.Result
     $duration = ((Get-Date) - $session.started).TotalSeconds
     Write-ManagerLog ('exit pid={0} code={1} after {2:N0}s' -f $process.Id, $code, $duration)
     try {
-        if ($out -or $err) {
-            Add-Content -LiteralPath (Join-Path $script:HleDir 'zfr_last_run.log') -Encoding UTF8 -Value (
-                '[{0}] exit={1}{2}{3}{2}{4}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $code, [Environment]::NewLine, $out, $err)
-        }
+        $err = $session.output.Finish()
     } finally {
         # Another manager can take over if the original GUI closes mid-game.
         # Clear the record only while it still names this child.

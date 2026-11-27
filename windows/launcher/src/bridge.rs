@@ -180,6 +180,9 @@ impl Worker {
 }
 
 pub fn package_check(backend: &Backend) -> Result<()> {
+    if !backend.layout.install.join("GameOutput.cs").is_file() {
+        return Err("缺少 GameOutput.cs，请完整解压便携包。".into());
+    }
     if !backend.layout.install.join("compat/WinForms.ps1").is_file() {
         return Err("缺少兼容界面 compat/WinForms.ps1，请完整解压便携包。".into());
     }

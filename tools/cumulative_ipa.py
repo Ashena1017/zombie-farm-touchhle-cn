@@ -3,7 +3,6 @@
 import argparse
 import hashlib
 import json
-import os
 import sys
 import tempfile
 from compression import zstd
@@ -11,6 +10,8 @@ from copy import copy
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
+
+from ipa_output import install_file
 
 
 IPA_DIR = Path(__file__).resolve().parents[1] / "zombie_farm_ipa"
@@ -45,19 +46,15 @@ def repack(data, method):
 
 
 def publish(path, data):
-    # Publish a fully verified file without overwriting a concurrent writer.
+    def check_existing(existing_path):
+        with existing_path.open("rb") as existing:
+            if hashlib.file_digest(existing, "sha256").digest() != hashlib.sha256(data).digest():
+                raise ValueError(f"existing file differs, choose another output: {existing_path}")
+
     with tempfile.TemporaryDirectory(dir=path.parent) as temp:
         candidate = Path(temp) / "candidate"
         candidate.write_bytes(data)
-        try:
-            if os.name == "nt":
-                candidate.rename(path)
-            else:
-                os.link(candidate, path)
-        except FileExistsError:
-            with path.open("rb") as existing:
-                if hashlib.file_digest(existing, "sha256").digest() != hashlib.sha256(data).digest():
-                    raise ValueError(f"existing file differs, choose another output: {path}") from None
+        install_file(candidate, path, check_existing)
 
 
 def restore(patch, prefix):

@@ -391,8 +391,8 @@ public class ManagerActivity extends Activity {
         simulatedClock = text("", 15, palette.ink, true);
         launch.addView(simulatedClock); updateSimulatedClock();
         if (running) {
-            addButton(launch, button("返回正在运行的游戏", true, () -> startActivity(new Intent(this, MainActivity.class))));
-            addButton(launch, button("退出游戏并返回管理器", false, () -> startActivity(new Intent(this, MainActivity.class)
+            addButton(launch, button("返回正在运行的游戏", true, () -> startActivity(new Intent(this, FarmActivity.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))));
+            addButton(launch, button("退出游戏并返回管理器", false, () -> startActivity(new Intent(this, FarmActivity.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                 .putExtra("stop_game", true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP))));
         } else {
             Button start = button("启动游戏", true, () -> launch(0)); start.setEnabled(editable()); addButton(launch, start);
@@ -444,11 +444,8 @@ public class ManagerActivity extends Activity {
         return hours * 3600 + minutes * 60;
     }
     private void launch(long seconds) {
-        String id = selected.appId;
-        task(() -> {
-            storage.advance(id, seconds);
-            return null;
-        }, () -> startActivity(new Intent(this, MainActivity.class)));
+        startActivityForResult(MainActivity.request(this, selected.appId, (int)(seconds / 3600),
+            (int)(seconds % 3600 / 60), false, true), MainActivity.REQUEST_GAME);
     }
     private void skipDialog() {
         LinearLayout content = vertical(); content.setPadding(dp(24), dp(8), dp(24), dp(8));
@@ -492,12 +489,9 @@ public class ManagerActivity extends Activity {
         dialog.setOnShowListener(d -> dialog.getButton(-1).setOnClickListener(v -> {
             try {
                 long h = Long.parseLong(hours.getText().toString()); int m = Integer.parseInt(minutes.getText().toString());
-                String id = selected.appId; long seconds = skipSeconds(h, m);
-                dialog.dismiss(); task(() -> {
-                    JSONObject app = storage.settings(id).put("skipHours", h).put("skipMinutes", m);
-                    storage.advance(id, seconds, app);
-                    return null;
-                }, () -> startActivity(new Intent(this, MainActivity.class)));
+                skipSeconds(h, m);
+                dialog.dismiss();
+                startActivityForResult(MainActivity.request(this, selected.appId, (int)h, m, true, true), MainActivity.REQUEST_GAME);
             } catch (Exception e) { toast("请输入小时与 0～59 的分钟，时间需大于零"); }
         })); dialog.show(); tintDialogButtons(dialog); skipPreview.run();
     }
@@ -680,6 +674,10 @@ public class ManagerActivity extends Activity {
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == MainActivity.REQUEST_GAME) {
+            if (result != RESULT_OK && data != null) toast(data.getStringExtra("detail"));
+            return;
+        }
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
         if (request == IMPORT_IPA) task(() -> {

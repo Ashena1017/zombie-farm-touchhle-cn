@@ -2,9 +2,11 @@
     # Forwarded to the inner build: dependency cache only, no network resolves.
     [switch]$Offline,
     [switch]$TestBuild,
+    [switch]$WithDeviceTests,
     [string]$AndroidSdk = 'C:\Haven\Tools\android-sdk',
     [string]$Jdk = 'C:\Haven\Tools\jdk\jdk-17.0.20.1+1',
-    [string]$Gradle = (Join-Path $env:USERPROFILE '.gradle\manual-gradle-8.11.1\bin\gradle.bat')
+    [string]$Gradle = (Join-Path $env:USERPROFILE '.gradle\manual-gradle-8.11.1\bin\gradle.bat'),
+    [string]$OutputDir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist\android')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +38,7 @@ $env:PATH = @(
     $env:PATH
 ) -join ';'
 
-& (Join-Path $PSScriptRoot '_build_android.ps1') -Gradle $gradle -Offline:$Offline -TestBuild:$TestBuild
+& (Join-Path $PSScriptRoot '_build_android.ps1') -Gradle $gradle -Offline:$Offline -TestBuild:$TestBuild -WithDeviceTests:$WithDeviceTests -OutputDir $OutputDir
 if ($LASTEXITCODE -ne 0) {
     throw "Android build failed with exit code $LASTEXITCODE."
 }

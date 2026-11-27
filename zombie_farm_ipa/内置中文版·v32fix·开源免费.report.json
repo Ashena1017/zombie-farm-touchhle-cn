@@ -1,0 +1,31 @@
+{
+  "tool": "patch_zfr_v32.py",
+  "input": {
+    "name": "内置中文版·v31fix·开源免费.ipa",
+    "sha256": "cfa750f4cba8d5acf0923c595ca3c257b0617c2cafed7d4ee08f4bc37d689e65"
+  },
+  "output": {
+    "name": "内置中文版·v32fix·开源免费.ipa",
+    "size": 59565945,
+    "sha256": "ffbd9d7c7e73a0c5aab0ca3cd252d28e55272ac5f665ab3b4ecb6e2006c3ffea"
+  },
+  "members": {
+    "Payload/ZFR.app/Enemies.plist": {
+      "before": "87351c2c59bf1a9ef4fad5e59e9b947ea2bcdafe11c6d61743a446c0fbfd7693",
+      "after": "81b9814e11f9ca5148164772d7c1ece852ba93b7510495444ca9963aee6ab816"
+    },
+    "Payload/ZFR.app/TileProperties.plist": {
+      "before": "4517eb889fa7b7b12adc5aa858c1cea3859f501c883eed19132b7c072c22cfa5",
+      "after": "aacca9ff3f8cd3131278efd7a725a096be5cbbc3ca5e7122c1a7c5741fa72186"
+    },
+    "Payload/ZFR.app/zh-Hans.lproj/Localizable.strings": {
+      "before": "bd7db080232b8749ed3324ce134c19807ef26a5d010efc2f2508e1030194c3ea",
+      "after": "f9346e6ba06681ff6ad3072842387d0dd6a3babe549aa09b2f67a85e0aaa6569"
+    },
+    "Payload/ZFR.app/zh-Hant.lproj/Localizable.strings": {
+      "before": "ce2ceeb26e701ae1f9eb0d2b5c3b2b32b047836941f005411bacbcdb2ecd122b",
+      "after": "c1f5137d671122879f3278e6e9017d469a2f0e7ecaa8fa8fc51bcfa14baf06ab"
+    }
+  },
+  "other_members_unchanged": 1082
+}

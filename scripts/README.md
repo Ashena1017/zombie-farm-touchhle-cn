@@ -16,6 +16,6 @@
 
 Windows 初始化脚本在 [windows/Initialize-Runtime.ps1](../windows/Initialize-Runtime.ps1)。IPA 工具和专题诊断分别见 [tools](../tools/README.md) 和 [_analysis](../_analysis/README.md)。
 
-Android 正式构建在候选包通过原发布证书校验后替换 `dist/android/` 中的 APK。使用自己的测试证书时，给构建入口传 `-TestBuild`，输出在 `dist/android/test/`。
+Android 使用 SDK Platform 36、NDK 27.2.12479018 和 JDK 17。使用自己的测试证书时，给构建入口传 `-TestBuild`，输出在 `dist/android/test/`。QA 的应用 ID 为 `org.touchhle.zombiefarm.qa`，可与正式包共存。传 `-WithDeviceTests` 同时构建设备测试套件。正式包沿用已有发布证书，构建时需通过 Gradle 配置中列出的环境变量提供签名。
 
-Android 使用 SDK Platform 36 编译，保留原应用 ID 和最低系统版本。构建入口先用 cargo-ndk 编译 [Tauri 管理器](../windows/launcher/src/lib.rs)，生成 Kotlin 宿主和 ARM64 库，再调用 Gradle 打包。首次构建需要下载 AndroidX 与 Tauri 依赖。
+在仓库根目录运行 `_analysis/_test_android_manager.ps1 -Serial SERIAL` 可在连接的 Android 设备上运行隔离的存档、备份和管理器测试。打包后可运行 `scripts/_verify_android_package.ps1 -TestBuild -ApkPath PATH` 核验 QA 包的签名、内置 IPA 和 ARM64 库的 16 KiB 对齐。

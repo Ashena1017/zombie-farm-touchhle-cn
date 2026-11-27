@@ -1,12 +1,14 @@
 # 游戏 IPA 与补丁记录
 
-本工作区的 Windows 和 Android 构建共用 v31fix-notice。启动黑屏底部显示「本整合版免费 · 请勿购买」。本次构建沿用 v30 的游戏可执行文件、位图字体与标题水印。
+本工作区的 Windows 和 Android 构建共用 v32fix。启动黑屏底部显示「本整合版免费 · 请勿购买」。本次构建沿用 v30 的游戏可执行文件、位图字体与标题水印。
 
 | 项目 | 值 |
 | --- | --- |
-| 两端内置文件名 | `内置中文版·v31fix·开源免费.ipa` |
-| 大小 | 59,565,719 字节 |
-| SHA-256 | `CFA750F4CBA8D5ACF0923C595CA3C257B0617C2CAFED7D4EE08F4BC37D689E65` |
+| 两端内置文件名 | `内置中文版·v32fix·开源免费.ipa` |
+| 大小 | 59,565,945 字节 |
+| SHA-256 | `FFBD9D7C7E73A0C5AAB0CA3CD252D28E55272AC5F665AB3B4ECB6E2006C3FFEA` |
+
+v32 修正麦老爹与机器人关卡的中文提示、部分物品名、繁中合成提示和两组装饰动画路径。四个资源有改动，其余 1,082 个成员与 v31 逐字节相同。[资源校验报告](内置中文版·v32fix·开源免费.report.json)
 
 ## 从最初的 IPA 重建
 
@@ -19,7 +21,7 @@ python tools/cumulative_ipa.py apply
 | 输入 | 大小（字节） | SHA-256 |
 | --- | ---: | --- |
 | `ZFR 1.0.zh-CN-unsigned.ipa` | 58,788,319 | `E7CE2D18BC77E513B4B4B382E4A9AF9BB8A7133E5513B5A73955D3F3EE9A8F60` |
-| [unsigned-to-v31fix-notice.zst](unsigned-to-v31fix-notice.zst) | 1,869,819 | `969B031F68648C98EDEC392CAA8B918028E28774AAD9DFA83DBE88242417200B` |
+| [unsigned-to-v32fix.zst](unsigned-to-v32fix.zst) | 1,870,357 | `B4F8E48979A27D50463D738B6AD5BF032A5E80471BE18F0B0A34D5F7B6D11D69` |
 
 可以用 `--base` 指定原始 IPA 所在位置，用 `--output` 指定输出文件。工具核对原包、还原的文件集合及最终 IPA 的 SHA-256，全部通过后写入目标。目录中已有内容不同的同名文件时会报错。生成差分的命令见 [IPA 工具](../tools/README.md)。
 

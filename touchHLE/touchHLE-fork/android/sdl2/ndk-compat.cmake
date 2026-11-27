@@ -1,5 +1,6 @@
 set(CMAKE_SYSTEM_NAME Android)
 set(CMAKE_SYSTEM_PROCESSOR aarch64)
+add_link_options("-Wl,-z,max-page-size=16384")
 
 # rust-sdl2 builds this SDL revision from Cargo's own checkout. Limit the
 # NDK 27 API substitution to its one nonblocking sensor poll.

@@ -24,11 +24,7 @@ import android.webkit.MimeTypeMap
 import java.io.*
 
 class DocumentsProvider : DocumentsProvider() {
-    //private val baseDirectory = File(SkylineApplication.instance.getPublicFilesDir().canonicalPath)
-    //private val baseDirectory = Environment.getExternalStorageDirectory()
-   // private val baseDirectory = touchHLEApplication.getContext().getExternalFilesDir(null)!!
-    //private val applicationName = SkylineApplication.instance.applicationInfo.loadLabel(SkylineApplication.instance.packageManager).toString()
-    private val applicationName = BuildConfig.APP_NAME
+    private val applicationName: String get() = context!!.getString(R.string.app_name)
 
     companion object {
         private val DEFAULT_ROOT_PROJECTION : Array<String> = arrayOf(
@@ -55,7 +51,7 @@ class DocumentsProvider : DocumentsProvider() {
     }
 
     private fun getBaseDirectory() : File {
-        return context!!.getExternalFilesDir(null)!!
+        return context!!.getExternalFilesDir(null)!!.canonicalFile
     }
 
     override fun onCreate() : Boolean {
@@ -66,20 +62,31 @@ class DocumentsProvider : DocumentsProvider() {
      * @return The [File] that corresponds to the document ID supplied by [getDocumentId]
      */
     private fun getFile(documentId : String) : File {
-        if (documentId.startsWith(ROOT_ID)) {
-            val file = getBaseDirectory().resolve(documentId.drop(ROOT_ID.length + 1))
-            if (!file.exists()) throw FileNotFoundException("${file.absolutePath} ($documentId) not found")
-            return file
-        } else {
-            throw FileNotFoundException("'$documentId' is not in any known root")
+        if (!documentId.startsWith("$ROOT_ID/")) throw FileNotFoundException("Unknown document root")
+        val root = getBaseDirectory()
+        val file = checkedFile(root.resolve(documentId.removePrefix("$ROOT_ID/")))
+        if (!file.exists()) throw FileNotFoundException(documentId)
+        return file
+    }
+
+    private fun checkedFile(file: File): File {
+        val root = getBaseDirectory()
+        val canonical = file.canonicalFile
+        if (canonical != root && !canonical.path.startsWith(root.path + File.separator))
+            throw FileNotFoundException("Document is outside the app directory")
+        return canonical
+    }
+
+    private fun child(parent: File, name: String): File {
+        if (!parent.isDirectory || name.isEmpty() || name == "." || name == ".." || File(name).name != name)
+            throw FileNotFoundException("Invalid document name")
+        return checkedFile(parent.resolve(name)).also {
+            if (it.parentFile != parent) throw FileNotFoundException("Invalid document parent")
         }
     }
 
-    /**
-     * @return A unique ID for the provided [File]
-     */
     private fun getDocumentId(file : File) : String {
-        return "$ROOT_ID/${file.toRelativeString(getBaseDirectory())}"
+        return "$ROOT_ID/${checkedFile(file).toRelativeString(getBaseDirectory())}"
     }
 
     override fun queryRoots(projection : Array<out String>?) : Cursor {
@@ -105,20 +112,24 @@ class DocumentsProvider : DocumentsProvider() {
     }
 
     override fun isChildDocument(parentDocumentId : String?, documentId : String?) : Boolean {
-        return documentId?.startsWith(parentDocumentId!!) ?: false
+        if (parentDocumentId == null || documentId == null) return false
+        return try {
+            val parent = getFile(parentDocumentId)
+            parent.isDirectory && getFile(documentId).path.startsWith(parent.path + File.separator)
+        } catch (e: IOException) { false }
     }
 
     /**
      * @return A new [File] with a unique name based off the supplied [name], not conflicting with any existing file
      */
     fun File.resolveWithoutConflict(name : String) : File {
-        var file = resolve(name)
+        var file = child(this, name)
         if (file.exists()) {
             var noConflictId = 1 // Makes sure two files don't have the same name by adding a number to the end
             val extension = name.substringAfterLast('.')
             val baseName = name.substringBeforeLast('.')
             while (file.exists())
-                file = resolve("$baseName (${noConflictId++}).$extension")
+                file = child(this, "$baseName (${noConflictId++}).$extension")
         }
         return file
     }
@@ -144,7 +155,7 @@ class DocumentsProvider : DocumentsProvider() {
 
     override fun deleteDocument(documentId : String?) {
         val file = getFile(documentId!!)
-        if (!file.delete())
+        if (file == getBaseDirectory() || !file.delete())
             throw FileNotFoundException("Couldn't delete document with ID '$documentId'")
     }
 
@@ -152,7 +163,7 @@ class DocumentsProvider : DocumentsProvider() {
         val parent = getFile(parentDocumentId!!)
         val file = getFile(documentId)
 
-        if (parent == file || file.parentFile == null || file.parentFile!! == parent) {
+        if (file != getBaseDirectory() && file.parentFile == parent) {
             if (!file.delete())
                 throw FileNotFoundException("Couldn't delete document with ID '$documentId'")
         } else {
@@ -166,7 +177,9 @@ class DocumentsProvider : DocumentsProvider() {
 
         val sourceFile = getFile(documentId!!)
         val sourceParentFile = sourceFile.parentFile ?: throw FileNotFoundException("Couldn't rename document '$documentId' as it has no parent")
-        val destFile = sourceParentFile.resolve(displayName)
+        if (sourceFile == getBaseDirectory()) throw FileNotFoundException("Cannot rename root")
+        val destFile = child(sourceParentFile, displayName)
+        if (destFile != sourceFile && destFile.exists()) throw FileNotFoundException("Name already in use")
 
         try {
             if (!sourceFile.renameTo(destFile))
@@ -176,16 +189,6 @@ class DocumentsProvider : DocumentsProvider() {
         }
 
         return getDocumentId(destFile)
-    }
-
-    private fun copyDocument(
-        sourceDocumentId : String, sourceParentDocumentId : String,
-        targetParentDocumentId : String?
-    ) : String? {
-        if (!isChildDocument(sourceParentDocumentId, sourceDocumentId))
-            throw FileNotFoundException("Couldn't copy document '$sourceDocumentId' as its parent is not '$sourceParentDocumentId'")
-
-        return copyDocument(sourceDocumentId, targetParentDocumentId)
     }
 
     override fun copyDocument(sourceDocumentId : String, targetParentDocumentId : String?) : String? {
@@ -213,16 +216,15 @@ class DocumentsProvider : DocumentsProvider() {
         sourceDocumentId : String, sourceParentDocumentId : String?,
         targetParentDocumentId : String?
     ) : String? {
-        try {
-            val newDocumentId = copyDocument(
-                sourceDocumentId, sourceParentDocumentId!!,
-                targetParentDocumentId
-            )
-            removeDocument(sourceDocumentId, sourceParentDocumentId)
-            return newDocumentId
-        } catch (e : FileNotFoundException) {
-            throw FileNotFoundException("Couldn't move document '$sourceDocumentId'")
-        }
+        val source = getFile(sourceDocumentId)
+        val sourceParent = getFile(sourceParentDocumentId!!)
+        val targetParent = getFile(targetParentDocumentId!!)
+        if (source.parentFile != sourceParent || source == getBaseDirectory())
+            throw FileNotFoundException("Invalid move source")
+        if (sourceParent == targetParent) return getDocumentId(source)
+        val target = targetParent.resolveWithoutConflict(source.name)
+        if (!source.renameTo(target)) throw FileNotFoundException("Could not move document")
+        return getDocumentId(target)
     }
 
     private fun includeFile(cursor : MatrixCursor, documentId : String?, file : File?) : MatrixCursor {
@@ -271,7 +273,7 @@ class DocumentsProvider : DocumentsProvider() {
             if (mime != null)
                 return mime
         }
-        return "application/octect-stream"
+        return "application/octet-stream"
     }
 
     override fun queryChildDocuments(parentDocumentId : String?, projection : Array<out String>?, sortOrder : String?) : Cursor {

@@ -53,7 +53,14 @@ public final class ManagerPlugin extends Plugin {
         JSONObject args = call.getArgs();
         String action = args.getString("action");
         JSONObject data = args.getJSONObject("data");
-        if (action.equals("browseIpa") || action.equals("importSave") || action.equals("exportBackup")) {
+        if (action.equals("launch")) {
+            Intent intent = MainActivity.request(activity, data.getString("appId"), data.getInt("hours"),
+                data.getInt("minutes"), data.optBoolean("remember"), data.optBoolean("allowModified"));
+            activity.runOnUiThread(() -> {
+                try { startActivityForResult(call, intent, "launchFinished"); }
+                catch (Exception e) { call.reject(e.getMessage(), e); }
+            });
+        } else if (action.equals("browseIpa") || action.equals("importSave") || action.equals("exportBackup")) {
             boolean export = action.equals("exportBackup");
             Intent intent = new Intent(export ? Intent.ACTION_CREATE_DOCUMENT : Intent.ACTION_OPEN_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE).setType(export ? "application/zip" : "*/*");
@@ -70,6 +77,14 @@ public final class ManagerPlugin extends Plugin {
                 } catch (Exception ex) { call.reject(ex.getMessage(), ex); }
             });
         } else submit(call, () -> execute(action, data));
+    }
+
+    @ActivityCallback public void launchFinished(Invoke call, ActivityResult result) throws Exception {
+        String detail = result.getData() == null ? null : result.getData().getStringExtra("detail");
+        if (result.getResultCode() == Activity.RESULT_OK) call.resolve(new JSObject(obj("started", true).toString()));
+        else if (result.getResultCode() == MainActivity.WARNING)
+            call.resolve(new JSObject(obj("started", false, "warning", detail).toString()));
+        else call.reject(detail == null ? "游戏启动已取消" : detail);
     }
 
     @ActivityCallback public void filePicked(Invoke call, ActivityResult result) {
@@ -110,7 +125,7 @@ public final class ManagerPlugin extends Plugin {
     private JSONObject execute(String action, JSONObject data) throws Exception {
         switch (action) {
             case "appearance": case "setAppearance": return appearance(action, data);
-            case "verify": return verify();
+            case "verify": return verify(data.optBoolean("startup"));
             case "gameRunning": return obj("running", storage.gameRunning());
             case "snapshot":
                 if (!installed && !storage.gameRunning()) {
@@ -141,17 +156,8 @@ public final class ManagerPlugin extends Plugin {
                         }
                         storage.settings(id, prefs);
                         return obj("settings", settings(prefs));
-                    case "resetTime": storage.settings(id, prefs.put("offset", 0)); break;
-                    case "launch":
-                        if (!data.optBoolean("allowModified")) {
-                            JSONObject check = verifyLocked();
-                            if (!check.getString("level").equals("ok"))
-                                return obj("started", false, "warning", check.getString("text"));
-                        }
-                        int hours = data.getInt("hours"), minutes = data.getInt("minutes");
-                        if (hours < 0 || hours > 100000 || minutes < 0 || minutes > 59) throw new IOException("无效的快进时间");
-                        if (data.optBoolean("remember")) prefs.put("skipHours", hours).put("skipMinutes", minutes);
-                        storage.advance(id, hours * 3600L + minutes * 60L, prefs);
+                    case "resetTime":
+                        storage.settings(id, prefs.put("offset", 0));
                         break;
                     case "backup": storage.backup(id, "手动"); break;
                     case "restore":
@@ -173,10 +179,6 @@ public final class ManagerPlugin extends Plugin {
                     default: throw new IOException("未知操作");
                 }
             }
-        }
-        if (action.equals("launch")) {
-            activity.runOnUiThread(() -> activity.startActivity(new Intent(activity, MainActivity.class)));
-            return obj("started", true);
         }
         return snapshot();
     }
@@ -244,12 +246,11 @@ public final class ManagerPlugin extends Plugin {
 
     private static String hexColor(int color) { return String.format(Locale.ROOT, "#%06X", color & 0xffffff); }
 
-    private JSONObject verify() throws Exception {
-        try (ZfStorage.Lease ignored = storage.lock()) { return verifyLocked(); }
-    }
-
-    private JSONObject verifyLocked() throws Exception {
-        String warning = storage.ensureBundled();
+    private JSONObject verify(boolean startup) throws Exception {
+        String warning = null;
+        if (!startup || !installed) {
+            try (ZfStorage.Lease ignored = storage.lock()) { warning = storage.ensureBundled(); }
+        }
         if (initialWarning != null) {
             if (warning == null) warning = initialWarning;
             initialWarning = null;

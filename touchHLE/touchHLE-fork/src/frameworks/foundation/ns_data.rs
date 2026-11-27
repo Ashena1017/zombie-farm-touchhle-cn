@@ -212,9 +212,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithContentsOfFile:path]
 }
 
-// FIXME: writes should be atomic
 - (bool)writeToFile:(id)path // NSString*
-         atomically:(bool)_use_aux_file {
+         atomically:(bool)use_aux_file {
     let file = to_rust_string(env, path);
     let length = env.objc.borrow::<NSDataHostObject>(this).length;
     if is_zombie_farm_save_path(&file) {
@@ -229,16 +228,23 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         env.mem.bytes_at(host_object.bytes.cast(), host_object.length)
     };
-    env.fs.write(GuestPath::new(&file), slice).is_ok()
+    let path = GuestPath::new(&file);
+    if use_aux_file || is_zombie_farm_save_path(&file) || file.rsplit('/').next() == Some("saveGame.bin2") {
+        use std::io::Write;
+        env.fs.write_atomic(path, |f| f.write_all(slice)).is_ok()
+    } else {
+        env.fs.write(path, slice).is_ok()
+    }
 }
 
 - (bool)writeToFile:(id)path // NSString*
-            options:(NSUInteger)_write_options
+            options:(NSUInteger)write_options
               error:(MutPtr<id>)error {
     if !error.is_null() {
         env.mem.write(error, nil);
     }
-    msg![env; this writeToFile:path atomically:false]
+    let atomic = write_options & 1 != 0; // NSDataWritingAtomic
+    msg![env; this writeToFile:path atomically:atomic]
 }
 
 - (())dealloc {

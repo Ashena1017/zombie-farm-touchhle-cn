@@ -1,20 +1,20 @@
 {
-  "tag": "v31fix-time-reset",
+  "tag": "v32fix",
   "ipa": {
-    "name": "内置中文版·v31fix·开源免费.ipa",
-    "label": "v31fix",
-    "size": 59565719,
-    "sha256": "cfa750f4cba8d5acf0923c595ca3c257b0617c2cafed7d4ee08f4bc37d689e65"
+    "name": "内置中文版·v32fix·开源免费.ipa",
+    "label": "v32fix",
+    "size": 59565945,
+    "sha256": "ffbd9d7c7e73a0c5aab0ca3cd252d28e55272ac5f665ab3b4ecb6e2006c3ffea"
   },
   "android": {
-    "versionCode": 23,
-    "installedIpaName": "内置中文版·v31fix·开源免费.ipa"
+    "versionCode": 24,
+    "installedIpaName": "内置中文版·v32fix·开源免费.ipa"
   },
   "cumulativePatch": {
-    "name": "unsigned-to-v31fix-notice.zst",
+    "name": "unsigned-to-v32fix.zst",
     "baseName": "ZFR 1.0.zh-CN-unsigned.ipa",
     "baseSha256": "e7ce2d18bc77e513b4b4b382e4a9af9bb8a7133e5513b5a73955d3f3ee9a8f60",
-    "storedTargetSize": 71196503,
-    "storedTargetSha256": "1372b116827ce71dda49d455c5df95265636e2c63c9726ff2ff383d55750d26c"
+    "storedTargetSize": 71196711,
+    "storedTargetSha256": "e042f64854bf0ea11cd3e1c8d6a3791f80887a47b57b9a24f764d14910ce4676"
   }
 }

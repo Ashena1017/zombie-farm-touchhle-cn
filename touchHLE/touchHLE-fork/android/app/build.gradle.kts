@@ -8,6 +8,7 @@
  */
 import org.gradle.nativeplatform.platform.internal.DefaultNativePlatform
 import groovy.json.JsonSlurper
+import java.security.KeyStore
 import java.security.MessageDigest
 
 plugins {
@@ -64,25 +65,17 @@ val bundleZombieFarmIpa = tasks.register("bundleZombieFarmIpa") {
     }
 }
 
-android {
-    val releaseStoreFile = env("ANDROID_KEYSTORE_PATH")
-    val releaseStorePassword = env("ANDROID_KEYSTORE_PASSWORD")
-    val releaseKeyAlias = env("ANDROID_KEY_ALIAS")
-    val releaseKeyPassword = env("ANDROID_KEY_PASSWORD")
-    val hasReleaseSigning = listOf(
-        releaseStoreFile,
-        releaseStorePassword,
-        releaseKeyAlias,
-        releaseKeyPassword,
-    ).all { it != null }
+val testSigning = providers.gradleProperty("zfTestSigning").orNull == "true"
 
+android {
+    val branding = getTouchHLEBranding()
+    val testAppName = join("僵尸农场·测试版", " ", branding)
     ndkVersion = "27.2.12479018"
     compileSdk = 36
     buildFeatures {
         buildConfig = true
     }
     defaultConfig {
-        val branding = getTouchHLEBranding()
         applicationId = "org.touchhle.zombiefarm"
         // 5: free/open-source statement (first-run dialog + permanent footer)
         // and the signing-certificate self-check.
@@ -95,7 +88,6 @@ android {
             applicationIdSuffix = branding.lowercase()
         }
         resValue("string", "app_name", join("Zombie Farm 游戏管理", " ", branding))
-        buildConfigField("String", "APP_NAME", "\"${join("Zombie Farm 游戏管理", " ", branding)}\"")
         manifestPlaceholders["icon"] = "@drawable/zombie_farm_icon"
         buildConfigField("int", "APP_ICON", "org.touchhle.android.R.drawable.zombie_farm_icon")
         versionName = join(releaseInfo["tag"] as String, " ", branding)
@@ -129,26 +121,34 @@ android {
         jvmTarget = "11"
     }
     signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
-                storeFile = file(releaseStoreFile!!)
-                storePassword = releaseStorePassword
-                keyAlias = releaseKeyAlias
-                keyPassword = releaseKeyPassword
-            }
+        getByName("debug") {
+            val projectTestStore = File(System.getProperty("user.home"), ".android/zombie-farm-test.keystore")
+            val customStore = env("ZF_TEST_KEYSTORE_PATH")?.let { file(it) }
+            if (customStore != null || projectTestStore.isFile) storeFile = customStore ?: projectTestStore
+            env("ZF_TEST_KEYSTORE_PASSWORD")?.let { storePassword = it }
+            env("ZF_TEST_KEY_ALIAS")?.let { keyAlias = it }
+            env("ZF_TEST_KEY_PASSWORD")?.let { keyPassword = it }
+        }
+        create("release") {
+            storeFile = env("ANDROID_KEYSTORE_PATH")?.let { file(it) }
+            storePassword = env("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = env("ANDROID_KEY_ALIAS")
+            keyPassword = env("ANDROID_KEY_PASSWORD")
         }
     }
     buildTypes {
         release {
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (testSigning) {
+                applicationIdSuffix = ".qa"
+                resValue("string", "app_name", testAppName)
             }
+            signingConfig = signingConfigs.getByName(if (testSigning) "debug" else "release")
             isMinifyEnabled = false
             isDebuggable = true // allow use of ADB to manage files, etc
         }
         debug {
+            applicationIdSuffix = ".qa.debug"
+            resValue("string", "app_name", testAppName)
             isMinifyEnabled = false
             packaging {
                 jniLibs.keepDebugSymbols.add("**/*.so")
@@ -195,6 +195,37 @@ android {
         abortOnError = false
     }
     namespace = "org.touchhle.android"
+}
+
+// Inspect the resolved task graph so aggregate and abbreviated Gradle requests
+// get the same check. IDE sync and compile-only tasks need no signing secrets.
+gradle.taskGraph.whenReady {
+    val appTasks = allTasks.filter { it.project == project }.map { it.name }.toSet()
+    val pinSource = file("src/main/java/org/touchhle/android/ManagerActivity.java")
+    fun checkSigner(configName: String, official: Boolean) {
+        val config = android.signingConfigs.getByName(configName)
+        val store = config.storeFile
+        if (!official && store != null && !store.exists()) return // AGP provisions a fresh default debug store.
+        check(store != null && store.isFile && !config.storePassword.isNullOrBlank() &&
+            !config.keyAlias.isNullOrBlank() && !config.keyPassword.isNullOrBlank()) {
+            "Missing Android $configName signing configuration. See scripts/README.md."
+        }
+        val keys = KeyStore.getInstance(store, config.storePassword!!.toCharArray())
+        check(keys.isKeyEntry(config.keyAlias)) { "Missing $configName signing key entry." }
+        val certificate = keys.getCertificate(config.keyAlias)
+        val digest = MessageDigest.getInstance("SHA-256").digest(certificate.encoded)
+            .joinToString("") { "%02x".format(it) }
+        val pin = Regex("""OFFICIAL_CERT\s*=\s*"([a-fA-F0-9]{64})""").find(pinSource.readText())?.groupValues?.get(1)
+            ?: error("Cannot read the official certificate fingerprint from ManagerActivity.java.")
+        check(digest.equals(pin, ignoreCase = true) == official) {
+            if (official) "Release certificate does not match the player APK."
+            else "Test builds require a separate certificate from the player APK."
+        }
+    }
+    fun packages(variant: String) = listOf("assemble$variant", "package$variant", "bundle$variant",
+        "sign${variant}Bundle", "validateSigning$variant", "package${variant}AndroidTest").any { it in appTasks }
+    if (packages("Release")) checkSigner(if (testSigning) "debug" else "release", !testSigning)
+    if (packages("Debug")) checkSigner("debug", false)
 }
 
 cargoNdk {

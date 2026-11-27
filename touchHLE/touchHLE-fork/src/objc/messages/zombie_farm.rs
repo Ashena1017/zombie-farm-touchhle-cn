@@ -17,15 +17,12 @@ use crate::frameworks::foundation::{
     ns_date, ns_dictionary, ns_property_list_serialization, ns_string, ns_url_connection,
     NSUInteger,
 };
-use crate::fs::GuestPath;
 use crate::mem::{guest_size_of, ConstPtr, MutPtr, MutVoidPtr};
 use crate::Environment;
 use crate::{msg, msg_class};
 use chrono::{DateTime, Local, LocalResult, NaiveDate, TimeZone, Utc};
-use plist::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::io::Cursor;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Mutex, OnceLock,
@@ -1439,28 +1436,6 @@ fn zombie_farm_get_id_arg_result_if_responds(
     (value != nil).then_some(value)
 }
 
-fn zombie_farm_get_i32_arg_result_if_responds(
-    env: &mut Environment,
-    receiver: id,
-    selector_name: &str,
-    arg: id,
-) -> Option<i32> {
-    if receiver == nil {
-        return None;
-    }
-    let Some(selector) = env.objc.lookup_selector(selector_name) else {
-        return None;
-    };
-    if !env.objc.object_has_method(&env.mem, receiver, selector) {
-        return None;
-    }
-
-    let regs = *env.cpu.regs();
-    let value: i32 = msg_send_no_type_checking(env, (receiver, selector, arg));
-    env.cpu.regs_mut().copy_from_slice(&regs);
-    Some(value)
-}
-
 fn zombie_farm_get_array_count(env: &mut Environment, array: id) -> Option<NSUInteger> {
     let Some(selector) = env.objc.lookup_selector("count") else {
         return None;
@@ -2395,204 +2370,96 @@ fn zombie_farm_post_notification_name_object(
     true
 }
 
-fn zombie_farm_parse_assignment_line(line: &str, key: &str) -> Option<String> {
-    let trimmed = line.trim();
-    let prefix = format!("{key} = ");
-    let value = trimmed.strip_prefix(&prefix)?.strip_suffix(';')?;
-    Some(value.trim().to_string())
+fn zombie_farm_owned_inventory_names(env: &mut Environment, inventory: id) -> id {
+    let names: id = msg_class![env; NSMutableSet set];
+    let name_key = ns_string::get_static_str(env, "name");
+    let tile_key = ns_string::get_static_str(env, "tile");
+    let count_key = ns_string::get_static_str(env, "count");
+    let len: NSUInteger = msg![env; inventory count];
+    for i in 0..len {
+        let entry: id = msg![env; inventory objectAtIndex:i];
+        let name: id = msg![env; entry objectForKey:name_key];
+        // GameData stores decorations one per tile record, consumables in counted stacks.
+        let tile: id = msg![env; entry objectForKey:tile_key];
+        let count: id = msg![env; entry objectForKey:count_key];
+        let quantity: i32 = msg![env; count intValue];
+        if name != nil && (tile != nil || quantity > 0) {
+            () = msg![env; names addObject:name];
+        }
+    }
+    names
 }
 
-fn zombie_farm_collect_loot_item_requirement_names_from_description(
-    description: &str,
-) -> Vec<String> {
-    let mut items = Vec::new();
-    let mut in_requirement = false;
-    let mut notification_id: Option<String> = None;
-    let mut notification_object: Option<String> = None;
-
-    for line in description.lines() {
-        let trimmed = line.trim();
-        if trimmed == "{" {
-            in_requirement = true;
-            notification_id = None;
-            notification_object = None;
+fn zombie_farm_restore_loot_quest(env: &mut Environment, quest: id, owned_names: id) -> usize {
+    let loot = ns_string::get_static_str(env, "kLootItemWonNotification");
+    let requirements: id = msg![env; quest requirements];
+    let len: NSUInteger = msg![env; requirements count];
+    let mut restored = 0;
+    for i in 0..len {
+        let req: id = msg![env; requirements objectAtIndex:i];
+        let event: id = msg![env; req notificationID];
+        let matches_loot: bool = msg![env; event isEqualToString:loot];
+        if !matches_loot {
             continue;
         }
-        if !in_requirement {
-            continue;
-        }
-        if trimmed == "}," || trimmed == "}" {
-            if notification_id.as_deref() == Some("kLootItemWonNotification") {
-                if let Some(item_name) = notification_object.take() {
-                    if !item_name.is_empty() {
-                        items.push(item_name);
-                    }
-                }
+        let kind: i32 = msg![env; req type];
+        let total: i32 = msg![env; req countTotal];
+        let current: i32 = msg![env; req countCurrent];
+        let item: id = msg![env; req notificationObject];
+        if (kind, total, current) == (1, 1, 0) && item != nil {
+            let owned: bool = msg![env; owned_names containsObject:item];
+            if owned {
+                () = msg![env; req setCountCurrent:1i32];
+                restored += 1;
             }
-            in_requirement = false;
-            notification_id = None;
-            notification_object = None;
-            continue;
-        }
-
-        if let Some(value) = zombie_farm_parse_assignment_line(trimmed, "notificationID") {
-            notification_id = Some(value);
-        } else if let Some(value) = zombie_farm_parse_assignment_line(trimmed, "notificationObject")
-        {
-            notification_object = Some(value);
         }
     }
-
-    items
-}
-
-fn zombie_farm_storage_key_for_display_name(
-    env: &mut Environment,
-    display_name: &str,
-) -> Option<String> {
-    let tile_properties_path = env
-        .fs
-        .home_directory()
-        .join("Documents/remoteAssets_1.0/TileProperties.plist");
-    let bytes = env
-        .fs
-        .read(GuestPath::new(tile_properties_path.as_str()))
-        .ok()?;
-    let root = Value::from_reader(Cursor::new(bytes)).ok()?;
-    let dict = root.as_dictionary()?;
-
-    for (storage_key, value) in dict {
-        let Some(entry) = value.as_dictionary() else {
-            continue;
-        };
-        let Some(name) = entry.get("name").and_then(Value::as_string) else {
-            continue;
-        };
-        if name == display_name {
-            return Some(storage_key.clone());
-        }
+    if restored > 0 {
+        // These are the original quest's progress and completion callbacks. Deliver only
+        // to the owner; broadcasting a fresh loot event would wake unrelated observers.
+        () = msg![env; quest requirementUpdated];
+        () = msg![env; quest requirementComplete];
     }
-
-    None
+    restored
 }
 
-fn zombie_farm_replay_loot_item_notifications_from_inventory(
-    env: &mut Environment,
-    quest_man: id,
-) -> usize {
+fn zombie_farm_restore_owned_loot(env: &mut Environment, quest_man: id) -> usize {
+    if !matches!(
+        env.bundle.bundle_identifier(),
+        "com.playforge.ZombieFarm.ZFR" | "com.playforge.ZFR.LZ54D2GT3D"
+    ) || env.bundle.bundle_version() != "1.0"
+    {
+        return 0;
+    }
     let Some(game_data) = zombie_farm_get_game_data(env) else {
-        log!(
-            "ZombieFarm workaround: quest inventory replay skipped because GameData is unavailable"
-        );
         return 0;
     };
-
-    let Some(quest_array) = zombie_farm_get_id_if_responds(env, quest_man, "questArray") else {
-        log!(
-            "ZombieFarm workaround: quest inventory replay skipped because questArray is unavailable"
-        );
+    let inventory: id = msg![env; game_data inventory];
+    let queue: id = msg![env; quest_man questQueue];
+    if inventory == nil || queue == nil {
         return 0;
-    };
-
-    let Some(quest_count) = zombie_farm_get_array_count(env, quest_array) else {
-        return 0;
-    };
-
-    let mut replayed = 0usize;
-    let mut loot_item_candidates = 0usize;
-    let mut replayed_items = HashSet::<String>::new();
-
-    for quest_idx in 0..quest_count {
-        let Some(quest_definition) =
-            zombie_farm_get_array_object_at_index(env, quest_array, quest_idx)
-        else {
-            continue;
-        };
-        let Some(description) =
-            zombie_farm_get_string_property(env, quest_definition, "description")
-        else {
-            continue;
-        };
-
-        let item_names =
-            zombie_farm_collect_loot_item_requirement_names_from_description(&description);
-        if item_names
-            .iter()
-            .any(|item_name| item_name.contains("Circus Flag"))
-        {
-            log!(
-                "ZombieFarm workaround: quest inventory replay parsed circus loot items from quest {}: {:?}",
-                quest_idx,
-                item_names
-            );
-        }
-
-        for item_name in item_names {
-            loot_item_candidates += 1;
-            if item_name.is_empty() || !replayed_items.insert(item_name.clone()) {
-                continue;
-            }
-
-            let item_name_ns = ns_string::from_rust_string(env, item_name.clone());
-            let owned_count_display_name_raw = zombie_farm_get_i32_arg_result_if_responds(
-                env,
-                game_data,
-                "numberOfItemInStorageWithKey:",
-                item_name_ns,
-            );
-            let storage_key = zombie_farm_storage_key_for_display_name(env, &item_name);
-            let owned_count_storage_key_raw = storage_key.as_ref().and_then(|storage_key| {
-                let storage_key_ns = ns_string::from_rust_string(env, storage_key.clone());
-                zombie_farm_get_i32_arg_result_if_responds(
-                    env,
-                    game_data,
-                    "numberOfItemInStorageWithKey:",
-                    storage_key_ns,
-                )
-            });
-            let owned_count_display_name = owned_count_display_name_raw.unwrap_or(0);
-            let owned_count_storage_key = owned_count_storage_key_raw.unwrap_or(0);
-            let owned_count = owned_count_display_name.max(owned_count_storage_key);
-
-            if item_name.contains("Circus Flag") {
-                log!(
-                    "ZombieFarm workaround: quest inventory replay item {:?}, storage key {:?}, owned display {:?}, owned key {:?}, effective {}",
-                    item_name,
-                    storage_key,
-                    owned_count_display_name_raw,
-                    owned_count_storage_key_raw,
-                    owned_count
-                );
-            }
-
-            if owned_count < 1 {
-                continue;
-            }
-
-            if zombie_farm_post_notification_name_object(
-                env,
-                "kLootItemWonNotification",
-                item_name_ns,
-            ) {
-                replayed += 1;
-                log!(
-                    "ZombieFarm workaround: replayed kLootItemWonNotification for {:?} (owned display={}, owned key={}, storage key {:?})",
-                    item_name,
-                    owned_count_display_name,
-                    owned_count_storage_key,
-                    storage_key
-                );
+    }
+    let owned_names = zombie_farm_owned_inventory_names(env, inventory);
+    // A completion can remove a quest, release its requirements and unlock another one.
+    // Keep the original quests alive and only process those that are still active.
+    let snapshot: id = msg![env; queue copy];
+    let len: NSUInteger = msg![env; snapshot count];
+    let mut restored = 0;
+    for i in 0..len {
+        let quest: id = msg![env; snapshot objectAtIndex:i];
+        let active: bool = msg![env; queue containsObject:quest];
+        let quest_id: i32 = msg![env; quest ID];
+        let completed: bool = msg![env; quest_man hasQuestBeenCompleted:quest_id];
+        if active && !completed {
+            let changed = zombie_farm_restore_loot_quest(env, quest, owned_names);
+            if changed > 0 {
+                log!("ZombieFarm: restored {changed} owned loot requirement(s) for quest {quest_id}");
+                restored += changed;
             }
         }
     }
-
-    log!(
-        "ZombieFarm workaround: quest inventory replay finished with {} replay(s) from {} loot item candidate(s)",
-        replayed,
-        loot_item_candidates
-    );
-
-    replayed
+    release(env, snapshot);
+    restored
 }
 
 fn zombie_farm_get_live_actor_list(env: &mut Environment) -> Option<id> {
@@ -3569,14 +3436,8 @@ fn zombie_farm_restore_local_quest_progress(
             );
             restored_any = true;
         }
-        let replayed = zombie_farm_replay_loot_item_notifications_from_inventory(env, quest_man);
-        if replayed > 0 {
+        if zombie_farm_restore_owned_loot(env, quest_man) > 0 {
             restored_any = true;
-            log!(
-                "ZombieFarm workaround: replayed {} offline loot quest notification(s) after {}",
-                replayed,
-                selector_name
-            );
         }
         if zombie_farm_send_noarg_if_responds(env, quest_man, "updateStats") {
             log!(

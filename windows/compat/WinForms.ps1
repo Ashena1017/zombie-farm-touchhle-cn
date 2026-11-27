@@ -1311,11 +1311,10 @@ function Update-SaveTab {
 
     $files = Get-BackupFiles
     foreach ($f in $files) {
-        $kind = Get-BackupKind -File $f
-        $item = New-Object System.Windows.Forms.ListViewItem($kind)
+        $item = New-Object System.Windows.Forms.ListViewItem($f.BackupKind)
         [void]$item.SubItems.Add($f.Name)
         [void]$item.SubItems.Add([string]$f.Length)
-        [void]$item.SubItems.Add($f.LastWriteTime.ToString('MM-dd HH:mm'))
+        [void]$item.SubItems.Add($f.BackupTime.ToString('MM-dd HH:mm'))
         $item.Tag = $f.FullName
         [void]$listSaves.Items.Add($item)
     }
@@ -1516,8 +1515,6 @@ function Start-GameProcess {
     Update-Status $BusyMessage 'busy'
     $form.Hide()
 
-    # The log belongs beside touchHLE's other state, not in the parent folder.
-    $logFile = Join-Path $script:HleDir 'zfr_last_run.log'
     $started = Get-Date
     $proc = $null
     try {
@@ -1528,10 +1525,7 @@ function Start-GameProcess {
         throw
     }
 
-    # Drain both pipes concurrently; reading them one after the other can deadlock
-    # if the child fills the second pipe's buffer while we block on the first.
-    $outTask = $proc.StandardOutput.ReadToEndAsync()
-    $errTask = $proc.StandardError.ReadToEndAsync()
+    $output = [ZfGameOutput]::new($proc, $script:HleDir)
 
     # Wait in slices rather than one blind WaitForExit(): a crash can leave the
     # process alive with its window gone, and then this method never returns and
@@ -1594,19 +1588,11 @@ function Start-GameProcess {
     # The timeout overload does not wait for the redirected readers; this one does.
     try { $proc.WaitForExit() } catch { }
 
-    $out = ''; $err = ''
-    try { $out = $outTask.Result } catch { }
-    try { $err = $errTask.Result } catch { }
+    $err = $output.Finish()
 
     $exitCode = $proc.ExitCode
     Remove-RunState
     Write-ManagerLog ('exit pid={0} code={1} after {2:N0}s' -f $proc.Id, $exitCode, ((Get-Date) - $started).TotalSeconds)
-
-    if ($out -or $err) {
-        $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-        $text = "[$stamp] exit=$exitCode`r`n$out`r`n$err`r`n"
-        Add-Content -LiteralPath $logFile -Value $text -Encoding UTF8
-    }
 
     $form.Show()
     $form.Activate()

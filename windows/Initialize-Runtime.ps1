@@ -6,6 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $project = Split-Path -Parent $PSScriptRoot
+. (Join-Path $project 'scripts\_file_hash.ps1')
 $runtime = Join-Path $project 'run\windows'
 $emulator = Join-Path $runtime 'touchHLE'
 $ipaDir = Join-Path $project 'zombie_farm_ipa'
@@ -34,7 +35,13 @@ try {
     foreach ($directory in $directories) {
         if (-not (Test-Path -LiteralPath (Join-Path $source $directory) -PathType Container)) { throw "Missing directory: $directory" }
     }
-    & (Join-Path $project 'scripts\_check_pinned_hashes.ps1') -ManagerPath (Join-Path $PSScriptRoot 'GameManager.ps1') -ExePath (Join-Path $source 'touchHLE.exe') -IpaPath $sourceIpa
+    $pinSource = Join-Path $PSScriptRoot 'GameManager.ps1'
+    $zipPin = Join-Path $PSScriptRoot 'bootstrap-zip.sha256'
+    if ((Test-Path -LiteralPath $zipPin -PathType Leaf) -and (Get-Sha256Hex $archive) -eq [IO.File]::ReadAllText($zipPin).Trim()) {
+        # A fresh maintenance checkout can seed its dependencies from the published portable release.
+        $pinSource = Join-Path $bundle 'GameManager.ps1'
+    }
+    & (Join-Path $project 'scripts\_check_pinned_hashes.ps1') -ManagerPath $pinSource -ManifestPath (Join-Path $project 'release.json') -ExePath (Join-Path $source 'touchHLE.exe') -IpaPath $sourceIpa
     if ($LASTEXITCODE -ne 0) { throw 'The ZIP does not match the pinned Windows runtime.' }
 
     New-Item -ItemType Directory -Path $emulator, $ipaDir -Force | Out-Null
@@ -52,16 +59,23 @@ try {
         New-Item -ItemType Junction -Path $ipaLink -Target $ipaDir | Out-Null
     }
 
-    foreach ($name in $files + $directories) {
-        $destination = Join-Path $emulator $name
-        if (-not (Test-Path -LiteralPath $destination)) {
-            Copy-Item -LiteralPath (Join-Path $source $name) -Destination $destination -Recurse
+    function Install-RuntimeFile([string]$From, [string]$To) {
+        [void][IO.Directory]::CreateDirectory((Split-Path -Parent $To))
+        if (-not [IO.File]::Exists($To)) { [IO.File]::Copy($From, $To, $false) }
+        if ((Get-Sha256Hex $From) -ne (Get-Sha256Hex $To)) {
+            throw "Existing runtime file differs from the verified ZIP: $To"
         }
     }
-    $destinationIpa = Join-Path $ipaDir $ipaName
-    if (-not (Test-Path -LiteralPath $destinationIpa)) {
-        Copy-Item -LiteralPath $sourceIpa -Destination $destinationIpa
+    foreach ($name in $files) { Install-RuntimeFile (Join-Path $source $name) (Join-Path $emulator $name) }
+    foreach ($directory in $directories) {
+        $members = @(Get-ChildItem -File -Recurse -LiteralPath (Join-Path $source $directory))
+        if (-not $members.Count) { throw "Runtime ZIP contains an empty $directory directory." }
+        foreach ($member in $members) {
+            $relative = $member.FullName.Substring($source.Length + 1)
+            Install-RuntimeFile $member.FullName (Join-Path $emulator $relative)
+        }
     }
+    Install-RuntimeFile $sourceIpa (Join-Path $ipaDir $ipaName)
     $options = Join-Path $emulator 'touchHLE_options.txt'
     if (-not (Test-Path -LiteralPath $options)) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'touchHLE_options.txt') -Destination $options

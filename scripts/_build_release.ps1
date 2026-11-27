@@ -53,7 +53,7 @@ try {
     Log '--- manager (top level) ---'
     & (Join-Path $windowsDir 'launcher\build.ps1') -Destination (Join-Path $release '游戏管理.exe')
     New-Item -ItemType Directory -Path (Join-Path $release 'compat') | Out-Null
-    foreach ($f in @('GameManager.ps1', 'ManagerWorker.ps1', 'compat\WinForms.ps1')) {
+    foreach ($f in @('GameManager.ps1', 'ManagerWorker.ps1', 'GameOutput.cs', 'compat\WinForms.ps1')) {
         $src = Join-Path $windowsDir $f
         if (-not (Test-Path -LiteralPath $src)) { throw "missing: $src" }
         Copy-Item -LiteralPath $src -Destination (Join-Path $release $f)
@@ -404,6 +404,7 @@ try {
         @{ Rel = 'touchHLE\touchHLE.exe';                 File = (Join-Path $hleDir 'touchHLE.exe') },
         @{ Rel = ('zombie_farm_ipa\' + $ipaName);         File = (Join-Path (Join-Path $release 'zombie_farm_ipa') $ipaName) },
         @{ Rel = 'GameManager.ps1';                       File = (Join-Path $release 'GameManager.ps1') },
+        @{ Rel = 'GameOutput.cs'; File = (Join-Path $release 'GameOutput.cs') },
         @{ Rel = 'ManagerWorker.ps1';                     File = (Join-Path $release 'ManagerWorker.ps1') },
         @{ Rel = 'compat\WinForms.ps1';                  File = (Join-Path $release 'compat\WinForms.ps1') },
         @{ Rel = 'release.json';                          File = (Join-Path $release 'release.json') },
@@ -437,7 +438,8 @@ try {
         '  echo   请从官方地址重新下载：https://github.com/Ashena1017/zombie-farm-touchhle-cn',
         ')',
         'echo.',
-        'pause',
+        'if /i not "%~1"=="--no-pause" pause',
+        'if not "!FAILS!"=="0" exit /b 1',
         'exit /b 0',
         '',
         ':check',

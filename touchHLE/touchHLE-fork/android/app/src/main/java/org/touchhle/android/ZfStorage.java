@@ -20,6 +20,7 @@ public final class ZfStorage {
     private static final String LEGACY_BUNDLED = "Zombie_Farm_v29fix.ipa";
     static final String DEFAULT_FAMILY = "iphone";
     static final String DEFAULT_SCALE = "3";
+    private static final String SAVE_PATH = "Documents/saveGame.bin2";
     static final long MAX_GAME_EPOCH = 2147483000L;
     private static final int MAX_SAVE_BYTES = 16 * 1024 * 1024;
     private static final long MAX_BACKUP_DATA_BYTES = 128L * 1024 * 1024;
@@ -292,17 +293,21 @@ public final class ZfStorage {
         return advance(id, seconds, settings(id));
     }
     long advance(String id, long seconds, JSONObject app) throws Exception {
-        long before = app.optLong("offset", 0);
+        long after = advancedOffset(app.optLong("offset", 0), seconds);
+        settings(id, app.put("offset", after));
+        return after;
+    }
+    static long advancedOffset(long before, long seconds) {
         if (seconds < 0 || before < 0 || seconds > Long.MAX_VALUE - before
                 || seconds + before > MAX_GAME_EPOCH - System.currentTimeMillis() / 1000)
             throw new IllegalArgumentException("累计时间超出游戏支持范围");
-        app.put("offset", before + seconds); settings(id, app); return before + seconds;
+        return before + seconds;
     }
     public File sandbox(String id) throws IOException {
         if (!id.matches("com\\.playforge\\.[A-Za-z0-9.]+")) throw new IOException("应用标识无效");
         return new File(new File(root, "touchHLE_sandbox"), id);
     }
-    public File live(String id) throws IOException { return new File(sandbox(id), "Documents/saveGame.bin2"); }
+    public File live(String id) throws IOException { return new File(sandbox(id), SAVE_PATH); }
     public ZfSave currency(String id) throws Exception { return ZfSave.read(bytes(live(id))); }
     private File backupDir(String id) throws IOException { File dir = new File(new File(root, "zf_backups"), id); mkdir(dir); return dir; }
     public List<File> backups(String id) throws IOException {
@@ -312,16 +317,25 @@ public final class ZfStorage {
         return result;
     }
     public File backup(String id, String kind) throws Exception {
+        return writeBackup(id, kind, false);
+    }
+    private static long checkedBackupOffset(long offset) {
+        if (offset < 0 || offset > MAX_GAME_EPOCH - System.currentTimeMillis() / 1000)
+            throw new IllegalArgumentException("备份的累计时间无效");
+        return offset;
+    }
+    private File writeBackup(String id, String kind, boolean preserveDamaged) throws Exception {
         File save = live(id);
         if (!save.isFile()) throw new IOException("还没有存档，请先进入游戏创建存档");
         if (save.length() > MAX_SAVE_BYTES) throw new IOException("存档大小超出限制");
         String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(new Date());
-        File target = new File(backupDir(id), stamp + "_" + kind + "_" + UUID.randomUUID().toString().substring(0, 4) + ".zip");
+        File directory = backupDir(id);
+        File target = new File(directory, stamp + "_" + kind + "_" + UUID.randomUUID().toString().substring(0, 4) + ".zip");
         File temp = new File(target.getPath() + ".tmp");
         try {
+            long offset = settings(id).optLong("offset", 0);
             try (FileOutputStream file = new FileOutputStream(temp); ZipOutputStream zip = new ZipOutputStream(file)) {
-                JSONObject metadata = new JSONObject().put("format", 1).put("appId", id)
-                    .put("offset", settings(id).optLong("offset", 0));
+                JSONObject metadata = new JSONObject().put("format", 1).put("appId", id).put("offset", offset);
                 zip.putNextEntry(new ZipEntry("zf_backup.json"));
                 zip.write(metadata.toString().getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
                 zipDirectory(zip, sandbox(id), "sandbox/", new BackupLimits());
@@ -329,6 +343,21 @@ public final class ZfStorage {
                 file.getFD().sync();
             }
             if (temp.length() > MAX_BACKUP_ARCHIVE_BYTES) throw new IOException("备份文件大小超出限制");
+            // Validate the bytes in the finished ZIP with the same checks used by restore.
+            try (ZipFile archive = new ZipFile(temp)) {
+                ZipEntry main = archive.getEntry("sandbox/" + SAVE_PATH);
+                if (main == null) throw new IOException("备份缺少主存档");
+                try (InputStream in = archive.getInputStream(main)) {
+                    ZfSave.read(ZfIpa.readLimited(in, MAX_SAVE_BYTES));
+                }
+                checkedBackupOffset(offset);
+            } catch (IllegalArgumentException damaged) {
+                if (!preserveDamaged) throw damaged;
+                // Keep the original sandbox available in the system Files app for manual recovery.
+                File recovery = new File(directory, "recovery");
+                mkdir(recovery);
+                target = new File(recovery, target.getName());
+            }
             android.system.Os.rename(temp.getPath(), target.getPath()); return target;
         } finally { temp.delete(); }
     }
@@ -370,7 +399,7 @@ public final class ZfStorage {
     public void importSave(String id, InputStream in) throws Exception {
         byte[] imported = ZfIpa.readLimited(in, MAX_SAVE_BYTES); ZfSave.read(imported);
         File save = live(id); byte[] original = save.isFile() ? bytes(save) : null;
-        if (original != null) backup(id, "导入前");
+        if (original != null) writeBackup(id, "导入前", true);
         try {
             atomic(save, imported);
             if (!Arrays.equals(bytes(save), imported)) throw new IOException("导入后校验失败");
@@ -417,13 +446,11 @@ public final class ZfStorage {
             }
             if (metadata == null || metadata.optInt("format") != 1 || !id.equals(metadata.optString("appId")))
                 throw new IOException("请选择当前游戏版本的 ZF 存档备份");
-            ZfSave.read(bytes(new File(incoming, "Documents/saveGame.bin2")));
-            long offset = metadata.optLong("offset", -1);
-            if (offset < 0 || offset > MAX_GAME_EPOCH - System.currentTimeMillis() / 1000)
-                throw new IOException("备份的累计时间无效");
+            ZfSave.read(bytes(new File(incoming, SAVE_PATH)));
+            long offset = checkedBackupOffset(metadata.optLong("offset", -1));
             File current = sandbox(id); mkdir(current.getParentFile());
             if (current.exists()) {
-                backup(id, "恢复前");
+                if (live(id).isFile()) writeBackup(id, "恢复前", true);
                 if (!current.renameTo(old)) throw new IOException("无法归档当前存档");
                 moved = true;
             }

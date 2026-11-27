@@ -52,6 +52,74 @@ public class ManagerTestRunner extends Instrumentation {
         }
         return bytes.toByteArray();
     }
+    private void checkDocumentTree(File testRoot) throws Exception {
+        File external = new File(testRoot, "provider");
+        if (!external.mkdir()) throw new IOException("Cannot create document provider fixture");
+        ContextWrapper context = new ContextWrapper(getTargetContext()) {
+            @Override public File getExternalFilesDir(String type) { return external; }
+        };
+        android.content.pm.ProviderInfo info = new android.content.pm.ProviderInfo();
+        info.authority = context.getPackageName() + ".provider";
+        info.exported = info.grantUriPermissions = true;
+        info.readPermission = info.writePermission = android.Manifest.permission.MANAGE_DOCUMENTS;
+        DocumentsProvider provider = new DocumentsProvider();
+        provider.attachInfo(context, info);
+
+        String label = context.getApplicationInfo().loadLabel(context.getPackageManager()).toString();
+        String title = android.provider.DocumentsContract.Root.COLUMN_TITLE;
+        try (android.database.Cursor roots = provider.queryRoots(new String[]{title})) {
+            check(label.contains("测试版") && roots.moveToFirst() && label.equals(roots.getString(0)),
+                "test edition is identified on the launcher and in the system file picker");
+        }
+        String directory = android.provider.DocumentsContract.Document.MIME_TYPE_DIR;
+        String farm = provider.createDocument("root/", directory, "farm");
+        String other = provider.createDocument("root/", directory, "farm-backup");
+        String item = provider.createDocument(farm, "text/plain", "crop.txt");
+        check(provider.isChildDocument(farm, item) && provider.isChildDocument("root/", item),
+            "file picker recognizes direct and nested children");
+        check(!provider.isChildDocument(farm, other), "file picker separates similarly named sibling directories");
+        String moved = provider.moveDocument(item, farm, other);
+        String renamed = provider.renameDocument(moved, "seed.txt");
+        check(provider.isChildDocument(other, renamed) && !provider.isChildDocument(farm, renamed)
+            && new File(external, "farm-backup/seed.txt").isFile(), "file picker tracks moved and renamed documents");
+    }
+    private void checkDamagedFarmRecovery(ZfStorage store, String id, File manual) throws Exception {
+        byte[] good = fixture();
+        File prefs = new File(store.sandbox(id), "Library/Preferences/game.plist");
+        for (boolean fromZip : new boolean[]{true, false}) {
+            byte[] old = fromZip ? new byte[0] : Arrays.copyOf(good, 50);
+            ZfStorage.atomic(store.live(id), old);
+            ZfStorage.atomic(prefs, new byte[]{42});
+            List<File> before = store.backups(id);
+            reject(() -> store.backup(id, "manual"), "damaged farm cannot create a manual backup, ZIP restore=" + fromZip);
+            check(before.equals(store.backups(id)), "failed manual backup leaves the list untouched, ZIP restore=" + fromZip);
+            if (fromZip) {
+                try (InputStream in = new FileInputStream(manual)) { store.restore(id, in); }
+            } else {
+                store.importSave(id, new ByteArrayInputStream(good));
+            }
+            byte[] expectedPrefs = fromZip ? "original preferences".getBytes(StandardCharsets.UTF_8) : new byte[]{42};
+            check(Arrays.equals(good, ZfStorage.bytes(store.live(id))) && Arrays.equals(expectedPrefs, ZfStorage.bytes(prefs))
+                && before.equals(store.backups(id)), "good farm replaces damaged save, ZIP restore=" + fromZip);
+            String kind = fromZip ? "_恢复前_" : "_导入前_";
+            File[] copies = new File(manual.getParentFile(), "recovery").listFiles((dir, name) -> name.contains(kind));
+            check(copies != null && copies.length == 1, "damaged original kept separately, ZIP restore=" + fromZip);
+            try (ZipFile zip = new ZipFile(copies[0]);
+                 InputStream save = zip.getInputStream(zip.getEntry("sandbox/Documents/saveGame.bin2"));
+                 InputStream preferences = zip.getInputStream(zip.getEntry("sandbox/Library/Preferences/game.plist"))) {
+                check(Arrays.equals(old, ZfIpa.readLimited(save, 1024)) && Arrays.equals(new byte[]{42}, ZfIpa.readLimited(preferences, 1024)),
+                    "recovery copy preserves the exact damaged save and preferences, ZIP restore=" + fromZip);
+            }
+        }
+        JSONObject settings = store.settings(id);
+        long previous = settings.optLong("offset", 0);
+        store.settings(id, settings.put("offset", Long.MAX_VALUE));
+        try {
+            reject(() -> store.backup(id, "manual"), "manual backup rejects a clock the game could never restore");
+        } finally {
+            store.settings(id, settings.put("offset", previous));
+        }
+    }
     private void checkAppearance() {
         android.content.SharedPreferences prefs = getTargetContext().getSharedPreferences("appearance_test", 0);
         prefs.edit().clear().commit();
@@ -92,7 +160,9 @@ public class ManagerTestRunner extends Instrumentation {
         Bundle result = new Bundle(); File root = new File(getTargetContext().getCacheDir(), "zf-manager-tests-" + UUID.randomUUID());
         try {
             checkAppearance();
-            root.mkdirs(); ZfStorage store = new ZfStorage(getTargetContext(), root, new File(root, "test.lock"));
+            if (!root.mkdirs()) throw new IOException("Cannot create test directory");
+            checkDocumentTree(root);
+            ZfStorage store = new ZfStorage(getTargetContext(), root, new File(root, "test.lock"));
             try (ZfStorage.Lease held = store.lock()) {
                 check(store.gameRunning(), "exclusive lock blocks a second operation");
                 check(store.ensureBundled() == null, "clean install extracts the fixed-name IPA without warning");
@@ -209,6 +279,31 @@ public class ManagerTestRunner extends Instrumentation {
                 check(new String(ZfStorage.bytes(profile), StandardCharsets.UTF_8).equals("original profile")
                     && new String(ZfStorage.bytes(preferences), StandardCharsets.UTF_8).equals("original preferences"), "backup restores profile and preferences");
                 check(store.settings(id).getLong("offset") == 3660, "backup restores cumulative clock");
+                for (boolean preferencesOnly : new boolean[]{false, true}) {
+                    ZfStorage.deleteTree(store.sandbox(id));
+                    if (preferencesOnly) ZfStorage.atomic(preferences, new byte[]{42});
+                    int countBefore = store.backups(id).size();
+                    try (InputStream in = new FileInputStream(manual)) { store.restore(id, in); }
+                    check(Arrays.equals(original, ZfStorage.bytes(store.live(id))) && store.backups(id).size() == countBefore,
+                        "first restore installs a full farm, preferencesOnly=" + preferencesOnly);
+                }
+                // Reject settings after the incoming sandbox is installed to exercise the rollback.
+                File configFile = new File(root, "zf_manager.json");
+                byte[] goodConfig = ZfStorage.bytes(configFile);
+                JSONObject invalidConfig = new JSONObject(new String(goodConfig, StandardCharsets.UTF_8));
+                invalidConfig.getJSONObject(id).put("family", "broken");
+                ZfStorage.atomic(configFile, invalidConfig.toString().getBytes(StandardCharsets.UTF_8));
+                ZfStorage.deleteTree(store.sandbox(id));
+                ZfStorage.atomic(preferences, new byte[]{10, 20});
+                try {
+                    reject(() -> { try (InputStream in = new FileInputStream(manual)) { store.restore(id, in); } },
+                        "settings failure rejects a partially installed restore");
+                    check(!store.live(id).exists() && Arrays.equals(ZfStorage.bytes(preferences), new byte[]{10, 20}),
+                        "settings failure restores the pre-existing preferences-only sandbox");
+                } finally {
+                    ZfStorage.atomic(configFile, goodConfig);
+                    try (InputStream in = new FileInputStream(manual)) { store.restore(id, in); }
+                }
                 byte[] traversal = hostileZip(id, "sandbox/../../escaped.bin");
                 reject(() -> store.restore(id, new ByteArrayInputStream(traversal)), "zip traversal refused");
                 check(!new File(root, "escaped.bin").exists() && Arrays.equals(original, ZfStorage.bytes(store.live(id))), "hostile backup leaves live data untouched");
@@ -217,6 +312,7 @@ public class ManagerTestRunner extends Instrumentation {
                 byte[] imported = ZfSave.edit(original, 999, 888);
                 store.importSave(id, new ByteArrayInputStream(imported));
                 check(Arrays.equals(imported, ZfStorage.bytes(store.live(id))), "raw save import exact readback");
+                checkDamagedFarmRecovery(store, id, manual);
                 try (InputStream in = getTargetContext().getAssets().open(ZfStorage.BUNDLED)) {
                     ZfIpa added = store.importIpa(in, "测试版本.IPA");
                     List<ZfIpa> versions = store.versions();

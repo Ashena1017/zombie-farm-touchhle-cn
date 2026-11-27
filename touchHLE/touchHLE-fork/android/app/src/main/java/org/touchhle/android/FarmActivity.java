@@ -1,0 +1,156 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * Parts of this file are derived from SDL 2's Android project template, which
+ * has a different license. Please see vendor/SDL/LICENSE.txt for details.
+ */
+package org.touchhle.android;
+
+import android.os.Build;
+import android.os.Bundle;
+import android.content.Intent;
+import android.app.AlertDialog;
+import android.widget.Toast;
+import android.view.View;
+import android.view.InputDevice;
+import android.view.KeyEvent;
+import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
+
+import org.libsdl.app.SDLActivity;
+
+/**
+ * A wrapper class over SDLActivity
+ */
+
+public class FarmActivity extends SDLActivity {
+    static boolean running;
+    private ZfStorage.Lease gameLease;
+    private String[] launchArguments = new String[0];
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        MainActivity.Prepared launch = MainActivity.takePrepared();
+        if (launch == null) {
+            super.onCreate(savedInstanceState);
+            finish();
+            return;
+        }
+        gameLease = launch.lease;
+        launchArguments = launch.arguments;
+        super.onCreate(savedInstanceState);
+        try {
+            if (mBrokenLibraries) throw new java.io.IOException("无法加载游戏运行库");
+            launch.commit();
+            launch.owner.complete(RESULT_OK, null);
+        } catch (Exception e) {
+            launch.owner.complete(RESULT_CANCELED, e.getMessage());
+            finish();
+            return;
+        }
+        running = true;
+        hideSystemBars();
+        if (launch.warning != null) ManagerActivity.showBundledWarning(this, launch.warning);
+    }
+
+    @Override
+    protected String[] getArguments() { return launchArguments; }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent.getBooleanExtra("stop_game", false)) finish();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // SDL consumes hardware Back as a keyboard event before Activity.onBackPressed.
+        if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && !event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+            if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled()) onBackPressed();
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override public void onBackPressed() {
+        new AlertDialog.Builder(this).setTitle("返回游戏管理？")
+            .setNegativeButton("继续游戏", null)
+            .setPositiveButton("退出游戏", (dialog, which) -> finish()).show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            super.onDestroy();
+        } finally {
+            running = false;
+            if (gameLease != null) {
+                try { gameLease.close(); } catch (java.io.IOException ignored) {}
+            }
+            // Reset SDL, the emulator and its cached clock for the next launch.
+            // Only this dedicated :game process exits; the manager stays alive.
+            android.os.Process.killProcess(android.os.Process.myPid());
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        hideSystemBars();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            hideSystemBars();
+        }
+    }
+
+    @Override
+    public void onSystemUiVisibilityChange(int visibility) {
+        // SDL can request a windowed style while creating or rotating its window.
+        // Keep this Android game fullscreen, including after those requests.
+        if (!mFullscreenModeActive && hasWindowFocus()) {
+            hideSystemBars();
+        }
+        super.onSystemUiVisibilityChange(visibility);
+    }
+
+    private void hideSystemBars() {
+        Window window = getWindow();
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        mFullscreenModeActive = true;
+
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false);
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                controller.setSystemBarsBehavior(
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                controller.hide(WindowInsets.Type.systemBars());
+            }
+        } else {
+            window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        }
+    }
+
+    @Override
+    protected String[] getLibraries() {
+        return new String[]{
+            "SDL2",
+            "touchHLE"
+        };
+    }
+}

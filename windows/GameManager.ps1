@@ -49,11 +49,12 @@ if (Test-Path -LiteralPath $repositoryPaths -PathType Leaf) {
 # touchHLE resolves resources against its current directory. Start-GameProcess
 # launches it with HleDir as its working directory.
 $script:OptionsFile = Join-Path $script:HleDir 'touchHLE_options.txt'
-$script:BundledIpaName = '内置中文版·v31fix·开源免费.ipa'
+$script:BundledIpaName = '内置中文版·v32fix·开源免费.ipa'
 $script:SupersededIpaNames = @(
     'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix.ipa',
     'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v29fix-notice.ipa',
-    'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa'
+    'Zombie Farm ZFR 1.0.zh-CN-complete-final.fixed-fonts-v30fix-notice.ipa',
+    '内置中文版·v31fix·开源免费.ipa'
 )
 # Records which IPA the user picked, so the choice survives a restart. Kept at the
 # top level, since it describes the manager's state rather than touchHLE's.
@@ -92,8 +93,8 @@ $script:NoticeFile = Join-Path $script:RuntimeRoot 'launcher_notice_seen.txt'
 #
 # The packager checks these pins and the IPA name against release.json. The
 # installed manager can still check the official files if that manifest changes.
-$script:PinnedExeSha256 = 'C925A60E194CB432A24BFFDB7E3B0FFAAF6320F0114FAFEA73B45A901BC3A9B5'
-$script:PinnedIpaSha256 = 'CFA750F4CBA8D5ACF0923C595CA3C257B0617C2CAFED7D4EE08F4BC37D689E65'
+$script:PinnedExeSha256 = '8C96BDB70D50381851BED84437CC2D568C6F7DA906E7C3D449B91542DB9C1F37'
+$script:PinnedIpaSha256 = 'FFBD9D7C7E73A0C5AAB0CA3CD252D28E55272AC5F665AB3B4ECB6E2006C3FFEA'
 
 # Filled in by Invoke-IntegrityCheck; empty until the manager has hashed once.
 $script:IntegrityRows = @()
@@ -275,9 +276,14 @@ function Read-IpaInfo {
         Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
         $zip = [System.IO.Compression.ZipFile]::OpenRead($Path)
         try {
-            $entry = $zip.Entries | Where-Object {
-                $_.FullName -like 'Payload/*.app/Info.plist'
-            } | Select-Object -First 1
+            # touchHLE selects the first top-level .app component in ZIP order.
+            $entry = $null
+            foreach ($item in $zip.Entries) {
+                if ($item.FullName -cmatch '^(Payload/[^/]+\.app)/') {
+                    $entry = $zip.GetEntry($Matches[1] + '/Info.plist')
+                    break
+                }
+            }
             if (-not $entry) {
                 $result.Error = '没有 Payload/*.app/Info.plist'
                 return $result
@@ -292,30 +298,21 @@ function Read-IpaInfo {
             $plist = Read-BinaryPlist -Data $bytes
 
             if ($null -eq $plist) {
-                # Not a binary plist: try the XML form.
-                $text = [System.Text.Encoding]::UTF8.GetString($bytes)
-                $m = [regex]::Match($text, 'CFBundleIdentifier</key>\s*<string>([^<]+)</string>')
-                if ($m.Success) {
-                    $result.AppId = $m.Groups[1].Value
-                    $m2 = [regex]::Match($text, 'CFBundleExecutable</key>\s*<string>([^<]+)</string>')
-                    if ($m2.Success) { $result.Executable = $m2.Groups[1].Value }
-                } else {
-                    $result.Error = 'Info.plist 既不是二进制也不是可识别的 XML 格式'
+                $xml = New-Object System.Xml.XmlDocument
+                $xml.XmlResolver = $null
+                $ms.Position = 0
+                $xml.Load($ms)
+                $plist = @{}
+                foreach ($key in $xml.SelectNodes('/plist/dict/key')) {
+                    $value = $key.SelectSingleNode('following-sibling::*[1]')
+                    if ($value.LocalName -in @('string', 'integer')) { $plist[$key.InnerText] = $value.InnerText }
                 }
-            } else {
-                if ($plist.ContainsKey('CFBundleIdentifier')) {
-                    $result.AppId = [string]$plist['CFBundleIdentifier']
-                }
-                if ($plist.ContainsKey('CFBundleExecutable')) {
-                    $result.Executable = [string]$plist['CFBundleExecutable']
-                }
-                if ($plist.ContainsKey('CFBundleShortVersionString')) {
-                    $result.Version = [string]$plist['CFBundleShortVersionString']
-                } elseif ($plist.ContainsKey('CFBundleVersion')) {
-                    $result.Version = [string]$plist['CFBundleVersion']
-                }
-                if (-not $result.AppId) { $result.Error = 'Info.plist 里没有 CFBundleIdentifier' }
             }
+            $result.AppId = $plist['CFBundleIdentifier']
+            $result.Executable = $plist['CFBundleExecutable']
+            $result.Version = $plist['CFBundleShortVersionString']
+            if (-not $result.Version) { $result.Version = $plist['CFBundleVersion'] }
+            if (-not $result.AppId) { $result.Error = 'Info.plist 里没有 CFBundleIdentifier' }
         } finally { $zip.Dispose() }
     } catch {
         $result.Error = $_.Exception.Message
@@ -1026,6 +1023,25 @@ function Test-GameRunning {
 # Paths the launcher needs. Defined up here (rather than next to the launching
 # code further down) so the -SelfTest block, which runs before that code is
 # parsed into scope, can still verify them.
+function Get-FarmOffsetPath([string]$Id, [string]$Emulator = $script:HleDir, [switch]$ReadOnly) {
+    if (-not $Id) { return $null }
+    if ($Id -notmatch '^[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*$') { throw 'IPA 的应用标识无效。' }
+    $folder = Join-Path $Emulator ('touchHLE_sandbox\{0}' -f $Id)
+    $path = Join-Path $folder 'touchHLE_time_offset_seconds.txt'
+    # Older managers kept a single clock without recording its owner. Migrate it
+    # once to the bundled farm, even if an extra IPA is selected first.
+    if (-not $ReadOnly -and $Id -ceq 'com.playforge.ZombieFarm.ZFR' -and -not [IO.File]::Exists($path)) {
+        $legacy = Join-Path $Emulator 'touchHLE_time_offset_seconds.txt'
+        if ([IO.File]::Exists($legacy)) {
+            [void][IO.Directory]::CreateDirectory($folder)
+            try { [IO.File]::Move($legacy, $path) } catch [IO.IOException] {
+                if (-not [IO.File]::Exists($path)) { throw }
+            }
+        }
+    }
+    return $path
+}
+
 function Get-LaunchPaths {
     $ipa = $null
     if ($null -ne $script:CurrentIpa) { $ipa = $script:CurrentIpa.Path }
@@ -1033,7 +1049,7 @@ function Get-LaunchPaths {
 
     return [pscustomobject]@{
         # touchHLE's own state lives beside touchHLE.exe.
-        OffsetFile  = Join-Path $script:HleDir 'touchHLE_time_offset_seconds.txt'
+        OffsetFile  = Get-FarmOffsetPath $script:AppId -ReadOnly:$SelfTest
         Fingerprint = Join-Path $script:HleDir 'zfr_last_launch.txt'
         TouchHLE    = Join-Path $script:HleDir 'touchHLE.exe'
         Ipa         = $ipa
@@ -1092,13 +1108,25 @@ function Get-BackupFiles {
     param([string]$Directory = $script:SaveDir)
 
     if (-not $Directory -or -not (Test-Path -LiteralPath $Directory)) { return @() }
-    $prefix = $script:BackupPrefix
-    return @(Get-ChildItem -LiteralPath $Directory -File |
-        Where-Object {
-            $_.Name -like "$prefix*" -and
-            -not $_.Name.EndsWith($script:BackupOffsetSuffix, [System.StringComparison]::OrdinalIgnoreCase)
-        } |
-        Sort-Object LastWriteTime -Descending)
+    $formats = [string[]]@('yyyyMMdd-HHmmss-fff', 'yyyyMMdd-HHmmss')
+    $pattern = '^saveGame\.bin2\.bak-(?<stamp>[0-9]{8}-[0-9]{6}(?:-[0-9]{3})?)(?:-(?<label>(?![0-9]+$).+?))?(?:-(?<sequence>[0-9]+))?$'
+    $files = foreach ($file in (Get-ChildItem -LiteralPath $Directory -File -Filter "$($script:BackupPrefix)*")) {
+        if ($file.Name.EndsWith($script:BackupOffsetSuffix, [StringComparison]::OrdinalIgnoreCase)) { continue }
+        # Copying a save keeps its original modification time. The filename records
+        # when the backup was made, even after it moves to another installation.
+        $time = $file.CreationTime
+        $kind = '备份'
+        [long]$sequence = 0
+        [datetime]$parsed = [datetime]::MinValue
+        if ($file.Name -match $pattern -and [datetime]::TryParseExact($Matches.stamp, $formats,
+                [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)) {
+            $time = $parsed
+            if ($Matches.label) { $kind = $Matches.label }
+            [void][long]::TryParse($Matches.sequence, [ref]$sequence)
+        }
+        Add-Member -InputObject $file -NotePropertyMembers @{ BackupTime = $time; BackupKind = $kind; BackupSequence = $sequence } -PassThru
+    }
+    return @($files | Sort-Object -Property BackupTime, BackupSequence, CreationTime, Name -Descending)
 }
 
 function Get-BackupOffsetPath {
@@ -1109,7 +1137,7 @@ function Get-BackupOffsetPath {
 function Read-TimeOffset {
     param([string]$Path = (Get-LaunchPaths).OffsetFile)
 
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return [int64]0 }
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return [int64]0 }
     $text = [System.IO.File]::ReadAllText($Path).Trim()
     if (-not $text) { return [int64]0 }
     [int64]$value = 0
@@ -1138,24 +1166,30 @@ function Get-SimulatedTimeBase {
     return [DateTimeOffset]::UtcNow
 }
 
-function Write-TimeOffset {
-    param(
-        [Parameter(Mandatory = $true)][int64]$Value,
-        [string]$Path = (Get-LaunchPaths).OffsetFile
-    )
+function Invoke-WithTimeOffsetLock([scriptblock]$Action) {
+    # CLI launches, GUI launches and explicit clock changes can come from different processes.
+    $mutex = [Threading.Mutex]::new($false, 'Local\ZombieFarm.TimeOffset')
+    try {
+        try { $acquired = $mutex.WaitOne(15000) }
+        catch [Threading.AbandonedMutexException] { $acquired = $true }
+        if (-not $acquired) { throw '另一个操作正在更新模拟时间，请稍后再试。' }
+        try { & $Action } finally { $mutex.ReleaseMutex() }
+    } finally { $mutex.Dispose() }
+}
 
+# Caller holds the clock lock. File.Replace can keep the exact original for a failed launch.
+function Set-TimeOffsetFile([string]$Path, [int64]$Value, [string]$PreviousPath) {
     if ($Value -lt 0) { throw '累计时间偏移不能为负数。' }
     $directory = Split-Path -Parent $Path
     if (-not (Test-Path -LiteralPath $directory -PathType Container)) {
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
     }
     $temp = Join-Path $directory ('.time-offset-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
-    $replaced = "$Path.bak-$([Guid]::NewGuid().ToString('N'))"
     try {
         [System.IO.File]::WriteAllText($temp, [string]$Value, [System.Text.Encoding]::ASCII)
         if (Test-Path -LiteralPath $Path -PathType Leaf) {
-            [System.IO.File]::Replace($temp, $Path, $replaced)
-            Remove-Item -LiteralPath $replaced -Force -ErrorAction SilentlyContinue
+            if ($PreviousPath) { [IO.File]::Replace($temp, $Path, $PreviousPath) }
+            else { [IO.File]::Replace($temp, $Path, [NullString]::Value) }
         } else {
             [System.IO.File]::Move($temp, $Path)
         }
@@ -1163,22 +1197,66 @@ function Write-TimeOffset {
         if (Test-Path -LiteralPath $temp) {
             Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
         }
-        if (Test-Path -LiteralPath $replaced) {
-            Remove-Item -LiteralPath $replaced -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Write-TimeOffset {
+    param(
+        [Parameter(Mandatory = $true)][int64]$Value,
+        [string]$Path = (Get-LaunchPaths).OffsetFile
+    )
+    Invoke-WithTimeOffsetLock { Set-TimeOffsetFile -Path $Path -Value $Value }
+}
+
+function Start-GameWithTimeOffset {
+    param([Diagnostics.ProcessStartInfo]$StartInfo, $Paths, [int64]$SkipSeconds, [switch]$Reset, [string]$IpaHash)
+
+    if (-not $IpaHash) { $IpaHash = Get-Sha256Hex $Paths.Ipa }
+    $offsetFile = $Paths.OffsetFile
+    Invoke-WithTimeOffsetLock {
+        $offset = if ($Reset) { [int64]0 } else { Read-TimeOffset -Path $OffsetFile }
+        if ($SkipSeconds -lt 0 -or $SkipSeconds -gt ([int64]::MaxValue - $offset)) {
+            throw '累计时间偏移超出范围。'
         }
+        $offset += $SkipSeconds
+        [void](Format-SimulatedTime -Offset $offset -Base (Get-SimulatedTimeBase))
+        $StartInfo.EnvironmentVariables['TOUCHHLE_TIME_OFFSET_SECONDS'] = [string]$offset
+        $previous = $null
+        if ($SkipSeconds -gt 0 -or $Reset) {
+            $previous = "$OffsetFile.bak-$([Guid]::NewGuid().ToString('N'))"
+            Set-TimeOffsetFile -Path $OffsetFile -Value $offset -PreviousPath $previous
+        }
+        try {
+            $child = [Diagnostics.Process]::Start($StartInfo)
+        } catch {
+            if ($previous) {
+                if ([IO.File]::Exists($previous)) { [IO.File]::Replace($previous, $OffsetFile, [NullString]::Value) }
+                else { [IO.File]::Delete($OffsetFile) }
+            }
+            throw
+        }
+        if ([IO.File]::Exists($previous)) { Remove-Item -LiteralPath $previous -Force -ErrorAction SilentlyContinue }
+        # Record successful launches in their actual order. A diagnostic cannot undo a running child.
+        try {
+            @("ipa = $(Split-Path -Leaf $Paths.Ipa)", "sha256 = $IpaHash", "launched = $(Get-Date -Format o)") |
+                Set-Content -LiteralPath $Paths.Fingerprint -Encoding utf8
+        } catch { Write-ManagerLog "Could not write launch fingerprint: $_" }
+        return $child
     }
 }
 
 function Write-BackupOffset {
     param(
         [Parameter(Mandatory = $true)][string]$BackupPath,
-        [Parameter(Mandatory = $true)][int64]$Value
+        [Parameter(Mandatory = $true)][int64]$Value,
+        [string]$ContentPath = $BackupPath
     )
 
     $metadataPath = Get-BackupOffsetPath -BackupPath $BackupPath
     $temp = Join-Path (Split-Path -Parent $BackupPath) ('.zf-offset-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
     try {
-        [System.IO.File]::WriteAllText($temp, [string]$Value, [System.Text.Encoding]::ASCII)
+        $metadata = @{ format = 1; offset = $Value; size = (Get-Item -LiteralPath $ContentPath).Length; sha256 = Get-Sha256Hex $ContentPath }
+        [System.IO.File]::WriteAllText($temp, ($metadata | ConvertTo-Json -Compress), [Text.Encoding]::ASCII)
         [System.IO.File]::Move($temp, $metadataPath)
         [System.IO.File]::SetAttributes($metadataPath, [System.IO.FileAttributes]::Hidden)
     } finally {
@@ -1186,19 +1264,6 @@ function Write-BackupOffset {
             Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
         }
     }
-}
-
-# Short label for a backup row: the label the backup was made with (e.g. manual,
-# pre-restore), or "备份" for a plain timestamped snapshot.
-function Get-BackupKind {
-    param([System.IO.FileInfo]$File)
-
-    $m = [regex]::Match($File.Name, '^saveGame\.bin2\.bak-(\d{8}-\d{6})(?:-(.+))?$')
-    if ($m.Success) {
-        if ($m.Groups[2].Success) { return $m.Groups[2].Value }
-        return '备份'
-    }
-    return '备份'
 }
 
 function New-SaveBackup {
@@ -1216,7 +1281,7 @@ function New-SaveBackup {
     }
 
     $offset = Read-TimeOffset -Path $OffsetFile
-    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $stamp = [datetime]::Now.ToString('yyyyMMdd-HHmmss-fff', [Globalization.CultureInfo]::InvariantCulture)
     $target = Join-Path $Directory ("{0}-{1}-{2}" -f $script:BackupPrefix, $stamp, $Label)
     $suffix = 1
     while ((Test-Path -LiteralPath $target) -or (Test-Path -LiteralPath (Get-BackupOffsetPath -BackupPath $target))) {
@@ -1224,13 +1289,19 @@ function New-SaveBackup {
         $suffix++
     }
 
-    Copy-Item -LiteralPath $SourcePath -Destination $target
+    if ($Label -ne 'pre-restore' -and (Get-Item -LiteralPath $SourcePath).Length -eq 0) { throw '当前存档为空，无法备份。' }
+    $pending = Join-Path $Directory ('.backup-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
+    $sidecarCreated = $false
     try {
-        Write-BackupOffset -BackupPath $target -Value $offset
+        [IO.File]::Copy($SourcePath, $pending)
+        Write-BackupOffset -BackupPath $target -Value $offset -ContentPath $pending
+        $sidecarCreated = $true
+        [IO.File]::Move($pending, $target)
     } catch {
-        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath (Get-BackupOffsetPath -BackupPath $target) -Force -ErrorAction SilentlyContinue
+        if ($sidecarCreated) { Remove-Item -LiteralPath (Get-BackupOffsetPath $target) -Force }
         throw
+    } finally {
+        [IO.File]::Delete($pending)
     }
     return $target
 }
@@ -1246,8 +1317,19 @@ function Restore-SaveBackup {
 
     $metadataPath = Get-BackupOffsetPath -BackupPath $BackupPath
     $restoreOffset = $null
-    if (Test-Path -LiteralPath $metadataPath -PathType Leaf) {
-        $restoreOffset = Read-TimeOffset -Path $metadataPath
+    $metadata = $null
+    if ([IO.File]::Exists($metadataPath)) {
+        $raw = [IO.File]::ReadAllText($metadataPath).Trim()
+        if ($raw.StartsWith('{')) {
+            $metadata = $raw | ConvertFrom-Json
+            if ($metadata.format -ne 1 -or [string]$metadata.offset -notmatch '^\d+$' -or
+                [string]$metadata.size -notmatch '^[1-9]\d*$' -or [string]$metadata.sha256 -notmatch '^[a-f0-9]{64}$') {
+                throw '备份校验记录无效。'
+            }
+            $restoreOffset = [int64]$metadata.offset
+        } elseif ($raw -match '^\d+$') {
+            $restoreOffset = [int64]$raw
+        } else { throw '备份的累计时间无效。' }
     }
 
     $live = Join-Path $Directory 'saveGame.bin2'
@@ -1256,7 +1338,13 @@ function Restore-SaveBackup {
     $saveReplaced = $false
     $stagedSave = Join-Path $Directory ('.restore-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
     try {
+        [void][IO.Directory]::CreateDirectory($Directory)
         [System.IO.File]::Copy($BackupPath, $stagedSave)
+        $size = (Get-Item -LiteralPath $stagedSave).Length
+        if ($size -eq 0) { throw '备份为空，无法还原。' }
+        if ($metadata -and ($size -ne $metadata.size -or (Get-Sha256Hex $stagedSave) -ne $metadata.sha256)) {
+            throw '备份大小或 SHA-256 与创建时不同，无法还原。'
+        }
         if (Test-Path -LiteralPath $live -PathType Leaf) {
             $preRestore = New-SaveBackup -Directory $Directory -Label 'pre-restore' -SourcePath $live -OffsetFile $OffsetFile
             [System.IO.File]::Replace($stagedSave, $live, [NullString]::Value)
@@ -1458,7 +1546,7 @@ function Set-Currency {
             throw '写入校验失败，原存档未被修改。'
         }
 
-        Write-BackupOffset -BackupPath $backupPath -Value $offset
+        Write-BackupOffset -BackupPath $backupPath -Value $offset -ContentPath $SavePath
         [System.IO.File]::Replace($tempPath, $SavePath, $backupPath)
         $tempPath = $null
 
@@ -1686,14 +1774,9 @@ function Get-IntegrityHeadline {
 function New-GameChildProcess {
     param($Paths, [int64]$SkipSeconds)
 
-    # Cumulative offset bookkeeping, same as the command-line launcher.
-    $offset = Read-TimeOffset -Path $paths.OffsetFile
-    if ($SkipSeconds -gt ([int64]::MaxValue - $offset)) {
-        throw '累计时间偏移会超出 Int64 范围。'
+    if (-not ('ZfGameOutput' -as [type])) {
+        Add-Type -Path (Join-Path (Split-Path -Parent $script:ManagerPath) 'GameOutput.cs')
     }
-    $previousOffset = $offset
-    $offset += $SkipSeconds
-    [void](Format-SimulatedTime -Offset $offset -Base (Get-SimulatedTimeBase))
 
     # Diagnostic fingerprint: which IPA build actually ran.
     $ipaHash = $null
@@ -1702,12 +1785,6 @@ function New-GameChildProcess {
         $ipaHash = $script:IntegrityRows | Where-Object { $_.Path -eq $bundledPath } |
             Select-Object -First 1 -ExpandProperty Actual
     }
-    if (-not $ipaHash) { $ipaHash = Get-Sha256Hex $paths.Ipa }
-    @(
-        "ipa = $(Split-Path -Leaf $paths.Ipa)"
-        "sha256 = $ipaHash"
-        "launched = $(Get-Date -Format o)"
-    ) | Set-Content -LiteralPath $paths.Fingerprint -Encoding utf8
 
     # Set the clock override for this child process. --device-family and the rest come from touchHLE_options.txt, which
     # this UI writes; passing them on the command line would override that file.
@@ -1715,7 +1792,6 @@ function New-GameChildProcess {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $paths.TouchHLE
     # The manager has already shown any warning for this launch.
-    $psi.EnvironmentVariables['TOUCHHLE_TIME_OFFSET_SECONDS'] = [string]$offset
     $psi.EnvironmentVariables['ZFR_MANAGER_IPA_CHECKED'] = '1'
     # Quotes matter: the IPA file name contains spaces.
     #
@@ -1738,15 +1814,7 @@ function New-GameChildProcess {
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
 
-    if ($SkipSeconds -gt 0) {
-        Write-TimeOffset -Value $offset -Path $paths.OffsetFile
-    }
-    try {
-        $process = [System.Diagnostics.Process]::Start($psi)
-    } catch {
-        if ($SkipSeconds -gt 0) { Write-TimeOffset -Value $previousOffset -Path $paths.OffsetFile }
-        throw
-    }
+    $process = Start-GameWithTimeOffset -StartInfo $psi -Paths $paths -SkipSeconds $SkipSeconds -IpaHash $ipaHash
     Write-RunState -Process $process -Ipa $paths.Ipa
     Write-ManagerLog ('launch pid={0} ipa={1} skip={2}s' -f $process.Id, (Split-Path -Leaf $paths.Ipa), $SkipSeconds)
     return $process
@@ -2086,12 +2154,50 @@ if ($SelfTest) {
         Write-Host ''
         Write-Host '--- save management (sandboxed) ---'
         New-Item -ItemType Directory -Force -Path $sandbox | Out-Null
+        $clockRoot = Join-Path $sandbox 'clocks'
+        [void][IO.Directory]::CreateDirectory($clockRoot)
+        [IO.File]::WriteAllText((Join-Path $clockRoot 'touchHLE_time_offset_seconds.txt'), '7200')
+        $secondFarm = Get-FarmOffsetPath 'com.playforge.ZombieFarmChinese' $clockRoot
+        $firstFarm = Get-FarmOffsetPath 'com.playforge.ZombieFarm.ZFR' $clockRoot
+        if ((Read-TimeOffset $secondFarm) -ne 0 -or (Read-TimeOffset $firstFarm) -ne 7200) { throw 'Farm clock migration failed' }
+        Write-TimeOffset 3600 $secondFarm
+        Write-TimeOffset 0 $secondFarm
+        if ((Read-TimeOffset $firstFarm) -ne 7200) { throw 'Farm clocks are not isolated' }
+        Write-Host '  legacy clock migration and independent resets : PASS'
         [System.IO.File]::WriteAllText($offsetFixture, '7200', [System.Text.Encoding]::ASCII)
         Write-TimeOffset -Value 0 -Path $offsetFixture
         $resetOffset = Read-TimeOffset -Path $offsetFixture
         Write-Host ("  reset time offset    : {0} sec  {1}" -f $resetOffset, $(if ($resetOffset -eq 0) { 'PASS' } else { 'FAIL' }))
         if ($resetOffset -ne 0) { $ok = $false }
         Write-TimeOffset -Value 7200 -Path $offsetFixture
+
+        $launchClock = Join-Path $clockRoot 'launch-test.txt'
+        $probePaths = @{ OffsetFile = $launchClock; Ipa = $offsetFixture; Fingerprint = (Join-Path $clockRoot 'probe-launch.txt') }
+        $probe = [Diagnostics.ProcessStartInfo]::new()
+        $probe.UseShellExecute = $false
+        $probe.CreateNoWindow = $true
+        $probe.FileName = Join-Path $clockRoot 'missing.exe'
+        foreach ($before in @($null, '7200', 'unreadable')) {
+            if ($null -ne $before) { [IO.File]::WriteAllText($launchClock, $before) }
+            $failed = $false
+            try { [void](Start-GameWithTimeOffset $probe $probePaths 3600 -Reset:($before -ne '7200')) }
+            catch { $failed = $true }
+            if (-not $failed -or [IO.File]::Exists($launchClock) -ne ($null -ne $before) -or
+                ($null -ne $before -and [IO.File]::ReadAllText($launchClock) -cne $before)) {
+                throw 'A failed process creation changed the farm clock.'
+            }
+        }
+        $probe.FileName = $env:ComSpec
+        $probe.Arguments = '/d /c exit 23'
+        if ([IO.File]::Exists($probePaths.Fingerprint)) { throw 'A failed launch replaced the last successful launch record.' }
+        $child = Start-GameWithTimeOffset $probe $probePaths 3600 -Reset
+        try {
+            $child.WaitForExit()
+            if ($child.ExitCode -ne 23 -or (Read-TimeOffset $launchClock) -ne 3600) {
+                throw 'An already-started child must keep its simulated time even on a nonzero exit.'
+            }
+        } finally { $child.Dispose() }
+        Write-Host '  clock rollback on launch failure and nonzero child exit : PASS'
 
         # Build a live save plus one pre-existing backup.
         $live = Join-Path $sandbox 'saveGame.bin2'
@@ -2102,16 +2208,47 @@ if ($SelfTest) {
         Write-Host ("  initial backups      : {0}" -f $count0)
 
         # 1. new backup
+        [IO.File]::SetLastWriteTime($live, [datetime]'2000-01-01')
+        $beforeBackup = [datetime]::Now.AddMilliseconds(-1)
         $made = New-SaveBackup -Directory $sandbox -Label 'manual' -OffsetFile $offsetFixture
+        $row = Get-BackupFiles -Directory $sandbox | Where-Object FullName -eq $made
+        if ($row.BackupTime -lt $beforeBackup -or $row.BackupTime -gt [datetime]::Now -or $row.BackupKind -ne 'manual') {
+            throw 'New backup uses the modification time of the old farm.'
+        }
+        # Legacy second-resolution labels, currency-tool milliseconds and numeric collision suffixes.
+        $orderDir = [IO.Directory]::CreateDirectory((Join-Path $sandbox 'backup-order')).FullName
+        $names = @('20250301-120000-200-10', '20250301-120000-200-2', '20250301-120000-120',
+            '20250301-120000-pre-restore-10', '20250301-120000-pre-restore-2', '20240101-180000-manual')
+        foreach ($name in $names) { [IO.File]::WriteAllText((Join-Path $orderDir "$($script:BackupPrefix)-$name"), 'farm') }
+        $legacy = Join-Path $orderDir $script:BackupPrefix
+        [IO.File]::WriteAllText($legacy, 'farm')
+        [IO.File]::SetCreationTime($legacy, [datetime]'2018-01-01')
+        $ordered = @(Get-BackupFiles -Directory $orderDir)
+        $expectedNames = @($names | ForEach-Object { "$($script:BackupPrefix)-$_" }) + $script:BackupPrefix
+        if (($ordered.Name -join '|') -ne ($expectedNames -join '|') -or $ordered[0].BackupTime.Millisecond -ne 200 -or
+            $ordered[0].BackupKind -ne '备份' -or $ordered[3].BackupKind -ne 'pre-restore' -or
+            $ordered[-1].BackupTime -ne [IO.File]::GetCreationTime($legacy)) { throw 'Backup list chronology is incorrect.' }
+        Write-Host '  backup creation dates, legacy names and numeric order : PASS'
         $count1 = (Get-BackupFiles -Directory $sandbox).Count
         $sizeOk = (Get-Item -LiteralPath $made).Length -eq 40
-        $savedOffset = Read-TimeOffset -Path (Get-BackupOffsetPath -BackupPath $made)
+        $savedOffset = (Get-Content -Raw -LiteralPath (Get-BackupOffsetPath -BackupPath $made) -Force | ConvertFrom-Json).offset
         $sidecarsHiddenFromList = @((Get-BackupFiles -Directory $sandbox | Where-Object { $_.Name.EndsWith($script:BackupOffsetSuffix) })).Count -eq 0
         Write-Host ("  after 新增备份        : {0}  (+{1})  content={2}" -f `
             $count1, ($count1 - $count0), $(if ($sizeOk) { 'ok' } else { 'FAIL' }))
         if ($count1 -ne ($count0 + 1) -or -not $sizeOk) { $ok = $false }
         Write-Host ("  backup time offset   : {0} sec  {1}" -f $savedOffset, $(if ($savedOffset -eq 7200 -and $sidecarsHiddenFromList) { 'PASS' } else { 'FAIL' }))
         if ($savedOffset -ne 7200 -or -not $sidecarsHiddenFromList) { $ok = $false }
+
+        $oldHash = Get-Sha256Hex $live
+        foreach ($replacement in @('empty', 'tampered')) {
+            if ($replacement -eq 'empty') { [IO.File]::WriteAllBytes($made, [byte[]]@()) }
+            else { [IO.File]::WriteAllBytes($made, [byte[]](40..1)) }
+            $rejected = $false
+            try { [void](Restore-SaveBackup $made $sandbox $offsetFixture) } catch { $rejected = $true }
+            if (-not $rejected -or (Get-Sha256Hex $live) -ne $oldHash) { throw "Damaged backup accepted: $replacement" }
+        }
+        [IO.File]::WriteAllBytes($made, [byte[]](1..40))
+        Write-Host '  empty and same-size damaged backups refused : PASS'
 
         # 2. restore: live is overwritten with the backup's content, and the old
         #    live save is archived first.
@@ -2240,18 +2377,17 @@ if ($SelfTest) {
         if (-not $labelOk) { $ok = $false }
 
         Write-Host ''
-        Write-Host '--- currency read (real save) ---'
-        $c = Get-Currency
-        if ($c) { Write-Host ("  Gold={0}  Brains={1}" -f $c.Gold, $c.Brains) }
-        else { Write-Host '  FAIL: save not readable'; $ok = $false }
-
-        # Currency writing runs against a COPY of the real save inside the
-        # sandbox, so the test proves the binary layout handling without touching
-        # anything the user cares about.
-        Write-Host ''
-        Write-Host '--- currency write (on a copy) ---'
+        Write-Host '--- currency fixture (v14) ---'
+        if ($liveHashBefore) {
+            $current = Get-Currency
+            if ($current) { Write-Host ("  current farm: Gold={0} Brains={1}" -f $current.Gold, $current.Brains) }
+        }
         $copy = Join-Path $sandbox 'saveGame.bin2'
-        Copy-Item -LiteralPath $script:LiveSave -Destination $copy -Force
+        $fixture = New-Object byte[] 512
+        $fixture[0] = 14
+        ([byte[]]@(1,9,0,0,0) + [Text.Encoding]::ASCII.GetBytes('UNDEFINED')).CopyTo($fixture, 64)
+        $fixture[64 + 0x42] = 4
+        [IO.File]::WriteAllBytes($copy, $fixture)
         $orig = Get-Currency -SavePath $copy
 
         $writtenBackup = Set-Currency -Gold 123456 -Brains 654321 -SavePath $copy -OffsetFile $offsetFixture
@@ -2265,7 +2401,7 @@ if ($SelfTest) {
         if (-not $writeOk) { $ok = $false }
 
         # The write must not change the file's size (equal-width in-place edit).
-        $sizeSame = (Get-Item -LiteralPath $copy).Length -eq (Get-Item -LiteralPath $script:LiveSave).Length
+        $sizeSame = (Get-Item -LiteralPath $copy).Length -eq $fixture.Length
         Write-Host ("  file size unchanged  : " + $(if ($sizeSame) { 'PASS' } else { 'FAIL' }))
         if (-not $sizeSame) { $ok = $false }
 
@@ -2273,7 +2409,7 @@ if ($SelfTest) {
         $bakExists = Test-Path -LiteralPath $writtenBackup
         Write-Host ("  backup written       : " + $(if ($bakExists) { 'PASS' } else { 'FAIL' }))
         if (-not $bakExists) { $ok = $false }
-        $currencyBackupOffset = Read-TimeOffset -Path (Get-BackupOffsetPath -BackupPath $writtenBackup)
+        $currencyBackupOffset = (Get-Content -Raw -LiteralPath (Get-BackupOffsetPath -BackupPath $writtenBackup) -Force | ConvertFrom-Json).offset
         $currencyBackupOffsetOk = $currencyBackupOffset -eq 12345
         Write-Host ("  currency backup offset: {0} sec  {1}" -f $currencyBackupOffset, $(if ($currencyBackupOffsetOk) { 'PASS' } else { 'FAIL' }))
         if (-not $currencyBackupOffsetOk) { $ok = $false }

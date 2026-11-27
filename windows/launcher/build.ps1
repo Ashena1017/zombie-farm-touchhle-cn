@@ -2,6 +2,7 @@
 param([string]$Destination = (Join-Path (Split-Path -Parent $PSScriptRoot) '游戏管理.exe'))
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+. (Join-Path $root 'scripts\_file_hash.ps1')
 $localTools = Join-Path $root 'touchHLE\_build_tools'
 if (-not (Get-Command cargo.exe -ErrorAction SilentlyContinue)) {
     $rustup = if ($env:RUSTUP_HOME) { $env:RUSTUP_HOME } else { Join-Path $env:USERPROFILE '.rustup' }
@@ -32,7 +33,7 @@ try {
     try {
         [IO.File]::Copy($exe, $tempExe)
         if ([IO.File]::Exists($Destination)) {
-            if ((Get-FileHash -LiteralPath $tempExe).Hash -ne (Get-FileHash -LiteralPath $Destination).Hash) {
+            if ((Get-Sha256Hex $tempExe) -ne (Get-Sha256Hex $Destination)) {
                 [IO.File]::Replace($tempExe, $Destination, [NullString]::Value)
             }
         } else {

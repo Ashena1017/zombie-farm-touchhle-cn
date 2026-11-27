@@ -5,6 +5,7 @@ $required = @(
     'windows\GameManager.ps1',
     'windows\compat\WinForms.ps1',
     'windows\ManagerWorker.ps1',
+    'windows\GameOutput.cs',
     'windows\launcher\Cargo.toml',
     'windows\launcher\ui\index.html',
     'windows\RepositoryPaths.ps1',

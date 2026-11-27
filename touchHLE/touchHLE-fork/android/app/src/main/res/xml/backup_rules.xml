@@ -1,0 +1,5 @@
+<full-backup-content>
+    <include domain="external" path="touchHLE_sandbox/" />
+    <include domain="external" path="zf_manager.json" />
+    <include domain="sharedpref" path="." />
+</full-backup-content>

@@ -916,6 +916,42 @@ impl Fs {
             .map_err(|_| ())
     }
 
+    /// Publish a fully written file and register a new guest node only after commit.
+    pub fn write_atomic(
+        &mut self,
+        path: &GuestPath,
+        write: impl FnOnce(&mut File) -> std::io::Result<()>,
+    ) -> Result<(), ()> {
+        let (parent, name) = self.lookup_parent_node(path).ok_or(())?;
+        let FsNode::Directory {
+            children,
+            writeable: Some(dir),
+        } = parent
+        else {
+            return Err(());
+        };
+        if Path::new(&name).file_name() != Some(name.as_ref()) {
+            return Err(());
+        }
+        let target = match children.get(&name) {
+            Some(FsNode::File {
+                location: FileLocation::Path(path),
+                writeable: true,
+            }) => path.clone(),
+            None => dir.join(&name),
+            _ => return Err(()),
+        };
+        let mut pending = tempfile::NamedTempFile::new_in(dir).map_err(|_| ())?;
+        write(pending.as_file_mut()).map_err(|_| ())?;
+        pending.as_file().sync_all().map_err(|_| ())?;
+        pending.persist(&target).map_err(|_| ())?;
+        children.entry(name).or_insert(FsNode::File {
+            location: FileLocation::Path(target),
+            writeable: true,
+        });
+        Ok(())
+    }
+
     /// Like [File::open] but for the guest filesystem.
     #[allow(dead_code)]
     pub fn open<P: AsRef<GuestPath>>(&self, path: P) -> Result<GuestFile, ()> {
@@ -1271,5 +1307,37 @@ impl Fs {
             },
         );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod atomic_write_tests {
+    use super::*;
+
+    #[test]
+    fn partial_write_keeps_old_data_and_creates_no_guest_node() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut fs = Fs {
+            root: FsNode::from_host_dir(dir.path(), true),
+            working_directory: GuestPathBuf::from("/".to_owned()),
+            home_directory: GuestPathBuf::from("/".to_owned()),
+        };
+        let path = GuestPath::new("/saveGame.bin2");
+        let fail = |f: &mut File| {
+            f.write_all(b"partial")?;
+            Err(std::io::Error::other("injected failure"))
+        };
+        assert!(fs.write_atomic(path, fail).is_err());
+        assert!(!fs.exists(path));
+        fs.write_atomic(path, |f| f.write_all(b"original farm"))
+            .unwrap();
+        assert!(fs.write_atomic(path, fail).is_err());
+        assert_eq!(fs.read(path).unwrap(), b"original farm");
+        assert_eq!(dir.path().read_dir().unwrap().count(), 1);
+        fs.write_atomic(path, |f| f.write_all(b"next farm"))
+            .unwrap();
+        assert_eq!(fs.read(path).unwrap(), b"next farm");
+        fs.root = FsNode::from_host_dir(dir.path(), false);
+        assert!(fs.write_atomic(path, |f| f.write_all(b"blocked")).is_err());
     }
 }
