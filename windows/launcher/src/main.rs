@@ -89,7 +89,7 @@ fn dispatch(app: AppHandle, action: &str, data: Value) -> Result<Value> {
             Ok(result)
         }
         "snapshot" | "selectIpa" | "setSetting" | "resetTime" | "setCurrency" | "backup" | "restore"
-        | "delete" | "verify" | "openProject" | "openSaves" => backend.request(action, data),
+        | "resetFarm" | "delete" | "verify" | "openProject" | "openSaves" => backend.request(action, data),
         _ => Err("未知的管理器操作。".into()),
     }
 }

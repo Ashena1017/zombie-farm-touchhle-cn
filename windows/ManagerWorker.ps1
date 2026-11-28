@@ -40,7 +40,7 @@ function Get-ManagerSnapshot {
             @{ name = $file.Name; kind = '当前存档'; size = $file.Length; modified = $file.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'); live = $true }
         }
         foreach ($file in (Get-BackupFiles)) {
-            @{ name = $file.Name; kind = $file.BackupKind; size = $file.Length; modified = $file.BackupTime.ToString('yyyy-MM-dd HH:mm:ss'); live = $false }
+            @{ name = $file.Name; kind = $file.BackupKind; size = $file.Length; modified = $file.BackupTime.ToString('yyyy-MM-dd HH:mm:ss'); live = $false; fullFarm = $file.Name -match $script:FarmBackupPattern }
         }
     })
     $amounts = Get-Currency
@@ -57,7 +57,8 @@ function Get-ManagerSnapshot {
     $skip = Read-SkipMemory
     if (-not $skip) { $skip = @{ hours = 6; minutes = 0 } }
     return @{
-        ipas = $entries; selected = $selected.Path; settings = Get-CurrentSettings; currency = $currency
+        ipas = $entries; selected = $selected.Path; appId = $selected.AppId; settings = Get-CurrentSettings; currency = $currency
+        hasFarmData = Test-FarmData
         saves = $saves; saveDir = $script:SaveDir; offset = $offset; fixedTime = $fixedTime
         skip = @{ hours = $skip.Hours; minutes = $skip.Minutes }; running = Test-GameRunning
     }
@@ -192,6 +193,12 @@ function Invoke-ManagerAction([string]$action, $data) {
         'backup' {
             if (Test-GameRunning) { throw '请先关闭游戏再备份存档。' }
             [void](New-SaveBackup)
+        }
+        'resetFarm' {
+            $recovery = Switch-FarmSave -AppId $data.appId
+            $state = Get-ManagerSnapshot
+            if ($recovery) { $state.recoveryFile = $recovery }
+            return $state
         }
         'restore' {
             if (Test-GameRunning) { throw '请先关闭游戏再还原存档。' }

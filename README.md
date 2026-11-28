@@ -30,12 +30,14 @@
 
 | 版本 | 下载 | 适用设备与特点 |
 |---|---|---|
-| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v32fix-save-recovery.zip) | 解压后运行「游戏管理.exe」，可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
-| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v32fix-save-recovery.apk) | 安装后打开「Zombie Farm 游戏管理」。APK 已内置带标题水印的游戏包，支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
+| **Windows x64** | [下载 Windows ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v32fix-new-farm.zip) | 解压后运行「游戏管理.exe」，可选择 iPhone/iPad、倍率、帧率，使用鼠标滚轮缩放，并管理存档与游戏数值。 |
+| **Android ARM64** | [下载 Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v32fix-new-farm.apk) | 安装后打开「Zombie Farm 游戏管理」。APK 已内置带标题水印的游戏包，支持触屏捏合缩放、帧率、跳过时间、数值与存档管理。 |
 
 两份附件和版本说明也可在[最新 Release](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest)查看。
 
 > 最新版本下载见 Releases，历史变更见下方记录。
+
+**2026-11-28 v32fix-new-farm**　Windows 和 Android 在存档管理中新增「开新档」，会先备份原农场。新版 Android 游戏管理器还可以删除已导入或旧版 IPA，保留内置版及农场存档。Android 内部版本号为 26。
 
 **2026-11-28 v32fix-save-recovery**　管理器现在会识别玩家或任务数据不完整的 v14 存档。Windows 可在当前模拟时间文件损坏时直接还原有效备份。Android 在主档丢失时还原备份，会先保存残留的玩家资料和偏好。Android 内部版本号升至 25，支持从 v24 覆盖安装。
 
@@ -215,7 +217,7 @@ Reforged **原生只有英文**，界面、弹窗、僵尸属性、商店说明�
 
 ### Windows
 
-1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v32fix-save-recovery.zip) 并解压。
+1. 下载 [Windows x64 ZIP](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-windows-x64-v32fix-new-farm.zip) 并解压。
 2. 双击 **`游戏管理.exe`**；
 3. 选择游戏版本和显示设置，点击「启动游戏」。
 
@@ -223,7 +225,7 @@ Windows 管理器提供帧率、窗口设备/倍率、滚轮缩放、跳过时�
 
 ### Android
 
-1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v32fix-save-recovery.apk)。
+1. 在 ARM64 Android 设备上安装 [Android APK](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/latest/download/zombie-farm-android-arm64-v32fix-new-farm.apk)。
 2. 打开应用 **「Zombie Farm 游戏管理」**；
 3. 选择版本并启动。`内置中文版·v32fix·开源免费.ipa` 已内置，管理器会校验其完整性，也可选择额外导入的游戏版本。
 

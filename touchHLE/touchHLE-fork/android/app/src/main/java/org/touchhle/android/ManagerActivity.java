@@ -48,6 +48,16 @@ public class ManagerActivity extends Activity {
     // on before resale. Update this constant if the keystore ever changes.
     static final String OFFICIAL_CERT =
         "c2ddca91eb8e54a081b768450f8a154d49219427674377a24ae9561f3814ca6f";
+    static final String PROJECT_TEST_CERT =
+        "4b268df40b8f3755d0b40fdad3139e38bc23fc0d5b96ba33821996217b0ffc54";
+
+    static boolean isTestEdition(String packageName) {
+        return packageName.endsWith(".qa") || packageName.endsWith(".qa.debug");
+    }
+
+    static String expectedCertificate(String packageName) {
+        return isTestEdition(packageName) ? PROJECT_TEST_CERT : OFFICIAL_CERT;
+    }
 
     private ZfAppearance appearance;
     private ZfAppearance.Palette palette;
@@ -761,31 +771,30 @@ public class ManagerActivity extends Activity {
     private void verifySignature() {
         String actual;
         try { actual = signatureOfSelf(this); }
-        catch (Exception e) { return; }             // never block the app on this
-        if (actual == null || actual.equalsIgnoreCase(OFFICIAL_CERT)) return;
+        catch (Exception e) { actual = null; }
+        String expected = expectedCertificate(getPackageName());
+        if (expected.equalsIgnoreCase(actual)) return;
         dialogBuilder()
             .setTitle("检测到非官方修改版本")
-            .setMessage("这个安装包的签名与官方发布版不一致，说明它被动过（例如塞入广告、替换内容）后重新打包。\n\n"
-                + "当前签名：" + actual + "\n\n官方签名：" + OFFICIAL_CERT
+            .setMessage("无法确认这个安装包的签名。\n\n"
+                + "当前签名：" + (actual == null ? "无法读取" : actual) + "\n\n此版本预期签名：" + expected
                 + "\n\n它可能是别人转卖的改版，建议从官方地址重新下载。")
             .setPositiveButton("打开项目主页", (dialog, which) -> openProjectUrl())
             .setNegativeButton("继续使用", null)
             .show();
     }
 
-    static String signatureOfSelf(Activity activity) throws Exception {
+    static String signatureOfSelf(Context activity) throws Exception {
         PackageManager pm = activity.getPackageManager();
         String name = activity.getPackageName();
         if (Build.VERSION.SDK_INT >= 28) {
             PackageInfo info = pm.getPackageInfo(name, PackageManager.GET_SIGNING_CERTIFICATES);
             if (info.signingInfo == null) return null;
-            Signature[] signatures = info.signingInfo.hasMultipleSigners()
-                ? info.signingInfo.getApkContentsSigners()
-                : info.signingInfo.getSigningCertificateHistory();
-            return signatures == null || signatures.length == 0 ? null : sha256Hex(signatures[0].toByteArray());
+            Signature[] signatures = info.signingInfo.getApkContentsSigners();
+            return signatures == null || signatures.length != 1 ? null : sha256Hex(signatures[0].toByteArray());
         }
         PackageInfo info = pm.getPackageInfo(name, PackageManager.GET_SIGNATURES);
-        return info.signatures == null || info.signatures.length == 0 ? null : sha256Hex(info.signatures[0].toByteArray());
+        return info.signatures == null || info.signatures.length != 1 ? null : sha256Hex(info.signatures[0].toByteArray());
     }
 
     private static String sha256Hex(byte[] data) throws Exception {

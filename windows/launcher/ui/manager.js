@@ -47,6 +47,14 @@ if (mobile) {
   versionHeading.before(versionHeader);
   versionHeader.append(versionHeading, byId("browse"));
   byId("browse").classList.add("text-button");
+  byId("ipa").hidden = true;
+  versionHeading.querySelector("label").htmlFor = "ipa-picker";
+  byId("ipa-picker").hidden = false;
+  byId("ipa-picker").onclick = () => {
+    drawVersionList();
+    byId("ipa-dialog").showModal();
+    byId("ipa-list").querySelector("[aria-pressed=true]")?.focus();
+  };
 
   for (const id of ["fullscreen", "wheel_zoom"]) byId(id).closest(".setting").hidden = true;
   byId("settings-fields").querySelector(".subhead").hidden = true;
@@ -65,7 +73,7 @@ if (mobile) {
     if (name) drawSnapshot(await invoke("exportBackup", { appId: snapshot.appId, name }));
   });
   window.managerBack = () => {
-    const open = document.querySelector("dialog[open]");
+    const open = byId("question").open ? byId("question") : document.querySelector("dialog[open]");
     if (open) { open.close(); return true; }
     if (byId("game").hidden) { document.querySelector('[data-page="game"]').click(); return true; }
     return false;
@@ -461,6 +469,8 @@ function drawSaves(previousSelection) {
   byId("currency-fields").disabled = !snapshot.currency || snapshot.running;
   byId("open-saves").disabled = !snapshot.saveDir;
   byId("backup").disabled = !live || snapshot.running;
+  byId("reset-farm").disabled = !snapshot.hasFarmData || snapshot.running;
+  if (!live && snapshot.hasFarmData) byId("live-save").textContent = "找到农场资料，但缺少主存档。";
   const backups = snapshot.saves.filter(file => !file.live);
   const list = byId("save-list");
   list.replaceChildren();
@@ -472,7 +482,8 @@ function drawSaves(previousSelection) {
     box.checked = previousSelection.includes(file.name);
     box.addEventListener("change", updateSelection);
     const meta = document.createElement("div");
-    meta.append(element("span", file.name), element("small", file.kind + " · " + saveMetadata(file)));
+    meta.append(element("span", file.fullFarm ? file.kind : file.name),
+      element("small", file.fullFarm ? "完整农场 · " + file.modified : file.kind + " · " + saveMetadata(file)));
     row.append(box, meta);
     list.append(row);
   }
@@ -488,13 +499,21 @@ function drawSnapshot(updated) {
   ipa.replaceChildren();
   for (const file of snapshot.ipas) ipa.add(new Option(file.name, file.path));
   if (!snapshot.ipas.length) ipa.add(new Option("未找到 IPA，请浏览选择…", ""));
-  const picked = snapshot.ipas.find(file => file.path.toLowerCase() === snapshot.selected?.toLowerCase());
+  const picked = snapshot.ipas.find(file => mobile ? file.path === snapshot.selected :
+    file.path.toLowerCase() === snapshot.selected?.toLowerCase());
   ipa.value = picked?.path ?? "";
   ipa.disabled = !snapshot.ipas.length;
   byId("ipa-info").textContent = picked?.error ? "无法管理此 IPA 的设置和存档。" + picked.error :
     [picked?.appId, picked?.version].filter(Boolean).join(" · ");
   byId("verify-selection").textContent = picked ? "当前选择：" + picked.name : "当前未选择游戏包。";
-  byId("browse").disabled = false;
+  byId("browse").disabled = mobile && snapshot.running;
+  if (mobile) {
+    const trigger = byId("ipa-picker");
+    trigger.firstElementChild.textContent = picked?.name ?? "尚未导入 IPA";
+    trigger.setAttribute("aria-label", "选择游戏版本，" + trigger.firstElementChild.textContent);
+    trigger.disabled = !picked || snapshot.running;
+    if (byId("ipa-dialog").open && !byId("question").open) drawVersionList();
+  }
   byId("settings-fields").disabled = !picked?.appId || (mobile && snapshot.running);
   if (mobile) byId("import-save").disabled = !picked?.appId || snapshot.running;
   byId("reset-time").hidden = !picked?.appId || snapshot.offset === 0;
@@ -519,6 +538,7 @@ byId("open-saves").addEventListener("click", () => invoke("openSaves").catch(rep
 
 function changeIpa(action, data) {
   byId("ipa").disabled = true;
+  byId("ipa-picker").disabled = true;
   byId("browse").disabled = true;
   byId("start").disabled = true;
   byId("skip").disabled = true;
@@ -527,7 +547,7 @@ function changeIpa(action, data) {
   enqueue(async () => {
     try {
       drawSnapshot(await invoke(action, data));
-      notify("");
+      notify(action === "deleteIpa" ? "已删除 IPA，农场和备份已保留。" : "");
     } catch (error) {
       if (snapshot) drawSnapshot(snapshot);
       throw error;
@@ -538,6 +558,58 @@ function changeIpa(action, data) {
 }
 byId("ipa").addEventListener("change", event => changeIpa("selectIpa", { path: event.target.value }));
 byId("browse").addEventListener("click", () => changeIpa("browseIpa", {}));
+
+function drawVersionList() {
+  const list = byId("ipa-list");
+  const dialog = byId("ipa-dialog");
+  list.replaceChildren();
+  for (const file of snapshot.ipas) {
+    const selected = file.path === snapshot.selected;
+    const row = element("div", undefined, "version-row");
+    const choice = element("button", undefined, "version-choice");
+    choice.setAttribute("aria-pressed", String(selected));
+    const mark = element("span", selected ? "✓" : "", "version-mark");
+    mark.setAttribute("aria-hidden", "true");
+    const label = element("span", undefined, "version-label");
+    label.append(element("strong", file.name), element("small", [file.bundled ? "内置版本" : "本机版本", file.version].filter(Boolean).join(" · ")));
+    choice.append(mark, label);
+    choice.disabled = snapshot.running;
+    choice.onclick = () => {
+      dialog.close();
+      if (!selected) changeIpa("selectIpa", { path: file.path });
+    };
+    row.append(choice);
+    if (!file.bundled) {
+      const remove = element("button", "删除", "text-button danger-text");
+      remove.setAttribute("aria-label", "删除 " + file.name);
+      remove.disabled = snapshot.running;
+      remove.onclick = async () => {
+        if (!await ask("删除这个 IPA？", file.name + "\n\n只移除游戏管理中的这份文件，农场和备份都会保留。", "删除 IPA")) return;
+        dialog.close();
+        changeIpa("deleteIpa", { path: file.path });
+      };
+      row.append(remove);
+    }
+    list.append(row);
+  }
+}
+
+byId("reset-farm").onclick = () => {
+  const { appId, ipas, selected } = snapshot;
+  const file = ipas.find(ipa => ipa.path === selected) ?? ipas.find(ipa => ipa.appId === appId);
+  const shared = ipas.filter(ipa => ipa.appId === appId).length > 1 ? "\n使用同一农场的其他 IPA 也会从新档开始。" : "";
+  enqueue(async () => {
+    if (!await ask("开新档？", file.name + "\n\n先备份当前农场，再清空进度。下次启动将创建新农场，模拟时间沿用当前设置。" + shared, "备份并开新档")) return;
+    const previous = new Set(snapshot.saves.map(save => save.name));
+    const updated = await invoke("resetFarm", { appId });
+    drawSnapshot(updated);
+    const created = updated.saves.find(save => !save.live && !previous.has(save.name));
+    for (const box of byId("save-list").querySelectorAll("input")) box.checked = box.value === created?.name;
+    updateSelection();
+    notify(updated.recoveryFile ? "已清空农场。原档需要手动恢复，副本在 " + updated.recoveryFile :
+      "下次启动将创建新农场。要找回原农场，请还原「新建农场前」备份。");
+  });
+};
 
 function saveAction(id, action, buildData) {
   byId(id).addEventListener("click", () => {
@@ -559,7 +631,9 @@ function saveAction(id, action, buildData) {
 saveAction("backup", "backup", () => ({}));
 saveAction("restore", "restore", async () => {
   const [name] = listSelection();
-  if (name && await ask("还原存档", "要用以下备份覆盖当前存档吗？当前存档将先自动备份。\n\n" + name, "还原备份")) return { name };
+  const file = snapshot.saves.find(save => save.name === name);
+  if (file && await ask("还原存档", "要用以下备份覆盖当前存档吗？当前存档将先自动备份。\n\n" +
+    (file.fullFarm ? file.kind + " · " + file.modified : name), "还原备份")) return { name };
 });
 saveAction("delete", "delete", async () => {
   const names = listSelection();
@@ -586,9 +660,9 @@ function drawIntegrity(result) {
   for (const row of result.rows) {
     const details = element("details", undefined, "integrity-item");
     const title = element("summary", row.name);
-    title.append(element("span", verdict[row.state] || row.state, row.state === "ok" ? "ok" : row.state === "info" ? "detail" : "bad"));
+    title.append(element("span", row.verdict || verdict[row.state] || row.state, row.state === "ok" ? "ok" : row.state === "info" ? "detail" : "bad"));
     const dl = element("dl");
-    for (const [label, value] of [["文件路径", row.path], ["官方 SHA-256", row.expected], ["本机 SHA-256", row.actual]]) {
+    for (const [label, value] of [["文件路径", row.path], [row.expectedLabel || "官方 SHA-256", row.expected], ["本机 SHA-256", row.actual]]) {
       if (value) dl.append(element("dt", label), element("dd", value));
     }
     details.append(title, dl);

@@ -131,6 +131,45 @@ public class ManagerTestRunner extends Instrumentation {
             store.settings(id, settings.put("offset", previous));
         }
     }
+    private void checkNewFarm(ZfStorage store, String id) throws Exception {
+        File profile = new File(store.sandbox(id), "Documents/profile.txt");
+        File other = store.live("com.playforge.ZombieFarmChinese");
+        ZfStorage.atomic(other, new byte[]{9, 8});
+        byte[] farm = ZfStorage.bytes(store.live(id)), player = ZfStorage.bytes(profile);
+        long offset = store.settings(id).getLong("offset");
+        List<File> existing = store.backups(id);
+        File resetCopy = store.resetFarm(id);
+        check(!store.hasFarmData(id) && !store.sandbox(id).exists() && store.backups(id).contains(resetCopy)
+            && store.backups(id).containsAll(existing), "new farm removes the live sandbox and retains all backups");
+        check(store.settings(id).getLong("offset") == offset && Arrays.equals(ZfStorage.bytes(other), new byte[]{9, 8}),
+            "new farm preserves clock and other games");
+        reject(() -> store.resetFarm(id), "repeat reset with no current farm refused");
+        ZfStorage.atomic(store.live(id), fixture());
+        try (InputStream in = new FileInputStream(resetCopy)) { store.restore(id, in); }
+        check(Arrays.equals(farm, ZfStorage.bytes(store.live(id))) && Arrays.equals(player, ZfStorage.bytes(profile)),
+            "pre-reset backup restores the exact farm and profile over a new save");
+        // A failed backup must never detach the current farm.
+        try (RandomAccessFile large = new RandomAccessFile(store.live(id), "rw")) {
+            large.setLength(17 * 1024 * 1024);
+            reject(() -> store.resetFarm(id), "backup size failure aborts new farm");
+            check(store.live(id).length() == large.length() && Arrays.equals(player, ZfStorage.bytes(profile)),
+                "failed reset preserves live data");
+        }
+        for (boolean missing : new boolean[]{false, true}) {
+            ZfStorage.atomic(profile, player);
+            if (missing) check(!store.live(id).exists(), "missing-main fixture");
+            else ZfStorage.atomic(store.live(id), new byte[]{14});
+            check(store.hasFarmData(id), "partial farm is visible, missing main=" + missing);
+            File damaged = store.resetFarm(id);
+            try (ZipFile archive = new ZipFile(damaged);
+                 InputStream in = archive.getInputStream(archive.getEntry("sandbox/Documents/profile.txt"))) {
+                check(!store.hasFarmData(id) && damaged.getParentFile().getName().equals("recovery")
+                    && Arrays.equals(ZfIpa.readLimited(in, 1024), player)
+                    && (archive.getEntry("sandbox/Documents/saveGame.bin2") == null) == missing,
+                    "new farm keeps damaged data in a recovery copy, missing main=" + missing);
+            }
+        }
+    }
     private void checkAppearance() {
         android.content.SharedPreferences prefs = getTargetContext().getSharedPreferences("appearance_test", 0);
         prefs.edit().clear().commit();
@@ -171,6 +210,12 @@ public class ManagerTestRunner extends Instrumentation {
         Bundle result = new Bundle(); File root = new File(getTargetContext().getCacheDir(), "zf-manager-tests-" + UUID.randomUUID());
         try {
             checkAppearance();
+            String cert = ManagerActivity.signatureOfSelf(getTargetContext());
+            String expected = ManagerActivity.expectedCertificate(getTargetContext().getPackageName());
+            check(expected.equals(ManagerActivity.PROJECT_TEST_CERT), "QA expects its own project certificate");
+            check(!ManagerActivity.OFFICIAL_CERT.equalsIgnoreCase(cert), "QA is signed separately from the player build");
+            check(ManagerActivity.expectedCertificate("org.touchhle.zombiefarm").equals(ManagerActivity.OFFICIAL_CERT)
+                && !expected.equals(ManagerActivity.OFFICIAL_CERT), "player edition only trusts its release certificate");
             if (!root.mkdirs()) throw new IOException("Cannot create test directory");
             checkDocumentTree(root);
             ZfStorage store = new ZfStorage(getTargetContext(), root, new File(root, "test.lock"));
@@ -229,8 +274,18 @@ public class ManagerTestRunner extends Instrumentation {
                 store.select(custom);
                 check(store.ensureBundled() == null && store.selected().file.equals(custom.file),
                     "modified old version remains selected and available during upgrade");
-                store.select(ipa);
-                check(custom.file.delete(), "remove isolated custom fixture");
+                reject(() -> store.deleteIpa(ZfStorage.BUNDLED), "backend protects the bundled game");
+                reject(() -> store.deleteIpa("../" + xmlIpa.getName()), "only listed IPA filenames can be removed");
+                store.deleteIpa(custom.file.getName());
+                check(!custom.file.exists() && xmlIpa.exists() && store.selected().file.equals(ipa.file),
+                    "deleting the selected import falls back to the bundled game and preserves original source");
+                File legacy = new File(store.apps, "Zombie_Farm_v29fix.ipa");
+                try (InputStream in = new FileInputStream(xmlIpa); OutputStream out = new FileOutputStream(legacy)) {
+                    ZfStorage.copy(in, out, 65536);
+                }
+                store.deleteIpa(legacy.getName());
+                check(!legacy.exists() && ZfStorage.hash(ipa.file).equals(bundledHash)
+                    && store.selected().file.equals(ipa.file), "deleting an unselected legacy IPA preserves current selection and bundled bytes");
                 JSONObject app = new JSONObject().put("family", "ipad").put("scale", "3/2").put("fps", "120").put("fix", false);
                 store.settings(id, app);
                 JSONObject roundtrip = store.settings(id);
@@ -377,7 +432,8 @@ public class ManagerTestRunner extends Instrumentation {
                 store.select(ipa); check(store.selected().file.equals(ipa.file), "switch back to bundled version");
                 int count = store.backups(id).size(); store.deleteBackup(id, manual);
                 check(store.backups(id).size() == count - 1, "delete one backup");
-                reject(() -> store.deleteBackup(id, store.live(id)), "live save deletion refused");
+                reject(() -> store.deleteBackup(id, store.live(id)), "bulk backup deletion cannot remove a live farm");
+                checkNewFarm(store, id);
             }
             check(!store.gameRunning(), "lock released after operation");
             result.putString("stream", "\n" + report + "RESULT: PASS (" + checks + " checks)\n");

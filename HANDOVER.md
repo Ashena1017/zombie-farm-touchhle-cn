@@ -4,6 +4,21 @@
 
 ## 当前发行
 
+Windows x64 和 Android ARM64 已发布 `v32fix-new-farm`，内置 v32 中文 IPA，Android 内部版本号为 26。[本版下载](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v32fix-new-farm)
+
+- **开新档**。在「存档管理 → 当前存档」选择「开新档」，确认后会自动备份旧农场，下次启动游戏即可重新开始。模拟时间沿用当前设置。要找回原农场，在备份里选择「新建农场前」并还原。
+- **Android 版本管理**。新版手机管理器可在跟随配色的列表里切换或删除 IPA。当前内置版受保护，删除其他 IPA 会保留农场和备份。
+- **Android 签名提示**。项目测试版显示测试证书的校验结果。玩家版继续核对正式签名。
+
+| 下载文件 | 大小（字节） | SHA-256 |
+| --- | ---: | --- |
+| `zombie-farm-windows-x64-v32fix-new-farm.zip` | 98,998,148 | `092edc8ef5d18340241cc2fb2fc9a0333a032982178d9ae6e4019409187381f8` |
+| `zombie-farm-android-arm64-v32fix-new-farm.apk` | 105,110,870 | `b400c4cc45c2eb6bd6923f078b1306d452d38f56aee1abe5c7a2db3d105c538d` |
+
+Windows 发行包在空目录启动并运行 45 秒通过。MuMu 玩家版从 v25 覆盖升级到 v26，升级前后的主档、管理器设置及模拟器选项 SHA-256 均一致。
+
+## v32fix-save-recovery 发行记录
+
 Windows x64 和 Android ARM64 同步发布 `v32fix-save-recovery`，Android 内部版本号为 25。两端继续使用 v32 中文 IPA。[双端下载与版本说明](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v32fix-save-recovery)
 
 - Windows 和 Android 的游戏管理会在备份或还原内置游戏的 v14 农场时检查玩家数据和任务进度，识别只写了一部分的存档。

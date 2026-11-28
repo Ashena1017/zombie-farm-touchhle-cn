@@ -77,7 +77,31 @@
 .mobile .time-actions button { flex: 1 1 auto; background: var(--tint); color: var(--accent-ink); border: 0; }
 .mobile #reset-time { background: var(--field); color: var(--text); }
 .mobile .file-picker { margin-top: 4px; }
-.mobile #ipa { width: 100%; font-size: 15px; }
+.mobile #ipa-picker {
+  width: 100%; min-width: 0; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 14px; background: var(--field); text-align: start; font-size: 15px;
+}
+.mobile #ipa-picker span:first-child { overflow-wrap: anywhere; }
+.mobile #ipa-picker span:last-child { color: var(--accent-ink); }
+.mobile #ipa-dialog[open] { display: flex; flex-direction: column; padding-top: 10px; }
+.mobile #ipa-dialog .spread { flex: none; }
+.mobile #ipa-dialog h2 { font-size: 19px; margin: 0; letter-spacing: 0; }
+.mobile #ipa-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px; margin-inline: -4px; }
+.mobile .version-row { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--line); padding: 4px 0; }
+.mobile .version-choice {
+  display: flex; align-items: center; flex: 1; min-width: 0; padding: 10px; gap: 12px;
+  text-align: start; background: transparent; border: 0;
+}
+.mobile .version-choice[aria-pressed=true] { background: var(--tint); }
+.mobile .version-label { min-width: 0; overflow-wrap: anywhere; }
+.mobile .version-label strong { display: block; font-size: 15px; font-weight: 600; }
+.mobile .version-label small { display: block; margin-top: 3px; font-size: 12px; color: var(--muted); }
+.mobile .version-mark {
+  display: grid; place-items: center; flex: 0 0 20px; height: 20px; border: 1px solid var(--muted);
+  border-radius: 50%; font-size: 14px; line-height: 1;
+}
+.mobile [aria-pressed=true] > .version-mark { background: var(--accent-ink); border-color: var(--accent-ink); color: var(--on-primary); }
+.mobile .version-row .danger-text { flex: 0 0 auto; min-width: 48px; }
 .mobile #browse { padding: 0 6px; }
 
 .mobile .setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding-block: 14px; }

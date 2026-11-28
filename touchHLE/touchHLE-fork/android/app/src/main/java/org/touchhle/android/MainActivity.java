@@ -75,8 +75,8 @@ public class MainActivity extends Activity {
             lease = storage.lock();
             String warning = storage.ensureBundled();
             if (internal && !request.getBooleanExtra("allowModified", false)) {
-                if (!ManagerActivity.OFFICIAL_CERT.equalsIgnoreCase(ManagerActivity.signatureOfSelf(this)))
-                    warning = (warning == null ? "" : warning + "\n") + "安装包签名与官方版本不一致。";
+                if (!ManagerActivity.expectedCertificate(getPackageName()).equalsIgnoreCase(ManagerActivity.signatureOfSelf(this)))
+                    warning = (warning == null ? "" : warning + "\n") + "安装包签名与此版本的预期签名不一致。";
                 if (warning != null) {
                     String message = warning;
                     runOnUiThread(() -> complete(WARNING, message));

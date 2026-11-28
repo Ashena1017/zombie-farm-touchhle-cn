@@ -134,6 +134,7 @@ public final class ManagerPlugin extends Plugin {
                 }
                 return snapshot();
         }
+        File resetBackup = null;
         try (ZfStorage.Lease ignored = storage.lock()) {
             if (action.equals("selectIpa")) {
                 boolean found = false;
@@ -141,6 +142,8 @@ public final class ManagerPlugin extends Plugin {
                     storage.select(item); found = true; break;
                 }
                 if (!found) throw new IOException("所选 IPA 不存在");
+            } else if (action.equals("deleteIpa")) {
+                storage.deleteIpa(data.getString("path"));
             } else {
                 String id = storage.selected().appId;
                 JSONObject prefs = storage.settings(id);
@@ -160,6 +163,10 @@ public final class ManagerPlugin extends Plugin {
                         storage.settings(id, prefs.put("offset", 0));
                         break;
                     case "backup": storage.backup(id, "手动"); break;
+                    case "resetFarm":
+                        if (!id.equals(data.getString("appId"))) throw new IOException("所选农场已改变，请重新确认");
+                        resetBackup = storage.resetFarm(id);
+                        break;
                     case "restore":
                         try (InputStream in = new FileInputStream(backup(id, data.getString("name")))) { storage.restore(id, in); }
                         break;
@@ -180,7 +187,10 @@ public final class ManagerPlugin extends Plugin {
                 }
             }
         }
-        return snapshot();
+        JSONObject updated = snapshot();
+        if (resetBackup != null && resetBackup.getParentFile().getName().equals("recovery"))
+            updated.put("recoveryFile", "zf_backups/" + data.getString("appId") + "/recovery/" + resetBackup.getName());
+        return updated;
     }
 
     private File backup(String id, String name) throws Exception {
@@ -198,13 +208,16 @@ public final class ManagerPlugin extends Plugin {
         List<ZfIpa> versions = storage.versions();
         ZfIpa selected = storage.selectedFrom(versions);
         JSONArray ipas = new JSONArray(), saves = new JSONArray();
-        for (ZfIpa item : versions) ipas.put(obj("name", item.name, "path", item.file.getName(), "appId", item.appId, "version", item.version));
+        for (ZfIpa item : versions) ipas.put(obj("name", item.name, "path", item.file.getName(),
+            "appId", item.appId, "version", item.version, "bundled", ZfStorage.BUNDLED.equals(item.file.getName())));
         boolean running = storage.gameRunning();
+        boolean hasFarmData = false;
         JSONObject prefs = new JSONObject(), currency = null;
         if (selected != null) {
             String id = selected.appId;
             prefs = storage.settings(id);
             File live = storage.live(id);
+            hasFarmData = !running && storage.hasFarmData(id);
             if (!running && live.isFile()) {
                 saves.put(fileInfo(live, true));
                 try {
@@ -217,7 +230,7 @@ public final class ManagerPlugin extends Plugin {
         return obj("ipas", ipas, "selected", selected == null ? null : selected.file.getName(),
             "appId", selected == null ? null : selected.appId, "running", running, "settings", settings(prefs),
             "offset", prefs.optLong("offset", 0), "skip", obj("hours", prefs.optInt("skipHours", 6), "minutes", prefs.optInt("skipMinutes", 0)),
-            "saves", saves, "currency", currency);
+            "saves", saves, "currency", currency, "hasFarmData", hasFarmData);
     }
 
     private static JSONObject fileInfo(File file, boolean live) throws Exception {
@@ -256,12 +269,17 @@ public final class ManagerPlugin extends Plugin {
             initialWarning = null;
         }
         String cert = ManagerActivity.signatureOfSelf(activity);
-        boolean signed = ManagerActivity.OFFICIAL_CERT.equalsIgnoreCase(cert);
+        String expected = ManagerActivity.expectedCertificate(activity.getPackageName());
+        boolean test = ManagerActivity.isTestEdition(activity.getPackageName());
+        boolean signed = expected.equalsIgnoreCase(cert);
         JSONArray rows = new JSONArray();
-        rows.put(obj("name", "Android 安装包签名", "expected", ManagerActivity.OFFICIAL_CERT, "actual", cert, "state", signed ? "ok" : "bad"));
+        rows.put(obj("name", test ? "Android 测试包签名" : "Android 安装包签名", "expected", expected, "actual", cert,
+            "state", signed ? "ok" : "bad", "verdict", test ? (signed ? "测试签名一致" : "测试签名异常") : null,
+            "expectedLabel", test ? "测试证书 SHA-256" : null));
         rows.put(obj("name", ZfStorage.BUNDLED, "expected", BuildConfig.BUNDLED_IPA_SHA256, "state", warning == null ? "ok" : "bad"));
         boolean ok = signed && warning == null;
-        return obj("rows", rows, "level", ok ? "ok" : "warn", "text", ok ? "签名与内置 IPA 均与官方一致。" :
+        return obj("rows", rows, "level", ok ? "ok" : "warn", "text", ok ?
+            (test ? "项目测试版：测试签名已确认，内置 IPA 校验通过。" : "签名与内置 IPA 均与官方一致。") :
             "你拿到的可能是改版。" + (signed ? "" : "安装包签名异常。") + (warning == null ? "" : warning));
     }
 }

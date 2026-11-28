@@ -40,7 +40,11 @@
       <button id="reset-time" hidden>重置为当前时间</button>
       <section class="card">
         <h2><label for="ipa">游戏版本 <span class="qualifier">IPA</span></label></h2>
-        <div class="file-picker"><select id="ipa" disabled><option>正在读取游戏版本…</option></select><button id="browse" disabled>浏览…</button></div>
+        <div class="file-picker">
+          <select id="ipa" disabled><option>正在读取游戏版本…</option></select>
+          <button id="ipa-picker" hidden disabled aria-haspopup="dialog" aria-controls="ipa-dialog"><span>正在读取游戏版本…</span><span aria-hidden="true">⌄</span></button>
+          <button id="browse" disabled>浏览…</button>
+        </div>
         <p class="detail" id="ipa-info"></p>
       </section>
     </section>
@@ -62,7 +66,7 @@
 
     <section id="saves" hidden aria-labelledby="heading">
       <section class="card">
-        <div class="spread"><h2>当前存档</h2><button class="text-button" id="open-saves" disabled>打开目录</button></div>
+        <div class="spread"><h2>当前存档</h2><div class="actions"><button class="text-button" id="open-saves" disabled>打开目录</button><button class="text-button danger-text" id="reset-farm" disabled>开新档</button></div></div>
         <p id="live-save" class="detail">读取中…</p>
         <button id="import-save" hidden>导入存档或备份</button>
         <fieldset class="currency" id="currency-fields" disabled>
@@ -108,6 +112,10 @@
     </section>
   </main>
 
+  <dialog id="ipa-dialog" aria-labelledby="ipa-title">
+    <div class="spread"><h2 id="ipa-title">选择游戏版本</h2><button class="text-button" data-close>完成</button></div>
+    <div id="ipa-list" role="group" aria-labelledby="ipa-title"></div>
+  </dialog>
   <dialog id="skip-dialog" aria-labelledby="skip-title">
     <form method="dialog" id="skip-form">
       <h2 id="skip-title">快进并启动</h2>

@@ -732,10 +732,17 @@ $grpCurrency.Controls.Add($lblCurrencyState)
 $lblSaveInfo = New-Object System.Windows.Forms.Label
 $lblSaveInfo.Text = ''
 $lblSaveInfo.Location = New-Object System.Drawing.Point(14, 14)
-$lblSaveInfo.Size = New-Object System.Drawing.Size(892, 22)
+$lblSaveInfo.Size = New-Object System.Drawing.Size(710, 22)
 $lblSaveInfo.Font = $fontSmall
 $lblSaveInfo.ForeColor = $grey
 $tabSave.Controls.Add($lblSaveInfo)
+
+$btnNewFarm = New-Object System.Windows.Forms.Button
+$btnNewFarm.Text = '开新档'
+$btnNewFarm.Location = New-Object System.Drawing.Point(738, 6)
+$btnNewFarm.Size = New-Object System.Drawing.Size(158, 32)
+$btnNewFarm.FlatStyle = 'Flat'
+$tabSave.Controls.Add($btnNewFarm)
 
 $btnBackup = New-Object System.Windows.Forms.Button
 $btnBackup.Text = '新增备份'
@@ -1284,6 +1291,7 @@ function Update-SaveTab {
     $listSaves.Items.Clear()
 
     $hadLive = $script:LiveSave -and (Test-Path -LiteralPath $script:LiveSave)
+    $btnNewFarm.Enabled = (Test-FarmData) -and !(Test-GameRunning)
     if (-not $hadLive) {
         $lblSaveInfo.Text = '找不到当前存档。'
         $lblSaveInfo.ForeColor = $red
@@ -1312,7 +1320,8 @@ function Update-SaveTab {
     $files = Get-BackupFiles
     foreach ($f in $files) {
         $item = New-Object System.Windows.Forms.ListViewItem($f.BackupKind)
-        [void]$item.SubItems.Add($f.Name)
+        $displayName = if ($f.Name -match $script:FarmBackupPattern) { '完整农场' } else { $f.Name }
+        [void]$item.SubItems.Add($displayName)
         [void]$item.SubItems.Add([string]$f.Length)
         [void]$item.SubItems.Add($f.BackupTime.ToString('MM-dd HH:mm'))
         $item.Tag = $f.FullName
@@ -1785,6 +1794,19 @@ $btnStartSkip.Add_Click({
 
 # --- save management -------------------------------------------------------
 
+$btnNewFarm.Add_Click({
+    $id = $script:AppId
+    $message = "先备份当前农场，再清空进度。下次启动将从新农场开始，模拟时间沿用当前设置。使用同一农场的其他 IPA 也会从新档开始。"
+    if ([Windows.Forms.MessageBox]::Show($message, '开新档？', 'YesNo', 'Question', 'Button2') -ne 'Yes') { return }
+    try {
+        $recovery = Switch-FarmSave -AppId $id
+        Update-SaveTab
+        Refresh-Currency
+        if ($recovery) { [void][Windows.Forms.MessageBox]::Show("原档需要手动恢复，副本在：$recovery", '已清空农场') }
+        else { Update-Status '下次启动将创建新农场。要找回原农场，请还原「新建农场前」备份。' 'ok' }
+    } catch { [void][Windows.Forms.MessageBox]::Show($_.Exception.Message, '无法开新档', 'OK', 'Error') }
+})
+
 $btnBackup.Add_Click({
     if (Test-GameRunning) {
         Update-Status '游戏正在运行，请先关闭游戏再备份存档。' 'err'
@@ -1821,9 +1843,10 @@ $btnRestore.Add_Click({
     }
 
     $name = [System.IO.Path]::GetFileName($path)
-    $size = (Get-Item -LiteralPath $path).Length
+    $details = if ($name -match $script:FarmBackupPattern) { $Matches.kind + ' · ' + $Matches.stamp }
+               else { "$name　$((Get-Item -LiteralPath $path).Length) 字节" }
     $answer = [System.Windows.Forms.MessageBox]::Show(
-        ("要用这个备份覆盖当前存档吗？`n`n{0}`n{1} 字节`n`n当前存档会先自动另存为一份，所以可以反悔。" -f $name, $size),
+        ("要用这个备份覆盖当前存档吗？`n`n{0}`n`n当前存档会先自动另存为一份，所以可以反悔。" -f $details),
         '还原备份', 'YesNo', 'Question')
     if ($answer -ne 'Yes') { return }
 
@@ -2493,7 +2516,7 @@ function Set-ManagerPalette {
 
     foreach ($button in @(
         $btnIpaBrowse, $btnStartSkip, $btnResetTime, $btnApplyCurrency, $btnBackup, $btnRestore,
-        $btnRefresh, $btnSelectAll, $btnSelectNone, $btnSelectInvert, $btnDelete
+        $btnRefresh, $btnSelectAll, $btnSelectNone, $btnSelectInvert, $btnDelete, $btnNewFarm
     )) {
         $button.BackColor = $script:SoftGreen
         $button.ForeColor = if ($Night) { $script:Sage } else { $script:Forest }

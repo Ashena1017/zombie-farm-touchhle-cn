@@ -212,6 +212,26 @@ public final class ZfStorage {
             throw new IOException("版本不在应用目录中");
         JSONObject config = config(); config.put("selected", ipa.file.getName()); writeConfig(config);
     }
+    /** Caller holds the game lease. Remove only a version present in the manager's list. */
+    public void deleteIpa(String name) throws Exception {
+        if (BUNDLED.equalsIgnoreCase(name)) throw new IOException("当前内置 IPA 受保护，无法删除");
+        List<ZfIpa> versions = versions();
+        ZfIpa selected = selectedFrom(versions);
+        for (ZfIpa item : versions) {
+            if (!item.file.getName().equals(name)) continue;
+            if (!item.file.getCanonicalFile().equals(new File(apps.getCanonicalFile(), name)))
+                throw new IOException("版本路径无效");
+            // Clear a selected filename before unlinking it, so reintroducing it later
+            // cannot silently change which game the player launches.
+            if (item == selected) writeConfig(config().put("selected", BUNDLED));
+            if (!item.file.delete()) {
+                if (item == selected) select(item);
+                throw new IOException("无法删除该 IPA");
+            }
+            return;
+        }
+        throw new IOException("所选 IPA 已不存在");
+    }
     public ZfIpa importIpa(InputStream in, String displayName) throws Exception {
         File temp = File.createTempFile("import-", ".tmp", apps);
         try {
@@ -308,6 +328,37 @@ public final class ZfStorage {
         return new File(new File(root, "touchHLE_sandbox"), id);
     }
     public File live(String id) throws IOException { return new File(sandbox(id), SAVE_PATH); }
+    private File farmDirectory(String id) throws IOException {
+        File farm = sandbox(id);
+        if (!farm.getCanonicalFile().equals(new File(new File(root.getCanonicalFile(), "touchHLE_sandbox"), id)))
+            throw new IOException("农场目录无效");
+        return farm;
+    }
+    public boolean hasFarmData(String id) throws IOException {
+        File farm = farmDirectory(id);
+        return farm.isDirectory() && (live(id).isFile() || containsFiles(farm));
+    }
+    private static boolean containsFiles(File directory) throws IOException {
+        File[] entries = directory.listFiles();
+        if (entries == null) throw new IOException("无法读取农场目录");
+        for (File entry : entries) {
+            if (!entry.getCanonicalFile().equals(new File(directory.getCanonicalFile(), entry.getName())))
+                throw new IOException("存档路径无效");
+            if (!entry.isDirectory() || containsFiles(entry)) return true;
+        }
+        return false;
+    }
+    /** A verified backup is published before the live sandbox is atomically detached. */
+    public File resetFarm(String id) throws Exception {
+        File farm = farmDirectory(id);
+        if (!farm.isDirectory()) throw new IOException("当前没有可清空的农场");
+        File backup = writeBackup(id, "新建农场前", true);
+        if (backup == null) throw new IOException("当前没有可清空的农场");
+        File retired = new File(root, ".zf-reset-" + UUID.randomUUID());
+        android.system.Os.rename(farm.getPath(), retired.getPath());
+        cleanupRestoreDirectory(retired);
+        return backup;
+    }
     public ZfSave currency(String id) throws Exception { return ZfSave.read(id, bytes(live(id))); }
     private File backupDir(String id) throws IOException { File dir = new File(new File(root, "zf_backups"), id); mkdir(dir); return dir; }
     public List<File> backups(String id) throws IOException {
@@ -381,7 +432,7 @@ public final class ZfStorage {
         File[] children = dir.listFiles();
         if (children == null) throw new IOException("无法读取存档目录");
         for (File child : children) {
-            if (!child.getCanonicalFile().getParentFile().equals(dir.getCanonicalFile())) throw new IOException("存档路径无效");
+            if (!child.getCanonicalFile().equals(new File(dir.getCanonicalFile(), child.getName()))) throw new IOException("存档路径无效");
             if (child.isDirectory()) zipDirectory(zip, child, prefix + child.getName() + "/", limits);
             else {
                 limits.nextEntry();

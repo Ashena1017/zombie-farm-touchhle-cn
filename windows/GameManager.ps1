@@ -1027,6 +1027,16 @@ function Get-FarmOffsetPath([string]$Id, [string]$Emulator = $script:HleDir, [sw
     if (-not $Id) { return $null }
     if ($Id -notmatch '^[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*$') { throw 'IPA 的应用标识无效。' }
     $folder = Join-Path $Emulator ('touchHLE_sandbox\{0}' -f $Id)
+    $ready = Join-Path $Emulator ("zf_farm_backups\$Id\.ready")
+    if (!$ReadOnly -and [IO.Directory]::Exists($ready)) {
+        Invoke-WithTimeOffsetLock {
+            if (![IO.Directory]::Exists($folder) -and [IO.Directory]::Exists($ready)) {
+                Assert-FarmPath $ready $Emulator
+                Assert-FarmPath $folder $Emulator
+                [IO.Directory]::Move($ready, $folder)
+            }
+        }
+    }
     $path = Join-Path $folder 'touchHLE_time_offset_seconds.txt'
     # Older managers kept a single clock without recording its owner. Migrate it
     # once to the bundled farm, even if an extra IPA is selected first.
@@ -1104,13 +1114,151 @@ function Get-PanicSummary {
 # Everything matching saveGame.bin2.bak* is listed, except its hidden .zf-offset
 # companion file. Restoring archives both the current save and its time offset.
 
+$script:FarmBackupPattern = '^(?<stamp>\d{8}-\d{6}-\d{3})_(?<kind>新建农场前|还原农场前)_[a-f0-9]{32}\.farm$'
+
+function Get-FarmBackupDirectory {
+    Join-Path $script:HleDir ("zf_farm_backups\" + $script:AppId)
+}
+
+# Reject junctions at every level before copying or moving player data.
+function Assert-FarmPath([string]$Path, [string]$Root = $script:HleDir) {
+    $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+    $p = [IO.Path]::GetFullPath($Path)
+    if (!$p.StartsWith($rootPath + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '农场路径超出游戏目录。' }
+    while ($p -ne $rootPath) {
+        $item = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+        if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "农场目录含有链接：$p" }
+        $p = [IO.Path]::GetDirectoryName($p)
+    }
+}
+
+function Get-FarmContents([string]$Root, [string]$Relative = '') {
+    $dir = if ($Relative) { Join-Path $Root $Relative } else { $Root }
+    foreach ($item in (Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop)) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "农场目录含有链接：$($item.FullName)" }
+        $name = if ($Relative) { "$Relative\$($item.Name)" } else { $item.Name }
+        if ($item.PSIsContainer) { Get-FarmContents $Root $name }
+        else {
+            $manager = $name -like 'Documents\recovery\*' -or
+                ($Relative -eq 'Documents' -and $item.Name -like "$($script:BackupPrefix)*")
+            [pscustomobject]@{ File = $item; Relative = $name; Manager = $manager; Clock = $name -eq 'touchHLE_time_offset_seconds.txt' }
+        }
+    }
+}
+
+function Test-FarmData {
+    if (!$script:SaveDir) { return $false }
+    $farm = Split-Path -Parent $script:SaveDir
+    if (![IO.Directory]::Exists($farm)) { return $false }
+    Assert-FarmPath $farm
+    if ([IO.File]::Exists($script:LiveSave)) { return $true }
+    return [bool](Get-FarmContents $farm | Where-Object { !$_.Manager -and !$_.Clock } | Select-Object -First 1)
+}
+
+function Copy-FarmMember($Member, [string]$Stage) {
+    $dest = Join-Path $Stage $Member.Relative
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($dest))
+    [IO.File]::Copy($Member.File.FullName, $dest)
+    if ((Get-Sha256Hex $dest) -ne (Get-Sha256Hex $Member.File.FullName)) { throw '农场文件复制校验失败。' }
+}
+
+function Remove-FarmDirectory([string]$Path) {
+    Assert-FarmPath $Path
+    if ((Split-Path -Parent $Path) -ne (Get-FarmBackupDirectory)) { throw '无法确认农场备份的位置。' }
+    if ([IO.Directory]::Exists($Path)) {
+        # Check children before recursion, including player-added junctions.
+        Get-FarmContents $Path | Out-Null
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+    }
+}
+
+# Move the original sandbox intact. The new sandbox receives existing manager
+# backups and either the current clock or the chosen farm's files and clock.
+function Switch-FarmSave([string]$AppId, [string]$RestoreFrom) {
+    if (!$AppId -or $AppId -cne $script:AppId -or !$script:SaveDir) { throw '所选农场已改变，请重新确认。' }
+    Invoke-WithTimeOffsetLock {
+        if (Test-GameRunning) { throw '请先退出游戏，再操作当前农场。' }
+        $farm = Split-Path -Parent $script:SaveDir
+        $store = Get-FarmBackupDirectory
+        Assert-FarmPath $farm
+        Assert-FarmPath $store
+        [void](Get-FarmOffsetPath $AppId)
+        $current = @(if ([IO.Directory]::Exists($farm)) { Get-FarmContents $farm })
+        $hasData = [bool]($current | Where-Object { !$_.Manager -and !$_.Clock } | Select-Object -First 1)
+        if (!$RestoreFrom -and !$hasData) { throw '当前没有可清空的农场。' }
+        if ($RestoreFrom) {
+            if ((Split-Path -Parent $RestoreFrom) -ne $store -or (Split-Path -Leaf $RestoreFrom) -notmatch $script:FarmBackupPattern) {
+                throw '请选择当前游戏的完整农场备份。'
+            }
+            Assert-FarmPath $RestoreFrom
+        }
+        $token = [guid]::NewGuid().ToString('N')
+        $staging = Join-Path $store ('.stage-' + $token)
+        $ready = Join-Path $store '.ready'
+        $archive = Join-Path $store ('.empty-' + $token)
+        $recovery = $false
+        if ($hasData) {
+            $kind = if ($RestoreFrom) { '还原农场前' } else { '新建农场前' }
+            $archive = Join-Path $store ("{0}_{1}_{2}.farm" -f (Get-Date -Format yyyyMMdd-HHmmss-fff), $kind, $token)
+            $recovery = ![IO.File]::Exists($script:LiveSave)
+            if (!$recovery) {
+                try { Assert-SaveBackupContent $script:LiveSave }
+                catch [IO.IOException] { throw }
+                catch [UnauthorizedAccessException] { throw }
+                catch { $recovery = $true }
+            }
+            if ($recovery) { $archive += '.recovery' }
+        }
+        # A ready directory with an existing live farm is an interrupted,
+        # uncommitted operation. Its files were copied from retained originals.
+        Remove-FarmDirectory $ready
+        [void][IO.Directory]::CreateDirectory((Join-Path $staging 'Documents'))
+        $moved = $false
+        try {
+            foreach ($member in $current) {
+                if ($member.Manager -or (!$RestoreFrom -and $member.Clock)) { Copy-FarmMember $member $staging }
+            }
+            if ($RestoreFrom) {
+                foreach ($member in (Get-FarmContents $RestoreFrom)) {
+                    if (!$member.Manager) { Copy-FarmMember $member $staging }
+                }
+                Assert-SaveBackupContent (Join-Path $staging 'Documents\saveGame.bin2')
+            }
+            [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($farm))
+            [IO.Directory]::Move($staging, $ready)
+            if ([IO.Directory]::Exists($farm)) { [IO.Directory]::Move($farm, $archive); $moved = $true }
+            try { [IO.Directory]::Move($ready, $farm) } catch {
+                if ($moved) { [IO.Directory]::Move($archive, $farm) }
+                throw
+            }
+            if ($moved -and !$hasData) { Remove-FarmDirectory $archive }
+            if ($recovery) { return $archive }
+        } finally { Remove-FarmDirectory $staging }
+    }
+}
+
 function Get-BackupFiles {
     param([string]$Directory = $script:SaveDir)
 
-    if (-not $Directory -or -not (Test-Path -LiteralPath $Directory)) { return @() }
+    if (-not $Directory) { return @() }
     $formats = [string[]]@('yyyyMMdd-HHmmss-fff', 'yyyyMMdd-HHmmss')
     $pattern = '^saveGame\.bin2\.bak-(?<stamp>[0-9]{8}-[0-9]{6}(?:-[0-9]{3})?)(?:-(?<label>(?![0-9]+$).+?))?(?:-(?<sequence>[0-9]+))?$'
-    $files = foreach ($file in (Get-ChildItem -LiteralPath $Directory -File -Filter "$($script:BackupPrefix)*")) {
+    $files = @(if ($Directory -eq $script:SaveDir) {
+        $store = Get-FarmBackupDirectory
+        if ([IO.Directory]::Exists($store)) {
+            Assert-FarmPath $store
+            foreach ($dir in (Get-ChildItem -LiteralPath $store -Directory -Filter '*.farm')) {
+                if ($dir.Name -notmatch $script:FarmBackupPattern -or ($dir.Attributes -band [IO.FileAttributes]::ReparsePoint)) { continue }
+                $time = [datetime]::MinValue
+                if (![datetime]::TryParseExact($Matches.stamp, 'yyyyMMdd-HHmmss-fff', [Globalization.CultureInfo]::InvariantCulture,
+                        [Globalization.DateTimeStyles]::None, [ref]$time)) { continue }
+                [pscustomobject]@{ Name = $dir.Name; FullName = $dir.FullName; Length = $null; BackupTime = $time
+                    BackupKind = $Matches.kind; BackupSequence = 0; CreationTime = $dir.CreationTime }
+            }
+        }
+    })
+    $legacy = if ([IO.Directory]::Exists($Directory)) { Get-ChildItem -LiteralPath $Directory -File -Filter "$($script:BackupPrefix)*" }
+    $files += @(foreach ($file in $legacy) {
         if ($file.Name.EndsWith($script:BackupOffsetSuffix, [StringComparison]::OrdinalIgnoreCase)) { continue }
         # Copying a save keeps its original modification time. The filename records
         # when the backup was made, even after it moves to another installation.
@@ -1125,7 +1273,7 @@ function Get-BackupFiles {
             [void][long]::TryParse($Matches.sequence, [ref]$sequence)
         }
         Add-Member -InputObject $file -NotePropertyMembers @{ BackupTime = $time; BackupKind = $kind; BackupSequence = $sequence } -PassThru
-    }
+    })
     return @($files | Sort-Object -Property BackupTime, BackupSequence, CreationTime, Name -Descending)
 }
 
@@ -1314,6 +1462,9 @@ function Restore-SaveBackup {
         [string]$OffsetFile = (Get-LaunchPaths).OffsetFile
     )
 
+    if ([IO.Directory]::Exists($BackupPath)) {
+        return Switch-FarmSave -AppId $script:AppId -RestoreFrom $BackupPath
+    }
     if (-not (Test-Path -LiteralPath $BackupPath -PathType Leaf)) { throw "备份不存在：$BackupPath" }
 
     $metadataPath = Get-BackupOffsetPath -BackupPath $BackupPath
@@ -1397,6 +1548,10 @@ function Remove-SaveBackup {
     # touch the live save, the .preview file, or anything else that is not a
     # backup. The live save is saveGame.bin2, which does not match this pattern.
     $leaf = [System.IO.Path]::GetFileName($BackupPath)
+    if ([IO.Directory]::Exists($BackupPath) -and $leaf -match $script:FarmBackupPattern) {
+        Invoke-WithTimeOffsetLock { Remove-FarmDirectory $BackupPath }
+        return $leaf
+    }
     if ($leaf -notlike "$($script:BackupPrefix)*") {
         throw "拒绝删除：$leaf 不是备份文件。"
     }
