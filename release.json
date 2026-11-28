@@ -1,5 +1,5 @@
 {
-  "tag": "v32fix",
+  "tag": "v32fix-save-recovery",
   "ipa": {
     "name": "内置中文版·v32fix·开源免费.ipa",
     "label": "v32fix",
@@ -7,7 +7,7 @@
     "sha256": "ffbd9d7c7e73a0c5aab0ca3cd252d28e55272ac5f665ab3b4ecb6e2006c3ffea"
   },
   "android": {
-    "versionCode": 24,
+    "versionCode": 25,
     "installedIpaName": "内置中文版·v32fix·开源免费.ipa"
   },
   "cumulativePatch": {

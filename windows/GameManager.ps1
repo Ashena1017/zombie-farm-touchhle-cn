@@ -1135,13 +1135,14 @@ function Get-BackupOffsetPath {
 }
 
 function Read-TimeOffset {
-    param([string]$Path = (Get-LaunchPaths).OffsetFile)
+    param([string]$Path = (Get-LaunchPaths).OffsetFile, [switch]$AllowInvalid)
 
     if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return [int64]0 }
     $text = [System.IO.File]::ReadAllText($Path).Trim()
     if (-not $text) { return [int64]0 }
     [int64]$value = 0
     if (-not [int64]::TryParse($text, [ref]$value) -or $value -lt 0) {
+        if ($AllowInvalid) { return $null }
         throw "累计时间偏移文件内容无效：$Path"
     }
     return $value
@@ -1289,11 +1290,11 @@ function New-SaveBackup {
         $suffix++
     }
 
-    if ($Label -ne 'pre-restore' -and (Get-Item -LiteralPath $SourcePath).Length -eq 0) { throw '当前存档为空，无法备份。' }
     $pending = Join-Path $Directory ('.backup-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
     $sidecarCreated = $false
     try {
         [IO.File]::Copy($SourcePath, $pending)
+        if ($Label -ne 'pre-restore') { Assert-SaveBackupContent $pending }
         Write-BackupOffset -BackupPath $target -Value $offset -ContentPath $pending
         $sidecarCreated = $true
         [IO.File]::Move($pending, $target)
@@ -1334,37 +1335,49 @@ function Restore-SaveBackup {
 
     $live = Join-Path $Directory 'saveGame.bin2'
     # Archive the current save first so a restore is itself undoable.
-    $preRestore = $null
-    $saveReplaced = $false
     $stagedSave = Join-Path $Directory ('.restore-{0}.tmp' -f [Guid]::NewGuid().ToString('N'))
     try {
         [void][IO.Directory]::CreateDirectory($Directory)
         [System.IO.File]::Copy($BackupPath, $stagedSave)
         $size = (Get-Item -LiteralPath $stagedSave).Length
-        if ($size -eq 0) { throw '备份为空，无法还原。' }
+        Assert-SaveBackupContent $stagedSave
         if ($metadata -and ($size -ne $metadata.size -or (Get-Sha256Hex $stagedSave) -ne $metadata.sha256)) {
             throw '备份大小或 SHA-256 与创建时不同，无法还原。'
         }
-        if (Test-Path -LiteralPath $live -PathType Leaf) {
-            $preRestore = New-SaveBackup -Directory $Directory -Label 'pre-restore' -SourcePath $live -OffsetFile $OffsetFile
-            [System.IO.File]::Replace($stagedSave, $live, [NullString]::Value)
-        } else {
-            [System.IO.File]::Move($stagedSave, $live)
-        }
-        $saveReplaced = $true
-        if ($null -ne $restoreOffset) {
-            Write-TimeOffset -Value $restoreOffset -Path $OffsetFile
-        }
-    } catch {
-        if ($saveReplaced) {
-            if ($preRestore) {
-                [System.IO.File]::Copy($preRestore, $stagedSave)
-                [System.IO.File]::Replace($stagedSave, $live, [NullString]::Value)
+        Invoke-WithTimeOffsetLock {
+            $preRestore = $null
+            $hasLive = [IO.File]::Exists($live)
+            if ($null -eq (Read-TimeOffset -Path $OffsetFile -AllowInvalid)) {
+                # A damaged clock cannot be encoded in an ordinary backup. Keep
+                # its original bytes alongside the displaced farm for recovery.
+                $recovery = Join-Path $Directory ('recovery\{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), [guid]::NewGuid().ToString('N'))
+                [void][IO.Directory]::CreateDirectory($recovery)
+                [IO.File]::Copy($OffsetFile, (Join-Path $recovery 'touchHLE_time_offset_seconds.txt'))
+                if ($hasLive) {
+                    $preRestore = Join-Path $recovery 'saveGame.bin2'
+                    [IO.File]::Copy($live, $preRestore)
+                }
+            } elseif ($hasLive) {
+                $preRestore = New-SaveBackup -Directory $Directory -Label 'pre-restore' -SourcePath $live -OffsetFile $OffsetFile
+            }
+
+            if ($hasLive) {
+                [IO.File]::Replace($stagedSave, $live, [NullString]::Value)
             } else {
-                [System.IO.File]::Delete($live)
+                [IO.File]::Move($stagedSave, $live)
+            }
+            try {
+                if ($null -ne $restoreOffset) { Set-TimeOffsetFile -Path $OffsetFile -Value $restoreOffset }
+            } catch {
+                if ($preRestore) {
+                    [IO.File]::Copy($preRestore, $stagedSave)
+                    [IO.File]::Replace($stagedSave, $live, [NullString]::Value)
+                } else {
+                    [IO.File]::Delete($live)
+                }
+                throw
             }
         }
-        throw
     } finally {
         if (Test-Path -LiteralPath $stagedSave -PathType Leaf) {
             Remove-Item -LiteralPath $stagedSave -Force -ErrorAction SilentlyContinue
@@ -1419,7 +1432,7 @@ function Remove-SaveBackup {
 # The surrounding invariant fields are checked as well, so a save damaged by an
 # earlier tool is refused instead of being made worse.
 
-function Get-CurrencyLayout {
+function Get-ZfrPlayerOffset {
     param([Parameter(Mandatory = $true)][byte[]]$Data)
 
     if ($Data.Length -lt 4 -or [BitConverter]::ToInt32($Data, 0) -ne 14) {
@@ -1445,19 +1458,57 @@ function Get-CurrencyLayout {
         throw '找不到版本 14 的玩家数据块。存档未被修改。'
     }
 
-    $goldOffset = $markerOffset + 0x46
-    $brainOffset = $markerOffset + 0x4A
     if ($Data.Length -lt ($markerOffset + 0x5E)) {
         throw '玩家数据块不完整。请先还原一个未经修改的备份。'
     }
 
     $layoutVersion = [BitConverter]::ToInt32($Data, $markerOffset + 0x42)
     $reservedValue = [BitConverter]::ToInt32($Data, $markerOffset + 0x52)
+    if ($layoutVersion -ne 4 -or $reservedValue -ne 0) {
+        throw '玩家数据块校验失败，可能已经损坏。'
+    }
+    return $markerOffset
+}
+
+function Assert-SaveBackupContent([string]$Path) {
+    if ((Get-Item -LiteralPath $Path).Length -eq 0) { throw '存档为空。' }
+    if ($script:AppId -cne 'com.playforge.ZombieFarm.ZFR') { return }
+
+    $data = [IO.File]::ReadAllBytes($Path)
+    if ($data.Length -le 4) { throw '存档缺少版本号或游戏数据。' }
+    $version = [BitConverter]::ToInt32($data, 0)
+    # Only v14's layout is known. Preserve opaque backups for other versions.
+    if ($version -le 0) { throw '存档版本号无效。' }
+    if ($version -ne 14) { return }
+    $marker = Get-ZfrPlayerOffset $data
+    Assert-ZfrQuests $data $marker
+}
+
+function Assert-ZfrQuests([byte[]]$Data, [int]$Marker) {
+    $completed = [BitConverter]::ToUInt32($data, $marker + 0x56)
+    [long]$pos = $marker + 0x5a + 4L * $completed
+    if ($pos + 4 -gt $data.Length) { throw '存档中的已完成任务列表不完整。' }
+    $active = [BitConverter]::ToUInt32($data, $pos)
+    $pos += 4
+    if ($pos + 8L * $active -gt $data.Length) { throw '存档中的活动任务列表不完整。' }
+    for ($i = 0; $i -lt $active; $i++) {
+        if ($pos + 8 -gt $data.Length) { throw '存档中的活动任务记录不完整。' }
+        $progress = [BitConverter]::ToUInt32($data, $pos + 4)
+        $pos += 8L + 4L * $progress
+        if ($pos -gt $data.Length) { throw '存档中的任务进度记录不完整。' }
+    }
+}
+
+function Get-CurrencyLayout {
+    param([Parameter(Mandatory = $true)][byte[]]$Data)
+
+    $markerOffset = Get-ZfrPlayerOffset $Data
+    if ($script:AppId -ceq 'com.playforge.ZombieFarm.ZFR') { Assert-ZfrQuests $Data $markerOffset }
+    $goldOffset = $markerOffset + 0x46
+    $brainOffset = $markerOffset + 0x4A
     $firstIndex = [BitConverter]::ToInt32($Data, $markerOffset + 0x56)
     $secondIndex = [BitConverter]::ToInt32($Data, $markerOffset + 0x5A)
     if (
-        $layoutVersion -ne 4 -or
-        $reservedValue -ne 0 -or
         $firstIndex -lt 0 -or $firstIndex -gt 1000000 -or
         $secondIndex -lt 0 -or $secondIndex -gt 1000000
     ) {
@@ -2199,7 +2250,9 @@ if ($SelfTest) {
         } finally { $child.Dispose() }
         Write-Host '  clock rollback on launch failure and nonzero child exit : PASS'
 
-        # Build a live save plus one pre-existing backup.
+        # An extra IPA's saves are opaque; only the bundled ZFR has a known format.
+        $selectedId = $script:AppId
+        $script:AppId = 'org.example.OtherFarm'
         $live = Join-Path $sandbox 'saveGame.bin2'
         [System.IO.File]::WriteAllBytes($live, [byte[]](1..40))
         [System.IO.File]::WriteAllBytes((Join-Path $sandbox 'saveGame.bin2.bak'), [byte[]](1..20))
@@ -2329,7 +2382,7 @@ if ($SelfTest) {
         Write-Host ''
         Write-Host '--- bulk delete (as the UI does) ---'
         for ($i = 1; $i -le 4; $i++) {
-            [void](New-SaveBackup -Directory $sandbox -Label "bulk$i")
+            [void](New-SaveBackup -Directory $sandbox -Label "bulk$i" -OffsetFile $offsetFixture)
         }
         $beforeBulk = (Get-BackupFiles -Directory $sandbox).Count
         $toDelete = @(Get-BackupFiles -Directory $sandbox | Where-Object { $_.Name -like '*bulk*' })
@@ -2387,7 +2440,60 @@ if ($SelfTest) {
         $fixture[0] = 14
         ([byte[]]@(1,9,0,0,0) + [Text.Encoding]::ASCII.GetBytes('UNDEFINED')).CopyTo($fixture, 64)
         $fixture[64 + 0x42] = 4
+        $script:AppId = 'com.playforge.ZombieFarm.ZFR'
         [IO.File]::WriteAllBytes($copy, $fixture)
+        $validBackup = New-SaveBackup -Directory $sandbox -OffsetFile $offsetFixture
+        $oldFormat = [byte[]]@(13,0,0,0,1,2,3,4)
+        [IO.File]::WriteAllBytes($copy, $oldFormat)
+        $olderBackup = New-SaveBackup -Directory $sandbox -OffsetFile $offsetFixture
+        [IO.File]::Delete((Get-BackupOffsetPath $olderBackup))
+        [IO.File]::WriteAllBytes($copy, $fixture)
+        [void](Restore-SaveBackup $olderBackup $sandbox $offsetFixture)
+        if ((Get-Sha256Hex $copy) -ne (Get-Sha256Hex $olderBackup)) { throw 'Legacy version backup was not preserved.' }
+        foreach ($field in @('header', 'short', 'completed', 'active', 'progress')) {
+            [byte[]]$damaged = $fixture.Clone()
+            switch ($field) {
+                'header' { $damaged = $oldFormat[0..2] }
+                'short' { $damaged = $damaged[0..7] }
+                'completed' { [BitConverter]::GetBytes([uint32]::MaxValue).CopyTo($damaged, 64 + 0x56) }
+                'active' { [BitConverter]::GetBytes([uint32]::MaxValue).CopyTo($damaged, 64 + 0x5a) }
+                'progress' { $damaged[64 + 0x5a] = 1; [BitConverter]::GetBytes([uint32]::MaxValue).CopyTo($damaged, 64 + 0x62) }
+            }
+            [IO.File]::WriteAllBytes($copy, $damaged)
+            $rejected = $false
+            try { [void](New-SaveBackup -Directory $sandbox -OffsetFile $offsetFixture) } catch { $rejected = $true }
+            if (-not $rejected) { throw "Accepted invalid ZFR backup: $field" }
+            [IO.File]::WriteAllBytes($legacyBackup, $damaged)
+            [IO.File]::WriteAllBytes($copy, $fixture)
+            $rejected = $false
+            try { [void](Restore-SaveBackup $legacyBackup $sandbox $offsetFixture) } catch { $rejected = $true }
+            if (-not $rejected -or (Get-Sha256Hex $copy) -ne (Get-Sha256Hex $validBackup)) { throw "Accepted invalid ZFR restore: $field" }
+        }
+        # Integrity of a backup does not depend on whether its currency is editable.
+        [BitConverter]::GetBytes([int]-1).CopyTo($fixture, 64 + 0x46)
+        [IO.File]::WriteAllBytes($copy, $fixture)
+        [void](New-SaveBackup -Directory $sandbox -OffsetFile $offsetFixture)
+        [IO.File]::Copy($copy, $legacyBackup, $true)
+        [void](Restore-SaveBackup $legacyBackup $sandbox $offsetFixture)
+        if ((Get-Sha256Hex $copy) -ne (Get-Sha256Hex $legacyBackup)) { throw 'Legacy ZFR restore changed its contents.' }
+        foreach ($withFarm in @($true, $false)) {
+            if (-not $withFarm) { [IO.File]::Delete($copy) }
+            [IO.File]::WriteAllBytes($offsetFixture, [byte[]]@(0xfe, 0x11, 0x09))
+            $clockHash = Get-Sha256Hex $offsetFixture
+            $archivesBefore = @(Get-ChildItem -LiteralPath (Join-Path $sandbox 'recovery') -Directory -ErrorAction SilentlyContinue)
+            [void](Restore-SaveBackup $validBackup $sandbox $offsetFixture)
+            $archive = @(Get-ChildItem -LiteralPath (Join-Path $sandbox 'recovery') -Directory | Where-Object { $_.FullName -notin $archivesBefore.FullName })
+            if ($archive.Count -ne 1 -or (Get-Sha256Hex (Join-Path $archive[0].FullName 'touchHLE_time_offset_seconds.txt')) -ne $clockHash -or
+                (Read-TimeOffset $offsetFixture) -ne 12345 -or (Get-Sha256Hex $copy) -ne (Get-Sha256Hex $validBackup)) {
+                throw 'Failed to preserve damaged clock and restore backup.'
+            }
+            $archivedFarm = Join-Path $archive[0].FullName 'saveGame.bin2'
+            if ([IO.File]::Exists($archivedFarm) -ne $withFarm -or ($withFarm -and (Get-Sha256Hex $archivedFarm) -ne (Get-Sha256Hex $legacyBackup))) {
+                throw 'Recovery archive does not match the farm present before restoring.'
+            }
+        }
+        Write-Host '  ZFR player and quest bounds, legacy backups, damaged clock recovery with and without live save : PASS'
+        $script:AppId = $selectedId
         $orig = Get-Currency -SavePath $copy
 
         $writtenBackup = Set-Currency -Gold 123456 -Brains 654321 -SavePath $copy -OffsetFile $offsetFixture

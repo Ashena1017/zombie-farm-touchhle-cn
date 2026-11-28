@@ -4,6 +4,21 @@
 
 ## 当前发行
 
+Windows x64 和 Android ARM64 同步发布 `v32fix-save-recovery`，Android 内部版本号为 25。两端继续使用 v32 中文 IPA。[双端下载与版本说明](https://github.com/Ashena1017/zombie-farm-touchhle-cn/releases/tag/v32fix-save-recovery)
+
+- Windows 和 Android 的游戏管理会在备份或还原内置游戏的 v14 农场时检查玩家数据和任务进度，识别只写了一部分的存档。
+- Windows 的模拟时间文件损坏时，现在可以直接还原有效备份。还原前会把损坏的时钟文件和已有主档保存在该农场的 `Documents/recovery/`。
+- Android 的农场主档丢失时，现在会在还原前保留剩余玩家资料、偏好和模拟时间偏移。可在游戏目录的 `zf_backups/<游戏标识>/recovery/` 找到副本。
+
+| 下载文件 | 大小（字节） | SHA-256 |
+| --- | ---: | --- |
+| `zombie-farm-windows-x64-v32fix-save-recovery.zip` | 98,406,457 | `3d3cd3699aceb2bc620d98ceb74781a04da2390e7e4b8dc3c6279bb45ff594a3` |
+| `zombie-farm-android-arm64-v32fix-save-recovery.apk` | 105,108,391 | `51cfe91e5a5b49fce8f67b7c97c589507f9d4f4114c83dd43a2b0f121fa067d0` |
+
+Windows 正式包在空目录解压后通过管理器自检，游戏独立运行了 45 秒。包内管理器拒绝了两份截断存档，并在当前时钟损坏时成功还原了原档及一小时偏移。MuMu 从 Android v24 覆盖安装正式 v25 后，主存档、管理器设置、模拟器选项的 SHA-256 均与升级前一致。
+
+## v32fix 记录
+
 Windows x64 和 Android ARM64 现共用 v32 中文 IPA。原有农场存档可以继续使用。
 
 - 修复旧农场仓库里已经有马戏团旗帜、任务却停在 0/3 的问题。集齐三色旗可领取原游戏的 200 经验。同色旗只算一次，重新进入农场不会重复发奖。

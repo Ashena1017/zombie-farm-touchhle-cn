@@ -308,7 +308,7 @@ public final class ZfStorage {
         return new File(new File(root, "touchHLE_sandbox"), id);
     }
     public File live(String id) throws IOException { return new File(sandbox(id), SAVE_PATH); }
-    public ZfSave currency(String id) throws Exception { return ZfSave.read(bytes(live(id))); }
+    public ZfSave currency(String id) throws Exception { return ZfSave.read(id, bytes(live(id))); }
     private File backupDir(String id) throws IOException { File dir = new File(new File(root, "zf_backups"), id); mkdir(dir); return dir; }
     public List<File> backups(String id) throws IOException {
         File[] files = backupDir(id).listFiles((dir, name) -> name.endsWith(".zip"));
@@ -326,8 +326,8 @@ public final class ZfStorage {
     }
     private File writeBackup(String id, String kind, boolean preserveDamaged) throws Exception {
         File save = live(id);
-        if (!save.isFile()) throw new IOException("还没有存档，请先进入游戏创建存档");
-        if (save.length() > MAX_SAVE_BYTES) throw new IOException("存档大小超出限制");
+        if (!save.isFile() && !preserveDamaged) throw new IOException("还没有存档，请先进入游戏创建存档");
+        if (save.isFile() && save.length() > MAX_SAVE_BYTES) throw new IOException("存档大小超出限制");
         String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(new Date());
         File directory = backupDir(id);
         File target = new File(directory, stamp + "_" + kind + "_" + UUID.randomUUID().toString().substring(0, 4) + ".zip");
@@ -346,9 +346,13 @@ public final class ZfStorage {
             // Validate the bytes in the finished ZIP with the same checks used by restore.
             try (ZipFile archive = new ZipFile(temp)) {
                 ZipEntry main = archive.getEntry("sandbox/" + SAVE_PATH);
-                if (main == null) throw new IOException("备份缺少主存档");
+                if (main == null) {
+                    // A new sandbox can contain just empty directories. Only retain player files.
+                    if (preserveDamaged && archive.size() == 1) return null;
+                    throw new IllegalArgumentException("备份缺少主存档");
+                }
                 try (InputStream in = archive.getInputStream(main)) {
-                    ZfSave.read(ZfIpa.readLimited(in, MAX_SAVE_BYTES));
+                    ZfSave.read(id, ZfIpa.readLimited(in, MAX_SAVE_BYTES));
                 }
                 checkedBackupOffset(offset);
             } catch (IllegalArgumentException damaged) {
@@ -388,7 +392,7 @@ public final class ZfStorage {
         }
     }
     public File setCurrency(String id, int gold, int brains) throws Exception {
-        File save = live(id); byte[] original = bytes(save), updated = ZfSave.edit(original, gold, brains);
+        File save = live(id); byte[] original = bytes(save), updated = ZfSave.edit(id, original, gold, brains);
         File backup = backup(id, "改货币前");
         try {
             atomic(save, updated);
@@ -397,7 +401,7 @@ public final class ZfStorage {
         return backup;
     }
     public void importSave(String id, InputStream in) throws Exception {
-        byte[] imported = ZfIpa.readLimited(in, MAX_SAVE_BYTES); ZfSave.read(imported);
+        byte[] imported = ZfIpa.readLimited(in, MAX_SAVE_BYTES); ZfSave.read(id, imported);
         File save = live(id); byte[] original = save.isFile() ? bytes(save) : null;
         if (original != null) writeBackup(id, "导入前", true);
         try {
@@ -446,11 +450,11 @@ public final class ZfStorage {
             }
             if (metadata == null || metadata.optInt("format") != 1 || !id.equals(metadata.optString("appId")))
                 throw new IOException("请选择当前游戏版本的 ZF 存档备份");
-            ZfSave.read(bytes(new File(incoming, SAVE_PATH)));
+            ZfSave.read(id, bytes(new File(incoming, SAVE_PATH)));
             long offset = checkedBackupOffset(metadata.optLong("offset", -1));
             File current = sandbox(id); mkdir(current.getParentFile());
             if (current.exists()) {
-                if (live(id).isFile()) writeBackup(id, "恢复前", true);
+                writeBackup(id, "恢复前", true);
                 if (!current.renameTo(old)) throw new IOException("无法归档当前存档");
                 moved = true;
             }

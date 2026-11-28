@@ -41,14 +41,17 @@ public class ManagerTestRunner extends Instrumentation {
         byte[] b = new byte[512]; ByteBuffer v = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN); v.putInt(0, 14);
         byte[] marker = {1,9,0,0,0,0x55,0x4e,0x44,0x45,0x46,0x49,0x4e,0x45,0x44};
         System.arraycopy(marker, 0, b, 30, marker.length); v.putInt(30 + 0x42, 4); v.putInt(30 + 0x46, 200);
-        v.putInt(30 + 0x56, 1); v.putInt(30 + 0x5a, 2); return b;
+        v.position(30 + 0x56);
+        v.putInt(1).putInt(2); // one completed quest
+        v.putInt(2).putInt(46).putInt(3).putInt(1).putInt(0).putInt(1).putInt(47).putInt(0);
+        return b;
     }
-    private static byte[] hostileZip(String id, String entry) throws Exception {
+    private static byte[] backupZip(String id, String entry, byte[] data) throws Exception {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
             zip.putNextEntry(new ZipEntry("zf_backup.json"));
             zip.write(new JSONObject().put("format", 1).put("appId", id).put("offset", 0).toString().getBytes(StandardCharsets.UTF_8));
-            zip.closeEntry(); zip.putNextEntry(new ZipEntry(entry)); zip.write(fixture()); zip.closeEntry();
+            zip.closeEntry(); zip.putNextEntry(new ZipEntry(entry)); zip.write(data); zip.closeEntry();
         }
         return bytes.toByteArray();
     }
@@ -83,14 +86,22 @@ public class ManagerTestRunner extends Instrumentation {
         check(provider.isChildDocument(other, renamed) && !provider.isChildDocument(farm, renamed)
             && new File(external, "farm-backup/seed.txt").isFile(), "file picker tracks moved and renamed documents");
     }
+    private static Set<File> recoveryCopies(File manual) throws IOException {
+        File dir = new File(manual.getParentFile(), "recovery");
+        if (!dir.exists()) return new HashSet<>();
+        File[] copies = dir.listFiles((parent, name) -> name.endsWith(".zip"));
+        if (copies == null) throw new IOException("Cannot list recovery copies");
+        return new HashSet<>(Arrays.asList(copies));
+    }
     private void checkDamagedFarmRecovery(ZfStorage store, String id, File manual) throws Exception {
         byte[] good = fixture();
         File prefs = new File(store.sandbox(id), "Library/Preferences/game.plist");
         for (boolean fromZip : new boolean[]{true, false}) {
-            byte[] old = fromZip ? new byte[0] : Arrays.copyOf(good, 50);
+            byte[] old = fromZip ? new byte[0] : Arrays.copyOf(good, 30 + 0x5e);
             ZfStorage.atomic(store.live(id), old);
             ZfStorage.atomic(prefs, new byte[]{42});
             List<File> before = store.backups(id);
+            Set<File> earlier = recoveryCopies(manual);
             reject(() -> store.backup(id, "manual"), "damaged farm cannot create a manual backup, ZIP restore=" + fromZip);
             check(before.equals(store.backups(id)), "failed manual backup leaves the list untouched, ZIP restore=" + fromZip);
             if (fromZip) {
@@ -101,10 +112,10 @@ public class ManagerTestRunner extends Instrumentation {
             byte[] expectedPrefs = fromZip ? "original preferences".getBytes(StandardCharsets.UTF_8) : new byte[]{42};
             check(Arrays.equals(good, ZfStorage.bytes(store.live(id))) && Arrays.equals(expectedPrefs, ZfStorage.bytes(prefs))
                 && before.equals(store.backups(id)), "good farm replaces damaged save, ZIP restore=" + fromZip);
-            String kind = fromZip ? "_恢复前_" : "_导入前_";
-            File[] copies = new File(manual.getParentFile(), "recovery").listFiles((dir, name) -> name.contains(kind));
-            check(copies != null && copies.length == 1, "damaged original kept separately, ZIP restore=" + fromZip);
-            try (ZipFile zip = new ZipFile(copies[0]);
+            Set<File> copies = recoveryCopies(manual);
+            copies.removeAll(earlier);
+            check(copies.size() == 1, "damaged original kept separately, ZIP restore=" + fromZip);
+            try (ZipFile zip = new ZipFile(copies.iterator().next());
                  InputStream save = zip.getInputStream(zip.getEntry("sandbox/Documents/saveGame.bin2"));
                  InputStream preferences = zip.getInputStream(zip.getEntry("sandbox/Library/Preferences/game.plist"))) {
                 check(Arrays.equals(old, ZfIpa.readLimited(save, 1024)) && Arrays.equals(new byte[]{42}, ZfIpa.readLimited(preferences, 1024)),
@@ -262,16 +273,30 @@ public class ManagerTestRunner extends Instrumentation {
                 boolean onlyCurrency = changed.length == original.length;
                 for (int i = 0; i < changed.length; i++)
                     if ((i < 30 + 0x46 || i >= 30 + 0x4e) && changed[i] != original[i]) onlyCurrency = false;
-                check(onlyCurrency && ZfSave.read(original).gold == 200, "only currency bytes change, input remains untouched");
+                check(onlyCurrency && ZfSave.read(id, original).gold == 200, "only currency bytes change, input remains untouched");
                 check(store.backups(id).size() == 2, "currency creates full automatic backup");
                 byte[] corrupt = Arrays.copyOf(original, original.length); corrupt[0] = 13;
                 reject(() -> store.importSave(id, new ByteArrayInputStream(corrupt)), "unsupported save refused");
                 check(Arrays.equals(changed, ZfStorage.bytes(store.live(id))), "failed import preserves live bytes");
                 byte[] duplicated = Arrays.copyOf(original, original.length);
                 System.arraycopy(original, 30, duplicated, 200, 14);
-                reject(() -> ZfSave.read(duplicated), "ambiguous player block refused");
-                reject(() -> ZfSave.read(Arrays.copyOf(original, 50)), "truncated save refused");
-                reject(() -> ZfSave.edit(original, -1, 0), "negative currency refused");
+                reject(() -> ZfSave.read(id, duplicated), "ambiguous player block refused");
+                reject(() -> ZfSave.read(id, Arrays.copyOf(original, 50)), "truncated save refused");
+                reject(() -> ZfSave.edit(id, original, -1, 0), "negative currency refused");
+                byte[] shortSave = Arrays.copyOf(original, 30 + 0x5e);
+                reject(() -> store.importSave(id, new ByteArrayInputStream(shortSave)), "raw import rejects missing active quest count");
+                byte[] shortZip = backupZip(id, "sandbox/Documents/saveGame.bin2", Arrays.copyOf(original, 30 + 0x72));
+                reject(() -> store.restore(id, new ByteArrayInputStream(shortZip)), "ZIP restore rejects incomplete quest progress");
+                check(Arrays.equals(changed, ZfStorage.bytes(store.live(id))) && store.backups(id).size() == 2,
+                    "incomplete imports leave the live save and backup list intact");
+                check(ZfSave.read("com.playforge.ZombieFarmChinese", shortSave).gold == 200,
+                    "the ZFR quest layout is not imposed on other bundle IDs");
+                byte[] zeroQuests = Arrays.copyOf(shortSave, shortSave.length);
+                Arrays.fill(zeroQuests, 30 + 0x56, zeroQuests.length, (byte) 0);
+                check(ZfSave.read(id, zeroQuests).gold == 200, "zero completed and zero active quests fit exactly");
+                byte[] excessive = Arrays.copyOf(original, original.length);
+                ByteBuffer.wrap(excessive).order(ByteOrder.LITTLE_ENDIAN).putInt(30 + 0x56, Integer.MAX_VALUE);
+                reject(() -> ZfSave.read(id, excessive), "oversized completed quest count refused before arithmetic");
                 ZfStorage.atomic(profile, "changed profile".getBytes(StandardCharsets.UTF_8));
                 store.advance(id, 7200);
                 try (InputStream in = new FileInputStream(manual)) { store.restore(id, in); }
@@ -279,13 +304,35 @@ public class ManagerTestRunner extends Instrumentation {
                 check(new String(ZfStorage.bytes(profile), StandardCharsets.UTF_8).equals("original profile")
                     && new String(ZfStorage.bytes(preferences), StandardCharsets.UTF_8).equals("original preferences"), "backup restores profile and preferences");
                 check(store.settings(id).getLong("offset") == 3660, "backup restores cumulative clock");
-                for (boolean preferencesOnly : new boolean[]{false, true}) {
+                for (String prior : new String[]{"absent", "empty directories", "player files"}) {
                     ZfStorage.deleteTree(store.sandbox(id));
-                    if (preferencesOnly) ZfStorage.atomic(preferences, new byte[]{42});
+                    if (prior.equals("empty directories") && !preferences.getParentFile().mkdirs())
+                        throw new IOException("Cannot create empty sandbox fixture");
+                    if (prior.equals("player files")) {
+                        ZfStorage.atomic(preferences, new byte[]{42});
+                        ZfStorage.atomic(profile, new byte[]{65, 66});
+                        store.advance(id, 60);
+                    }
+                    Set<File> earlier = recoveryCopies(manual);
                     int countBefore = store.backups(id).size();
                     try (InputStream in = new FileInputStream(manual)) { store.restore(id, in); }
                     check(Arrays.equals(original, ZfStorage.bytes(store.live(id))) && store.backups(id).size() == countBefore,
-                        "first restore installs a full farm, preferencesOnly=" + preferencesOnly);
+                        "first restore installs a full farm, prior=" + prior);
+                    Set<File> copies = recoveryCopies(manual);
+                    copies.removeAll(earlier);
+                    if (prior.equals("player files")) {
+                        check(copies.size() == 1, "main-less sandbox with player files is retained separately");
+                        try (ZipFile zip = new ZipFile(copies.iterator().next());
+                             InputStream prefs = zip.getInputStream(zip.getEntry("sandbox/Library/Preferences/game.plist"));
+                             InputStream player = zip.getInputStream(zip.getEntry("sandbox/Documents/profile.txt"));
+                             InputStream meta = zip.getInputStream(zip.getEntry("zf_backup.json"))) {
+                            JSONObject saved = new JSONObject(new String(ZfIpa.readLimited(meta, 1024), StandardCharsets.UTF_8));
+                            check(zip.getEntry("sandbox/Documents/saveGame.bin2") == null && saved.getLong("offset") == 3720
+                                && Arrays.equals(ZfIpa.readLimited(prefs, 10), new byte[]{42})
+                                && Arrays.equals(ZfIpa.readLimited(player, 10), new byte[]{65, 66}),
+                                "recovery ZIP preserves original profile, preferences and clock");
+                        }
+                    } else check(copies.isEmpty(), "no recovery copy created for " + prior);
                 }
                 // Reject settings after the incoming sandbox is installed to exercise the rollback.
                 File configFile = new File(root, "zf_manager.json");
@@ -304,12 +351,12 @@ public class ManagerTestRunner extends Instrumentation {
                     ZfStorage.atomic(configFile, goodConfig);
                     try (InputStream in = new FileInputStream(manual)) { store.restore(id, in); }
                 }
-                byte[] traversal = hostileZip(id, "sandbox/../../escaped.bin");
+                byte[] traversal = backupZip(id, "sandbox/../../escaped.bin", original);
                 reject(() -> store.restore(id, new ByteArrayInputStream(traversal)), "zip traversal refused");
                 check(!new File(root, "escaped.bin").exists() && Arrays.equals(original, ZfStorage.bytes(store.live(id))), "hostile backup leaves live data untouched");
-                byte[] wrongId = hostileZip("com.playforge.ZombieFarmChinese", "sandbox/Documents/saveGame.bin2");
+                byte[] wrongId = backupZip("com.playforge.ZombieFarmChinese", "sandbox/Documents/saveGame.bin2", original);
                 reject(() -> store.restore(id, new ByteArrayInputStream(wrongId)), "cross-game backup refused");
-                byte[] imported = ZfSave.edit(original, 999, 888);
+                byte[] imported = ZfSave.edit(id, original, 999, 888);
                 store.importSave(id, new ByteArrayInputStream(imported));
                 check(Arrays.equals(imported, ZfStorage.bytes(store.live(id))), "raw save import exact readback");
                 checkDamagedFarmRecovery(store, id, manual);
